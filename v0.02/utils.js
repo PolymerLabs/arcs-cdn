@@ -67,6 +67,7 @@ let utils = {
     let generations = [];
     let suggestions = await planner.suggest(5000, generations);
     suggestions.forEach((suggestion, i) => ui.add(suggestion, i));
+    document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
   }
 };
 
