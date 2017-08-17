@@ -1,0 +1,94 @@
+<!-- Arcs engine -->
+<!--<script src="https://sjmiles.github.io/arcs-cdn/ArcsLib.js"></script>-->
+<script src="../ArcsLib.js"></script>
+
+<!-- demo helpers -->
+<script src="data-context.js"></script>
+<script src="utils.js"></script>
+<script src="x-toast.js"></script>
+<script src="suggestions-element.js"></script>
+
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    background-image: url(assets/linen.png);
+  }
+  demo-frame {
+    flex: 1;
+    max-width: 414px;
+    max-height: 736px;
+    background-color: white;
+  }
+  demo-frame {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  #particle-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    margin-bottom: 25px;
+    overflow: auto;
+    overflow-x: hidden;
+  }
+  #particle-container > * {
+    flex: 1;
+  }
+</style>
+
+<template>
+  <demo-frame>
+    <div id="particle-container"></div>
+    <suggestions-element></suggestions-element>
+  </demo-frame>
+</template>
+
+<script>
+  let module = document.currentScript.ownerDocument;
+  document.body.appendChild(document.importNode(module.querySelector('template').content, true));
+  //
+  let go = ({db, recipes, urls}) => {
+    //
+    // 1. Setup URL mapping
+    //
+    // default URL map
+    let root = 'https://sjmiles.github.io/arcs-cdn';
+    let map = utils.createUrlMap(root);
+    // we have an additional artifact that we need to load dynamically, which should be
+    // on the same server as this module.
+    // find the path automagically so we don't have to configure it twice
+    let playgroundRoot = module.URL.split('/').slice(0, -2).join('/');
+    map['worker-entry-cdn.js'] = `${playgroundRoot}/worker-entry-cdn.js`;
+    //
+    // customize
+    Object.assign(map, window.urls);
+    //
+    // Step 2: create system objects
+    //
+    // rendering system
+    let slotComposer = new Arcs.SlotComposer(window['particle-container']);
+    // an Arc!
+    let arc = Arcs.createArc({id: 'demo', urlMap: map, slotComposer});
+    //
+    // Step 3: setup your app
+    //
+    // setup the database
+    prepareDataContext(window.db, arc);
+    // suggestion engine
+    let suggestinator = new Arcs.Suggestinator();
+    // configure suggestions UI
+    let suggestions = document.querySelector('suggestions-element');
+    suggestions.arc = arc;
+    suggestions.callback = () => {};
+    // feed suggestions UI
+    utils.suggest(arc, suggestinator, suggestions, window.recipes);
+  };
+  go(window);
+</script>
