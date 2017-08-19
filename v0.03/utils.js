@@ -37,6 +37,7 @@ let utils = {
       '/': '/',
       './': './',
       'assets': `${cdnRoot}/assets`,
+      '/$cdn': `${cdnRoot}`,
       // TODO(sjmiles): map must always contain (explicitly, no prefixing) a mapping for `worker-entry-cdn.js`
       'worker-entry-cdn.js': `${cdnRoot}/worker-entry-cdn.js`
     };
