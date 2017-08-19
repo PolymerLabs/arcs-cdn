@@ -1,12 +1,12 @@
 // ad-hoc (for now) utilities
 let utils = {
-  createArc: ({id, urlMap, slotComposer}) => {
+  createArc: ({id, urlMap, slotComposer, context}) => {
     // worker paths are relative to worker location, remap urls from there to here
     let remap = Arcs.utils._expandUrls(urlMap);
     // Configure worker factory
     let pecFactory = Arcs.utils._createPecWorker.bind(null, urlMap[`worker-entry-cdn.js`], remap);
     // create an arc
-    return new Arcs.Arc({id, pecFactory, slotComposer});
+    return new Arcs.Arc({id, pecFactory, slotComposer, context});
   },
   _expandUrls: urlMap => {
     let remap = {};
@@ -62,10 +62,10 @@ let utils = {
       }
     });
   },
-  suggest: (arc, ui, recipes) => {
+  suggest: (arc, ui) => {
     let makeSuggestions = async () => {
       let planner = new Arcs.Planner();
-      planner.init(arc, {arc, recipes});
+      planner.init(arc);
       let generations = [];
       ui.add(await planner.suggest(5000, generations));
       document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
