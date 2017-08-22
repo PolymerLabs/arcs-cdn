@@ -11,12 +11,14 @@ Build Process
 
 	[path]/arcs-cdn/> **npm install**
 
-3. Check target, build artifacts  
-  a. check **gulpfile.js**, build target (version number) is set there  
-  b. [path]/arcs-cdn/> **gulp**
+3. Check **gulpfile.js**, ensure correct build target (version number) is set there.
 
-4. Built artifacts should appear in [path]/arcs-cdn/**[version]**/ (ArcsLib.js [+.map], and worker-entry-cdn.js [+.map]).
+4. Build artifacts  
 
-5. Update playground/ or other files as needed.
+	[path]/arcs-cdn/> **gulp**
 
-6. Commit/push the arcs-cdn repo.
+5. Built artifacts should appear in [path]/arcs-cdn/**[version]**/.
+
+6. Update playground/ or other files as needed.
+
+7. Commit/push the arcs-cdn repo.
