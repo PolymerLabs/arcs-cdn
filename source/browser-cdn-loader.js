@@ -35,11 +35,8 @@ module.exports = class BrowserLoader extends Loader {
     //console.log(`browser-cdn-loader: resolve(${path}) = ${url}`);
     return url;
   }
-  loadFile(name) {
-    let xhr = new XMLHttpRequest();
-    xhr.open('GET', this._resolve(name), false);
-    xhr.send();
-    return xhr.responseText;
+  loadResource(name) {
+    return this._loadURL(this._resolve(name));
   }
   requireParticle(fileName) {
     let path = this._resolve(fileName);

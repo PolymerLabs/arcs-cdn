@@ -37,31 +37,10 @@ let utils = {
       '/': '/',
       './': './',
       'assets': `${cdnRoot}/assets`,
-      '/$cdn': `${cdnRoot}`,
+      'https://$cdn': `${cdnRoot}`,
       // TODO(sjmiles): map must always contain (explicitly, no prefixing) a mapping for `worker-entry-cdn.js`
       'worker-entry-cdn.js': `${cdnRoot}/worker-entry-cdn.js`
     };
-  },
-  prepareDataContext: (db, arc, manifest) => {
-    if (!db) return;
-    let highlight = 'padding: 3px 4px; background: #444; color: #bada55; font-weight: bold;';
-    // create views
-    // TODO(sjmiles): empirically, views must exist before committing Entities (?)
-    db.views && db.views.forEach(info => {
-      let entity = manifest.findSchemaByName(info.type).entityClass();
-      let view = arc.createView(entity.type.viewOf(), info.name);
-      console.log(`created View: %c${info.name||'anon'}::${info.type}`, `${highlight} color: #ff8080;`);
-      // commit entities
-      if (info.model) {
-        info.model.forEach((r, i) => {
-          let instance = new entity(r);
-          // TODO(sjmiles): this is not the right way to establish an id
-          instance.id = 1000 + i;
-          view.store(instance);
-        });
-        console.log(`committed Entities: %c${info.model.length}`, `${highlight} color: #ffff80;`);
-      }
-    });
   },
   suggest: (arc, ui) => {
     let makeSuggestions = async () => {
@@ -76,6 +55,13 @@ let utils = {
       makeSuggestions();
     });
     makeSuggestions();
+  },
+  collapseRecipes: manifest => {
+    let collapse = (recipes, manifest) => {
+      recipes = recipes.concat(manifest._recipes);
+      return manifest._imports.reduce((recipes, m) => collapse(recipes, m), recipes);
+    }
+    manifest._recipes = collapse([], manifest);
   }
 };
 

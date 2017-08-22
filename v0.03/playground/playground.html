@@ -64,12 +64,13 @@
     let loader = new Arcs.BrowserLoader(urlMap);
     // load manifest
     let manifest = await Arcs.Manifest.load(manifestPath, loader);
+    // TODO(sjmiles): hack in ability to utilize imported recipes
+    utils.collapseRecipes(manifest);
+    console.log(manifest);
     // renderer
     let slotComposer = new Arcs.SlotComposer(container, /* affordance */ "dom");
     // an Arc!
     let arc = Arcs.utils.createArc({id: 'demo', urlMap, slotComposer, context: manifest});
-    // setup the database
-    Arcs.utils.prepareDataContext(db, arc, manifest);
     // connect suggestions UI with a planner
     Arcs.utils.suggest(arc, document.querySelector('suggestions-element'));
   };
