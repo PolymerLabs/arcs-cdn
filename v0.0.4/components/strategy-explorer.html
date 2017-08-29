@@ -1,0 +1,25 @@
+<link rel="import" href="strategy-explorer/strategy-explorer.html"></link>
+
+<style>
+  strategy-explorer {
+    display: none;
+    background-color: white;
+    width: 100%;
+  }
+</style>
+
+<script>
+  let explorer = document.body.appendChild(document.createElement('strategy-explorer'));
+  //
+  document.addEventListener('generations', e => {
+    explorer.results = e.detail.map(explorer.preparePopulation);
+  });
+  //
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey && (e.key == "e")) {
+      e.preventDefault();
+      let explorerVisible = explorer.style.display == 'block';
+      explorer.style.display = !explorerVisible ? 'block' : 'none';
+    }
+  });
+</script>
