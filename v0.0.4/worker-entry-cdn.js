@@ -7109,11 +7109,38 @@ class Schema {
 
   entityClass() {
     let schema = this;
-    const name = this.name;
+    const className = this.name;
+    var properties = Object.keys(this.normative).concat(Object.keys(this.optional));
+    var classJunk = ['toJSON', 'prototype', 'toString'];
+
     var clazz = class extends Entity {
       constructor(data) {
+        var p = new Proxy(data, {
+          get: (target, name) => {
+            if (classJunk.includes(name))
+              return undefined;
+            if (name.constructor == Symbol)
+              return undefined;
+            if (!properties.includes(name))
+              throw new Error(`Can't access field ${name} not in schema ${className}`);
+            return target[name];
+          },
+          set: (target, name, value) => {
+            if (!properties.includes(name)) {
+              throw new Error(`Can't write field ${name} not in schema ${className}`);
+            }
+            target[name] = value;
+            return true;
+          }
+        });
         super();
-        this.rawData = data;
+        this.rawData = p;
+      }
+
+      dataClone() {
+        var clone = {};
+        properties.forEach(prop => clone[prop] = this.rawData[prop]);
+        return clone;
       }
 
       static get key() {
@@ -7123,6 +7150,7 @@ class Schema {
         };
       }
     }
+
     Object.defineProperty(clazz, 'type', {value: this.type});
     Object.defineProperty(clazz, 'name', {value: this.name});
     for (let property in this.normative) {
@@ -22794,7 +22822,7 @@ class Viewlet {
     if (!entity.isIdentified())
       entity.identify(this.generateID());
     let id = entity[identifier];
-    let rawData = cloneData(entity.toLiteral());
+    let rawData = entity.dataClone();
     return {
       id,
       rawData
@@ -22849,8 +22877,8 @@ class Variable extends Viewlet {
     super(variable, canRead, canWrite);
   }
   async get() {
-      if (!this.canRead)
-        throw new Error("View not readable");
+    if (!this.canRead)
+      throw new Error("View not readable");
     var result = await this._view.get();
     var data = result == null ? undefined : this._restore(result);
     return data;

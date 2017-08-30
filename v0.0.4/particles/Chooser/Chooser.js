@@ -10,7 +10,7 @@
 
 "use strict";
 
-defineParticle(({DomParticle}) => {
+defineParticle(({DomParticle, resolver}) => {
 
   const host = `[chooser]`;
 
@@ -143,11 +143,11 @@ ${productStyles}
     }
     _render(props, state) {
       return {
-        items: state.values.map(({rawData}, index) => {
-          return Object.assign({
-            index
-          }, rawData);
-        })
+        items: state.values.map(({rawData}, index) =>
+          Object.assign(Object.assign({}, rawData), {
+            index,
+            image: resolver ? resolver(rawData.image) : rawData.image
+          }))
       };
     }
     _onChooseValue(e, state) {
