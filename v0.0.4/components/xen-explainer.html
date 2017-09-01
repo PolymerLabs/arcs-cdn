@@ -42,6 +42,7 @@
         model values to property names that are all lowercase.
       -->
       <li hidden="{{hide}}">Probably can't see me.</li>
+      <li class="{{class}}">Inverted via CSS class.</li>
 
       <!--
         Add a `$` and the model value will be mapped to the element *attribute*
@@ -51,16 +52,18 @@
       <li class$="{{class}}">Inverted via CSS class.</li>
 
       <!--
-        Style objects in the model can be applied to elements using the `style%` pseudo-attribute.
-        You can use both `style` and `style%` on an element. `style%` wins all ties.
+        Style property can be set to either an Object containing JavaScript style values or a
+        CSS String.
       -->
-      <li style%="{{style}}" style="border-bottom: 1px dotted silver;">I'm stylish</li>
-
+      <li style="{{objectStyle}}">I'm stylish</li>
+      <li style="{{stringStyle}}">I'm stylish</li>
       <!--
-        You can also use `style$` to bind a string value to the style attribute
-        (as above, it's not special).
+        Setting an Object adds styles to the node.
+        Setting a String replaces styles on the node.
+        Use `style%` if there is a conflict with static style attribute.
       -->
-      <li style$="{{styles}}">I'm also stylish</li>
+      <li style="border: 4px dotted red;" style%="{{objectStyle}}">I'm stylish, and red.</li>
+      <li style="border: 4px dotted red;" style%="{{stringStyle}}">I'm also stylish, but not red.</li>
 
       <!--
         Events can be mapped using `on-<eventname>` syntax.
@@ -69,10 +72,14 @@
       -->
       <li><button on-click="onClick">Events!</button>
 
-      <li>More points:
+      <li>
+        More points:
+        <!--
+          You can use a mustache expression to iterate a sub-template by setting an a template reference and an array.
+          See below.
+        -->
         <ul>{{more_li}}</ul>
       </li>
-
     </ul>
   </template>
 
@@ -94,8 +101,8 @@
         mustache: 'Hello World',
         hide: true,
         class: 'inverted',
-        style: {fontStyle: 'italic'}, // style-object syntax (not style-sheet syntax [`font-style`])
-        styles: 'font-style: italic;'
+        objectStyle: {fontStyle: 'italic'}, // style-object syntax (not style-sheet syntax [`font-style`])
+        stringStyle: 'font-style: italic;'
       })
       // append the stamped subtree to an existing node
       .appendTo(container)
@@ -111,10 +118,7 @@
     ];
     // ... we can use a sub-template to render each record
     agent.set({
-      more_li: {
-        template: sub_template,
-        models: points
-      }
+      more_li: {models: points, template: sub_template}
     });
   </script>
 

@@ -220,8 +220,12 @@ let set = function(notes, map, scope) {
 let _set = function(node, property, value) {
   let modifier = property.slice(-1);
   //console.log('_set: %s, %s, '%s'', node.localName || '(text)', property, value);
-  if (property === 'style%') {
-    Object.assign(node.style, value);
+  if (property === 'style%' || property === 'style') {
+    if (typeof value === 'string') {
+      node.style.cssText = value;
+    } else {
+      Object.assign(node.style, value);
+    }
   } else if (modifier == '$') {
     let n = property.slice(0, -1);
     if (typeof value === 'boolean') {
@@ -230,8 +234,10 @@ let _set = function(node, property, value) {
       node.setAttribute(n, value);
     }
   } else if (property === 'textContent') {
-    if (!_setSubTemplate(node, value)) {
-      node.innerHTML = (value || '');
+    if (value && (value.$template || value.template)) {
+      _setSubTemplate(node, value);
+    } else {
+      node.textContent = (value || '');
     }
   } else if (property === 'unsafe-html') {
     node.innerHTML = value || ''
@@ -244,22 +250,18 @@ let _setSubTemplate = function(node, value) {
   // TODO(sjmiles): sub-template iteration ability
   // specially implemented to support arcs (serialization boundary)
   // Aim to re-implement as a plugin.
-  if (value && (value.$template || value.template)) {
-    let template = value.template;
-    if (!template) {
-      let name = value && value.$template;
-      let container = node.getRootNode(); //node.parentElement
-      template = container.querySelector(`template[${value.$template}]`);
-    }
-    node.textContent = '';
-    if (template) {
-      for (let m of value.models) {
-        stamp(template).set(m).appendTo(node);
-      }
-    }
-    return true;
+  let template = value.template;
+  if (!template) {
+    let container = node.getRootNode(); //node.parentElement
+    template = container.querySelector(`template[${value.$template}]`);
   }
-}
+  node.textContent = '';
+  if (template) {
+    for (let m of value.models) {
+      stamp(template).set(m).appendTo(node);
+    }
+  }
+};
 
 let setBoolAttribute = function(node, attr, state) {
   node[
