@@ -185,10 +185,18 @@ let mapEvents = function(notes, map, controller) {
     let events = notes[key] && notes[key].events;
     if (node && events) {
       for (let name in events) {
-        controller(node, name, events[name]);
+        listen(node, name, controller, events[name]);
       }
     }
   }
+};
+
+let listen = function(node, eventName, controller, handlerName) {
+  node.addEventListener(eventName, function(e) {
+    if (controller[handlerName]) {
+      return controller[handlerName](e, e.detail);
+    }
+  });
 };
 
 let set = function(notes, map, scope) {
@@ -200,7 +208,10 @@ let set = function(notes, map, scope) {
       // now get your regularly scheduled bindings
       let mustaches = notes[key].mustaches;
       for (let name in mustaches) {
-        _set(node, name, scope[mustaches[name]]);
+        let property = mustaches[name];
+        if (property in scope) {
+          _set(node, name, scope[property]);
+        }
       }
     }
   }
@@ -219,23 +230,36 @@ let _set = function(node, property, value) {
       node.setAttribute(n, value);
     }
   } else if (property === 'textContent') {
-    let name = value && value.$template;
-    if (name) {
-      node.textContent = '';
-      let container = node.getRootNode(); //node.parentElement
-      let template = container.querySelector(`template[${name}]`);
-      if (template) {
-        for (let m of value.models) {
-          stamp(template).set(m).appendTo(node);
-        }
-      }
-    } else {
+    if (!_setSubTemplate(node, value)) {
       node.innerHTML = (value || '');
     }
+  } else if (property === 'unsafe-html') {
+    node.innerHTML = value || ''
   } else {
-    node[property] = (property === 'textContent') ? (value || '') : value;
+    node[property] = value;
   }
 };
+
+let _setSubTemplate = function(node, value) {
+  // TODO(sjmiles): sub-template iteration ability
+  // specially implemented to support arcs (serialization boundary)
+  // Aim to re-implement as a plugin.
+  if (value && (value.$template || value.template)) {
+    let template = value.template;
+    if (!template) {
+      let name = value && value.$template;
+      let container = node.getRootNode(); //node.parentElement
+      template = container.querySelector(`template[${value.$template}]`);
+    }
+    node.textContent = '';
+    if (template) {
+      for (let m of value.models) {
+        stamp(template).set(m).appendTo(node);
+      }
+    }
+    return true;
+  }
+}
 
 let setBoolAttribute = function(node, attr, state) {
   node[
@@ -257,15 +281,17 @@ let stamp = function(template, opts) {
   // map DOM to keys
   let map = locateNodes(root, notes.locator);
   // return dom manager
-  return {
+  let dom = {
     root: root,
     notes: notes,
     map: map,
+    dispatch(handler, e) {
+    },
     set: function(scope) {
       set(notes, map, scope);
       return this;
     },
-    mapEvents: function(controller) {
+    events: function(controller) {
       if (controller) {
         mapEvents(notes, map, controller);
       }
@@ -283,6 +309,10 @@ let stamp = function(template, opts) {
       return this;
     }
   };
+  mapEvents(notes, map, (node, event, handler) => {
+    node.addEventListener(event, e => dom.dispatch(handler, e));
+  });
+  return dom;
 };
 
 window.Xen = {
