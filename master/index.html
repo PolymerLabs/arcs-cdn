@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+
+  <title>ArcsLib API Docs</title>
+
+  <style>
+    html, body {
+      font-family: sans-serif;
+      margin: 0;
+    }
+    [class] {
+      margin: 0 0 0 1em;
+    }
+    [class] > [name] {
+      background-color: #dcedc8;
+      margin-left: -1rem;
+      padding: 1rem;
+      font-size: 1.3rem;
+      /*
+      border-bottom: 1px dotted silver;
+      */
+    }
+    [class] > [desc] {
+      margin: 0.6em 0 1.2em;
+    }
+    [method] > [name] {
+      font-weight: bold;
+    }
+    [method] > [desc] {
+      margin: 0.4em 0 1em;
+    }
+    [end] {
+      /*
+      border-bottom: 2px dashed silver;
+      */
+      margin-bottom: 2em;
+    }
+    [pre] {
+      white-space: pre-wrap;
+    }
+  </style>
+
+  <link rel="import" href="components/doc-scraper.html">
+
+</head>
+<body>
+
+  <div docs></div>
+
+  <script>
+    let doc = document.querySelector(`[docs]`);
+
+    let strcmp = (a,b)=>(a<b)?-1:((a>b)?1:0);
+
+    let scrape = urls => {
+      return new DocScraper().addUrls(urls);
+    };
+
+    let renderDocs = docs => {
+      let html = [];
+      if (docs.classes) {
+        docs.classes.sort((a,b) => strcmp(a.name, b.name));
+        docs.classes.forEach(c => {
+          html.push(`
+            <div class>
+              <div name>${c.name}</div>
+              <div desc>${c.description}</div>
+          `.trim());
+          c.methods && c.methods.forEach(m => {
+            html.push(`
+              <div method>
+                <div name>${m.name}</div>
+                <div desc>${m.description}</div>
+              </div>
+            `.trim());
+          });
+          html.push(`</div>`);
+          html.push(`<div end></div>`)
+        });
+      }
+      doc.innerHTML = html.join(` `);
+    }
+
+    let root = `../../arcs/runtime`;
+    scrape([
+      `${root}/viewlet.js`,
+      `${root}/inner-PEC.js`,
+      `${root}/particle.js`,
+      `${root}/dom-particle.js`
+    ]).then(classes => {
+      return fetch(`${root}/manifest.md`)
+        .then(response => response.text())
+        .then(text => {
+          classes.push({name: 'Manifest', description: `<div pre>${text}</div>`});
+          return classes;
+        })
+        ;
+    }).then(classes => {
+      console.log(classes);
+      renderDocs({classes});
+    });
+  </script>
+
+</body>
+</html>

@@ -9,7 +9,7 @@
 const gulp = require('gulp');
 
 const paths = {
-  build: './v0.0.4',
+  build: './master/lib',
 };
 
 const sources = {
