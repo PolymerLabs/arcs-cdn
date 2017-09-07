@@ -1,3 +1,12 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
 <!doctype html>
 <html>
 <head>
@@ -8,11 +17,21 @@
     html, body {
       font-family: sans-serif;
       margin: 0;
+      display: flex;
     }
-    [class] {
+    [toc] {
+      /*flex: 1;
+      max-*/width: 128px;
+      padding: 16px;
+    }
+    [docs] {
+      flex: 1;
+      padding-top: 16px;
+    }
+    [dclass] {
       margin: 0 0 0 1em;
     }
-    [class] > [name] {
+    [dclass] > [name] {
       background-color: #dcedc8;
       margin-left: -1rem;
       padding: 1rem;
@@ -21,7 +40,7 @@
       border-bottom: 1px dotted silver;
       */
     }
-    [class] > [desc] {
+    [dclass] > [desc] {
       margin: 0.6em 0 1.2em;
     }
     [method] > [name] {
@@ -39,16 +58,35 @@
     [pre] {
       white-space: pre-wrap;
     }
+    pre {
+      padding: 16px;
+      background-color: #f6f8fa;
+    }
+    code {
+      /*display: block;*/
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      background-color: #f6f8fa;
+    }
   </style>
 
   <link rel="import" href="components/doc-scraper.html">
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/remarkable/1.7.1/remarkable.js"></script>
+  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.3.6/marked.min.js"></script>-->
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+  <script src="docUrls.js"></script>
+
 </head>
 <body>
 
+  <div toc></div>
   <div docs></div>
 
   <script>
+    let toc = document.querySelector(`[toc]`);
     let doc = document.querySelector(`[docs]`);
 
     let strcmp = (a,b)=>(a<b)?-1:((a>b)?1:0);
@@ -57,46 +95,80 @@
       return new DocScraper().addUrls(urls);
     };
 
+    let renderTopic = topic => {
+      let html = [];
+      html.push(`
+        <div dclass>
+          <div name>${topic.name}</div>
+          <div desc>${topic.description}</div>
+      `.trim());
+      topic.methods && topic.methods.forEach(m => {
+        html.push(`
+          <div method>
+            <div name>${m.name}</div>
+            <div desc>${m.description}</div>
+          </div>
+        `.trim());
+      });
+      html.push(`</div>`);
+      html.push(`<div end></div>`)
+      return html.join('');
+    }
+
     let renderDocs = docs => {
       let html = [];
       if (docs.classes) {
         docs.classes.sort((a,b) => strcmp(a.name, b.name));
-        docs.classes.forEach(c => {
-          html.push(`
-            <div class>
-              <div name>${c.name}</div>
-              <div desc>${c.description}</div>
-          `.trim());
-          c.methods && c.methods.forEach(m => {
-            html.push(`
-              <div method>
-                <div name>${m.name}</div>
-                <div desc>${m.description}</div>
-              </div>
-            `.trim());
-          });
-          html.push(`</div>`);
-          html.push(`<div end></div>`)
-        });
+        html = docs.classes.map(renderTopic);
       }
       doc.innerHTML = html.join(` `);
     }
 
-    let root = `./lib`;
-    scrape([
-      `${root}/ArcsLib.js`
-    ]).then(classes => {
-      return fetch(`${root}/manifest.md`)
+    let renderToc = data => {
+      let topics = data.classes.map(c => c.name);
+      let html = topics.map(t => `<div><a href="#${t}" title="${t}">${t}</a></div>`);
+      toc.innerHTML = html.join('');
+    };
+
+    var md = new Remarkable({
+      highlight: function (str, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(lang, str).value;
+          } catch (err) {}
+        }
+        //try {
+        //  return hljs.highlightAuto(str).value;
+        //} catch (err) {}
+        return ''; // use external default escaping
+      }
+    });
+
+    let corpus;
+
+    scrape(window.docUrls).then(classes => {
+      return fetch(`../../arcs/runtime/manifest.md`)
         .then(response => response.text())
         .then(text => {
-          classes.push({name: 'Manifest', description: `<div pre>${text}</div>`});
+          //classes.push({name: 'Manifest', description: `<div pre>${text}</div>`});
+          classes.push({name: 'Manifest', description: md.render(text)});
+          //classes.push({name: 'Manifest', description: marked(text)});
           return classes;
         })
         ;
     }).then(classes => {
       console.log(classes);
-      renderDocs({classes});
+      corpus = {classes};
+      renderDocs(corpus);
+      renderToc(corpus);
     });
+
+    window.onhashchange = e => {
+      let name = location.hash.slice(1);
+      let topic = corpus.classes.find(c => c.name === name);
+      doc.innerHTML = topic ? renderTopic(topic) : 'n/a';
+
+    };
   </script>
 
 </body>
