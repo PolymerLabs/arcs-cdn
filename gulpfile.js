@@ -15,7 +15,8 @@ const paths = {
 const sources = {
   cdn: [
     'worker-entry-cdn.js',
-    'ArcsLib.js'
+    'ArcsLib.js',
+    'Tracelib.js'
   ],
 };
 
