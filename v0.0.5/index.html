@@ -147,7 +147,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     let corpus;
 
     scrape(window.docUrls).then(classes => {
-      return fetch(`../../arcs/runtime/manifest.md`)
+      return fetch(`lib/manifest.md`)
         .then(response => response.text())
         .then(text => {
           //classes.push({name: 'Manifest', description: `<div pre>${text}</div>`});
