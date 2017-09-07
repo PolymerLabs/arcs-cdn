@@ -38,14 +38,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     max-width: 414px;
     max-height: 736px;
     background-color: white;
-  }
-  demo-frame {
     display: flex;
     flex-direction: column;
     position: relative;
     overflow: hidden;
   }
+  [header] {
+    position: fixed;
+    display: flex;
+    align-items: center;
+    width: 414px;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 8px;
+    background-color: whitesmoke;
+  }
   #particle-container {
+    padding-top: 32px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -54,15 +63,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     overflow: auto;
     overflow-x: hidden;
   }
-  #particle-container > * {
-    flex: 1;
-    overflow-x: hidden;
-    overflow-y: auto;
-  }
 </style>
 
 <template>
   <demo-frame>
+    <div header>
+      <i class="material-icons">menu</i>
+    </div>
     <div id="particle-container"></div>
     <suggestions-element></suggestions-element>
   </demo-frame>
@@ -71,7 +78,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script>
   let module = document.currentScript.ownerDocument;
   document.body.appendChild(document.importNode(module.querySelector('template').content, true));
-  //
+
   let app = async function(urlMap, metaUrls, manifestPath, container, db) {
     // create a system loader
     // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
@@ -93,8 +100,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     // connect suggestions UI with a planner
     Arcs.utils.suggest(arc, document.querySelector('suggestions-element'));
   };
-  //
-  let go = async ({db, urls}) => {
+
+  let go = async ({db, urls, manifest}) => {
     // find the path automagically
     let root = module.URL.split('/').slice(0, -2).join('/');
     // create default URL map
@@ -103,8 +110,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     // on the same server as this module.
     urlMap['worker-entry-cdn.js'] = `${root}/lib/worker-entry-cdn.js`;
     // start application
-    app(urlMap, urls, './arc.manifest', window['particle-container'], db);
+    app(urlMap, urls, manifest || './arc.manifest', window['particle-container'], db);
   };
-  //
+
   go(window);
 </script>
