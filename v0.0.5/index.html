@@ -159,15 +159,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }).then(classes => {
       console.log(classes);
       corpus = {classes};
-      renderDocs(corpus);
+      //renderDocs(corpus);
       renderToc(corpus);
+      updateTopic();
     });
 
-    window.onhashchange = e => {
-      let name = location.hash.slice(1);
+    let updateTopic = () => {
+      let name = location.hash.slice(1) || `Manifest`;
       let topic = corpus.classes.find(c => c.name === name);
       doc.innerHTML = topic ? renderTopic(topic) : 'n/a';
-
+    }
+    window.onhashchange = e => {
+      updateTopic();
     };
   </script>
 
