@@ -1,3 +1,12 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
 <script>
   class DocScraper {
     addUrls(urls) {
@@ -89,7 +98,7 @@
         });
       });
       if (classes.length === 0) {
-        classes.push({name: this.url.split('/').pop(), description: '**Undocumented**'});
+        classes.push({name: "no docs", description: '**Undocumented**'});
       }
       return classes;
     }
