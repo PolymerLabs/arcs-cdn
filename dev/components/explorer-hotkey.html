@@ -8,7 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 
-<link rel="import" href="strategy-explorer/strategy-explorer.html"></link>
+<!--<link rel="import" href="strategy-explorer/strategy-explorer.html"></link>-->
+<link rel="import" href="../../../arcs/strategy-explorer/strategy-explorer.html">
 
 <style>
   strategy-explorer {
@@ -19,20 +20,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 </style>
 
 <script>
+(function() {
+  
   let explorer = document.body.appendChild(document.createElement('strategy-explorer'));
-  //
-  document.addEventListener('generations', e => {
-    //explorer.reset();
-    setTimeout(
-      () => explorer.results = e.detail.map(pop => explorer.preparePopulation(pop))
-    , 0);
-  });
-  //
+
   window.addEventListener('keydown', e => {
     if (e.ctrlKey && (e.key == "e")) {
       e.preventDefault();
-      let explorerVisible = explorer.style.display == 'block';
-      explorer.style.display = !explorerVisible ? 'block' : 'none';
+      explorer.style.display = explorer.style.display == 'block' ? 'none' : 'block';
     }
   });
+
+  let populate = (population) => explorer.results = population.map(pop => explorer.preparePopulation(pop));
+
+  document.addEventListener('generations', e => {
+    explorer.reset();
+    setTimeout(()=>populate(e.detail), 0);
+  });
+
+})();
 </script>

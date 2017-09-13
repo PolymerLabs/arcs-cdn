@@ -14,7 +14,7 @@ defineParticle(({DomParticle}) => {
 
   let template = `
     <div hidden="{{notAlsoOn}}">
-      <span>Also on:</span> <span>{{choices.description}}</span>
+      <span>Also on:</span> <span unsafe-html="{{choices.description}}"></span>
     </div>
     `.trim();
 

@@ -8,9 +8,9 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
- (function() {
+(function() {
 
-  let template = Object.assign(document.createElement('template'), {innerHTML: `
+let template = Object.assign(document.createElement('template'), {innerHTML: `
 
 <style>
   :host {
@@ -20,7 +20,7 @@
     right: 0;
     bottom: 0;
     border: 1px solid silver;
-    transform: translate3d(0, 100%, 0) translateY(-25px);
+    transform: translate3d(0, 100%, 0) translateY(-33px);
     transition: transform 80ms ease-in;
   }
   :host([open]) {
@@ -28,15 +28,15 @@
   }
   [header] {
     background-color: white;
-    height: 24px;
-    line-height: 24px;
+    height: 32px;
+    line-height: 32px;
     text-align: center;
     font-size: 0.8em;
     border-bottom: 1px solid #dddddd;
     box-sizing: border-box;
   }
 </style>
-<div header><slot name="header"></slot></div>
+<div header><slot name="toast-header"></slot></div>
 <slot></slot>
 
 `.trim()});

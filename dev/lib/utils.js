@@ -42,26 +42,19 @@ let utils = {
       'worker-entry-cdn.js': `${cdnRoot}/worker-entry-cdn.js`
     };
   },
-  suggest: (arc, ui) => {
-    let makeSuggestions = async () => {
-      let planner = new Arcs.Planner();
-      planner.init(arc);
-      let generations = [];
-      ui.add(await planner.suggest(5000, generations));
-      document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
-    };
-    ui.addEventListener('plan-selected', e => {
-      arc.instantiate(e.detail);
-      makeSuggestions();
-    });
-    makeSuggestions();
-  },
   collapseRecipes: manifest => {
     let collapse = (recipes, manifest) => {
       recipes = recipes.concat(manifest._recipes);
       return manifest._imports.reduce((recipes, m) => collapse(recipes, m), recipes);
     };
     manifest._recipes = collapse([], manifest);
+  },
+  async makePlans(arc, timeout) {
+    let generations = [];
+    let planner = new Arcs.Planner();
+    planner.init(arc);
+    let plans = await planner.suggest(timeout || 5000, generations);
+    return {plans, generations};
   }
 };
 

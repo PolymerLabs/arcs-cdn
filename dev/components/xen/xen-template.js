@@ -155,7 +155,7 @@ let annotateEvent = function(node, key, notes, name, value) {
     if (value.slice(0, 2) === '{{') {
       value = value.slice(2, -2);
       console.warn(
-        `Xen: event handler for '{$name}' expressed as a mustache, which is not supported. Using literal value '${value}' instead.`
+        `Xen: event handler for '${name}' expressed as a mustache, which is not supported. Using literal value '${value}' instead.`
       );
     }
     takeNote(notes, key, 'events', name.slice(3), value);
@@ -240,7 +240,7 @@ let _set = function(node, property, value) {
       node.textContent = (value || '');
     }
   } else if (property === 'unsafe-html') {
-    node.innerHTML = value || ''
+    node.innerHTML = value || '';
   } else {
     node[property] = value;
   }
@@ -287,8 +287,14 @@ let stamp = function(template, opts) {
     root: root,
     notes: notes,
     map: map,
-    dispatch(handler, e) {
+    $(slctr) {
+      return this.root.querySelector(slctr);
     },
+    /*
+    dispatch(handler, e) {
+      // abstract
+    },
+    */
     set: function(scope) {
       set(notes, map, scope);
       return this;
@@ -311,9 +317,11 @@ let stamp = function(template, opts) {
       return this;
     }
   };
+  /*
   mapEvents(notes, map, (node, event, handler) => {
     node.addEventListener(event, e => dom.dispatch(handler, e));
   });
+  */
   return dom;
 };
 

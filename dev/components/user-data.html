@@ -1,0 +1,33 @@
+<template>
+  <style>
+    user-data {
+      display: flex;
+      flex: 1;
+    }
+    textarea {
+      flex: 1;
+      width: 100%;
+      border: none;
+      outline: none;
+    }
+  </style>
+  <textarea>{{json}}</textarea>
+</template>
+
+<script>
+  class UserData extends HTMLElement {
+    connectedCallback() {
+      if (!this._mounted) {
+        this._mounted = true;
+        this.json = {
+          name: 'Scott',
+          manifest: './arcs.manifest'
+        };
+        this._dom = Xen.stamp(UserData.module.querySelector('template')).events(this).appendTo(this);
+        this._dom.set({json: JSON.stringify(this.json, null, '  ')})
+      }
+    }
+  }
+  UserData.module = document.currentScript.ownerDocument;
+  customElements.define('user-data', UserData);
+</script>

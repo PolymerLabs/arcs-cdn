@@ -4132,6 +4132,10 @@ const Schema = __webpack_require__(28);
 
 const DEBUGGING = false;
 
+/** @class Particle
+ * A basic particle. For particles that provide UI, you may like to
+ * instead use DOMParticle.
+ */
 class Particle {
   constructor() {
     this.spec = this.constructor.spec;
@@ -4147,7 +4151,14 @@ class Particle {
     this._slotByName = new Map();
   }
 
-  // Override this to do stuff
+  /** @method setViews(views)
+   * This method is invoked with a handle for each view this particle
+   * is registered to interact with, once those views are ready for
+   * interaction. Override the method to register for events from
+   * the views.
+   *
+   * Views is a map from view names to view handles.
+   */
   setViews(views) {
 
   }
@@ -4160,6 +4171,10 @@ class Particle {
     return this._idle;
   }
 
+  /** @method setBusy()
+   * Prevents this particle from indicating that it's idle until a matching
+   * call to setIdle is made.
+   */
   setBusy() {
     if (this._busy == 0)
     this._idle = new Promise((resolve, reject) => {
@@ -4168,6 +4183,9 @@ class Particle {
     this._busy++;
   }
 
+  /** @method setIdle()
+   * Indicates that a busy period (initiated by a call to setBusy) has completed.
+   */
   setIdle() {
     assert(this._busy > 0);
     this._busy--;
@@ -4179,10 +4197,6 @@ class Particle {
     this.relevances.push(r);
   }
 
-  // Override this to do stuff
-  dataUpdated() {
-  }
-
   inputs() {
     return this.spec.inputs;
   }
@@ -4191,6 +4205,9 @@ class Particle {
     return this.spec.outputs;
   }
 
+  /** @method getSlot(name)
+   * Returns the slot with provided name.
+   */
   getSlot(name) {
     return this._slotByName.get(name);
   }
@@ -4213,11 +4230,19 @@ class Particle {
     this.stateHandlers.get(state).forEach(f => f(value));
   }
 
-  on(views, names, action, f) {
+  /** @method on(views, names, kind, f)
+   * Convenience method for registering a callback on multiple views at once.
+   *
+   * views is a map from names to view handles
+   * names indicates the views which should have a callback installed on them
+   * kind is the kind of event that should ve registered for
+   * f is the callback function
+   */
+  on(views, names, kind, f) {
     if (typeof names == "string")
       names = [names];
-    var trace = tracing.start({cat: 'particle', names: this.constructor.name + "::on", args: {view: names, event: action}});
-    names.forEach(name => views.get(name).on(action, tracing.wrap({cat: 'particle', name: this.constructor.name, args: {view: name, event: action}}, f), this));
+    var trace = tracing.start({cat: 'particle', names: this.constructor.name + "::on", args: {view: names, event: kind}});
+    names.forEach(name => views.get(name).on(kind, tracing.wrap({cat: 'particle', name: this.constructor.name, args: {view: name, event: kind}}, f), this));
     trace.end();
   }
 
@@ -7004,10 +7029,8 @@ class ParticleSpec {
     this.connections.forEach(a => this.connectionMap.set(a.name, a));
     this.inputs = this.connections.filter(a => a.isInput);
     this.outputs = this.connections.filter(a => a.isOutput);
-    this.exposes = model.exposes;  // TODO: deprecate and use this.slots instead.
-    this.renders = model.renders;  // TODO: deprecate and use this.slots instead.
     this.transient = model.transient;
-    this.description = model.description;
+    this.description = this.validateDescription(model.description);
     this.implFile = model.implFile;
     this.affordance = model.affordance;
     this.slots = new Map();
@@ -7016,7 +7039,7 @@ class ParticleSpec {
     // Verify provided slots use valid view connection names.
     this.slots.forEach(slot => {
       slot.providedSlots.forEach(ps => {
-        ps.views.forEach(v => assert(this.connectionMap.has(v), 'Cannot provide slot for nonexistent view constraint ', v));
+        ps.views.forEach(v => assert(this.connectionMap.has(v), "Cannot provide slot for nonexistent view constraint ", v));
       });
     });
   }
@@ -7033,19 +7056,30 @@ class ParticleSpec {
     return this.slots.get(slotName);
   }
 
+  matchAffordance(affordance) {
+    return this.slots.size <= 0 || this.affordance.includes(affordance);
+  }
+
   toLiteral() {
-    let {args, name, exposes, renders, transient, description, implFile} = this._model;
+    let {args, name, transient, description, implFile, affordance, slots} = this._model;
     args = args.map(a => {
       let {type, direction, name} = a;
       type = type.toLiteral();
       return {type, direction, name};
     });
-    return {args, name, exposes, renders, transient, description, implFile};
+    return {args, name, transient, description, implFile, affordance, slots};
   }
 
   static fromLiteral(literal) {
     literal.args.forEach(a => a.type = Type.fromLiteral(a.type));
     return new ParticleSpec(literal, () => assert(false));
+  }
+
+  validateDescription(description) {
+    Object.keys(description || []).forEach(d => {
+      assert(d == "pattern" || this.connectionMap.has(d), `Unexpected description for ${d}`);
+    });
+    return description;
   }
 }
 
@@ -9010,7 +9044,7 @@ class DomParticle extends XenStateMixin(Particle) {
       views: this.spec.inputs.map(i => i.name).concat(this.spec.outputs.map(o => o.name)),
       // TODO(mmandlis): this.spec needs to be replace with a particle-spec loaded from
       // .manifest files, instead of .ptcl ones.
-      slotNames: [ this.spec.renders.length && this.spec.renders[0].name.name ]
+      slotNames: [...this.spec.slots.values()].map(s => s.name)
     };
   }
   _info() {
@@ -9626,6 +9660,10 @@ class InnerPEC {
     this._apiPort.onUIEvent = ({particle, slotName, event}) => particle.fireEvent(slotName, event);
 
     this._apiPort.onStartRender = ({particle, slotName, contentTypes}) => {
+      /** @class Slot
+       * A representation of a consumed slot. Retrieved from a particle using
+       * particle.getSlot(name)
+       */
       class Slotlet {
         constructor(pec, particle, slotName) {
           this._slotName = slotName;
@@ -9637,6 +9675,9 @@ class InnerPEC {
         get particle() { return this._particle; }
         get slotName() { return this._slotName; }
         get isRendered() { return this._isRendered; }
+        /** @method render(content)
+         * renders content to the slot.
+         */
         render(content) {
           this._pec._apiPort.Render({particle, slotName, content});
 
@@ -9644,6 +9685,9 @@ class InnerPEC {
           // Slot is considered rendered, if a non-empty content was sent and all requested content types were fullfilled.
           this._isRendered = this._requestedContentTypes.size == 0 && (Object.keys(content).length > 0);
         }
+        /** @method registerEventHandler(name, f)
+         * registers a callback to be invoked when 'name' event happens.
+         */
         registerEventHandler(name, f) {
           if (!this._handlers.has(name)) {
             this._handlers.set(name, []);
@@ -9683,7 +9727,7 @@ class InnerPEC {
     let clazz = await this._loader.loadParticleClass(spec);
     let particle = new clazz();
     this._particles.push(particle);
-    
+
     var viewMap = new Map();
     views.forEach((value, key) => {
       viewMap.set(key, viewlet.viewletFor(value, value.type.isView, spec.connectionMap.get(key).isInput, spec.connectionMap.get(key).isOutput));
@@ -9700,13 +9744,12 @@ class InnerPEC {
       view.entityClass = new Schema(schemaModel).entityClass();
     }
 
-    setTimeout(() => {
+    return [particle, () => {
       resolve();
       var idx = this._pendingLoads.indexOf(p);
       this._pendingLoads.splice(idx, 1);
       particle.setViews(viewMap);
-    }, 0);
-    return particle;
+    }];
   }
 
   get relevance() {
@@ -18456,8 +18499,7 @@ class ThingMapper {
   createMappingForThing(thing) {
     assert(!this._reverseIdMap.has(thing));
     var id = this._newIdentifier();
-    this._idMap.set(id, thing);
-    this._reverseIdMap.set(thing, id);
+    this.establishThingMapping(id, thing);
     return id;
   }
 
@@ -18469,8 +18511,20 @@ class ThingMapper {
   }
 
   establishThingMapping(id, thing) {
+    let continuation;
+    if (Array.isArray(thing)) {
+      [thing, continuation] = thing;
+    }
     this._idMap.set(id, thing);
-    this._reverseIdMap.set(thing, id);
+    if (thing instanceof Promise) {
+      assert(continuation == null);
+      thing.then(actualThing => this.establishThingMapping(id, actualThing));
+    } else {
+      this._reverseIdMap.set(thing, id);
+      if (continuation) {
+        continuation();
+      }
+    }
   }
 
   hasMappingForThing(thing) {
@@ -18569,14 +18623,20 @@ class APIPort {
 
     this.messageCount++;
 
-    var handler = this._messageMap.get(e.data.messageType);
-    var args = this._unprocessArguments(handler, e.data.messageBody);
-    var r = this["on" + e.data.messageType](args);
-    if (r && args.identifier) {
-      if (r instanceof Promise)
-        r.then(v => this._mapper.establishThingMapping(args.identifier, v));
-      else
-        this._mapper.establishThingMapping(args.identifier, r);
+    let handler = this._messageMap.get(e.data.messageType);
+    let args = this._unprocessArguments(handler.args, e.data.messageBody);
+    // If any of the converted arguments are still pending promises
+    // wait for them to complete before processing the message.
+    for (let arg of Object.values(args)) {
+      if (arg instanceof Promise) {
+        arg.then(() => this._handle(e));
+        return;
+      }
+    }
+    let result = this["on" + e.data.messageType](args);
+    if (handler.isInitializer) {
+      assert(args.identifier);
+      this._mapper.establishThingMapping(args.identifier, result);
     }
   }
 
@@ -18602,12 +18662,15 @@ class APIPort {
   }
 
   registerHandler(name, argumentTypes) {
-    this._messageMap.set(name, argumentTypes);
+    this._messageMap.set(name, {args: argumentTypes});
   }
 
   registerInitializerHandler(name, argumentTypes) {
     argumentTypes.identifier = this.Direct;
-    this._messageMap.set(name, argumentTypes);
+    this._messageMap.set(name, {
+      isInitializer: true,
+      args: argumentTypes,
+    });
   }
 
   registerInitializer(name, argumentTypes) {
@@ -22765,13 +22828,14 @@ module.exports = new Scheduler();
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-// @license
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
+/** @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
 
 
 const Identifier = __webpack_require__(88);
@@ -22797,6 +22861,9 @@ function restore(entry, entityClass) {
   return entity;
 }
 
+/** @class Viewlet
+ * Base class for Views and Variables.
+ */
 class Viewlet {
   constructor(view, canRead, canWrite) {
     this._view = view;
@@ -22806,6 +22873,11 @@ class Viewlet {
   underlyingView() {
     return this._view;
   }
+  /** @method on(kind, callback, target)
+   * Register for callbacks every time the requested kind of event occurs.
+   * Events are grouped into delivery sets by target, which should therefore
+   * be the recieving particle.
+   */
   on(kind, callback, target) {
     return this._view.on(kind, callback, target);
   }
@@ -22846,6 +22918,13 @@ class Viewlet {
   }
 }
 
+/** @class View
+ * A handle on a set of Entity data. Note that, as a set, a View can only contain
+ * a single version of an Entity for each given ID. Further, no order is implied
+ * by the set. A particle's manifest dictates the types of views that need to be
+ * connected to that particle, and the current recipe identifies which views are
+ * connected.
+ */
 class View extends Viewlet {
   constructor(view, canRead, canWrite) {
     // TODO: this should talk to an API inside the PEC.
@@ -22854,12 +22933,23 @@ class View extends Viewlet {
   query() {
     // TODO: things
   }
+  /** @method async toList()
+   * Returns a list of the Entities contained by the View.
+   * throws: Error if this view is not configured as a readable view (i.e. 'in' or 'inout')
+     in the particle's manifest.
+   */
   async toList() {
     // TODO: remove this and use query instead
     if (!this.canRead)
       throw new Error("View not readable");
     return (await this._view.toList()).map(a => this._restore(a));
   }
+
+  /** @method store(entity)
+   * Stores a new entity into the View.
+   * throws: Error if this view is not configured as a writeable view (i.e. 'out' or 'inout')
+     in the particle's manifest.
+   */
   store(entity) {
     if (!this.canWrite)
       throw new Error("View not writeable");
@@ -22872,10 +22962,22 @@ class View extends Viewlet {
   }
 }
 
+/** @class Variable
+ * A handle on a single entity. A particle's manifest dictates
+ * the types of views that need to be connected to that particle, and
+ * the current recipe identifies which views are connected.
+ */
 class Variable extends Viewlet {
   constructor(variable, canRead, canWrite) {
     super(variable, canRead, canWrite);
   }
+
+  /** @method async get()
+  * Returns the Entity contained by the Variable, or undefined if the Variable
+  * is cleared.
+  * throws: Error if this variable is not configured as a readable view (i.e. 'in' or 'inout')
+    in the particle's manifest.
+   */
   async get() {
     if (!this.canRead)
       throw new Error("View not readable");
@@ -22883,11 +22985,23 @@ class Variable extends Viewlet {
     var data = result == null ? undefined : this._restore(result);
     return data;
   }
+
+  /** @method set(entity)
+   * Stores a new entity into the Variable, replacing any existing entity.
+   * throws: Error if this variable is not configured as a writeable view (i.e. 'out' or 'inout')
+     in the particle's manifest.
+   */
   set(entity) {
     if (!this.canWrite)
       throw new Error("View not writeable");
     return this._view.set(this._serialize(entity));
   }
+
+  /** @method clear()
+   * Clears any entity currently in the Variable.
+   * throws: Error if this variable is not configured as a writeable view (i.e. 'out' or 'inout')
+     in the particle's manifest.
+   */
   clear() {
     if (!this.canWrite)
       throw new Error("View not writeable");
