@@ -20,9 +20,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <!-- components (reusable commodities) -->
 <script src="../components/xen/xen-template.js"></script>
 <script src="../components/x-toast.js"></script>
-<script src="../components/suggestions-element.js"></script>
 <link rel="import" href="../components/dancing-dots.html">
 <link rel="import" href="../components/user-data.html">
+<script src="../components/suggestions-element.js"></script>
+<!--<script src="../../../arcs/runtime/browser/lib/suggestions-element.js"></script>-->
 
 <!-- tooling -->
 <link rel="import" href="../components/explorer-hotkey.html">
@@ -168,16 +169,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({dotsActive: true});
       //console.log('context:', this.arc.context);
       let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
+      console.log('plans:', plans);
       this._plans = plans;
       this._plans.generations = generations;
+      document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
       this._setState({dotsActive: false, dotsDisabled: plans.length === 0});
-      //console.log('plans:', plans);
       //this._setState({dotsDisabled: plans.length === 0, dotsActive: false, suggestions: plans});
       //document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
     }
-    _suggestPlans(plans, generations) {
+    _suggestPlans(plans) {
       this._setState({dotsDisabled: plans.length === 0, dotsActive: false, suggestions: plans});
-      document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
+      //document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
     }
     _onPlanSelected(e) {
       let {plan, descriptionGenerator} = e.detail;
@@ -195,15 +197,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onSearch(e) {
       let term = e.target.value.toLowerCase();
-      //console.group(term);
-      let plans = this._plans.filter(p => {
-        let desc = p.descriptionGenerator.description.toLowerCase();
-        //console.log(desc, desc.indexOf(term));
-        return desc.indexOf(term) >= 0;
-      });
-      //console.groupEnd();
-      //console.log('plans:', plans);
-      this._suggestPlans(plans, this._plans.generations);
+      let plans;
+      if (term === '*') {
+        plans = this._plans;
+      } else if (term.length > 2) {
+        //console.group(term);
+        plans = this._plans.filter(p => {
+          let desc = p.descriptionGenerator.description.toLowerCase();
+          //console.log(desc, desc.indexOf(term));
+          return desc.indexOf(term) >= 0;
+        });
+        //console.groupEnd();
+      }
+      //console.log('search results (plans):', plans);
+      this._suggestPlans(plans || []);
     }
   }
   AppShell.module = document.currentScript.ownerDocument;
