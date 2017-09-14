@@ -1,17 +1,17 @@
 {
   "name": "jsdiff",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "main": [
     "diff.js"
   ],
   "dependencies": {},
   "ignore": [],
   "homepage": "https://github.com/components/jsdiff",
-  "_release": "3.3.0",
+  "_release": "3.3.1",
   "_resolution": {
     "type": "version",
-    "tag": "v3.3.0",
-    "commit": "a1007cd648c06d3d9459beaf434bee5f2cb35798"
+    "tag": "v3.3.1",
+    "commit": "2aba1585bb82b08f07ae8f3e5f6270dc48c8b179"
   },
   "_source": "https://github.com/components/jsdiff.git",
   "_target": "^3.2.0",

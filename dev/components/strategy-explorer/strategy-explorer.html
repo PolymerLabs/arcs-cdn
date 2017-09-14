@@ -1,3 +1,11 @@
+<!--
+Copyright (c) 2017 Google Inc. All rights reserved.
+This code may only be used under the BSD style license found at
+http://polymer.github.io/LICENSE.txt
+Code distributed by Google as part of this project is also
+subject to an additional IP rights grant found at
+http://polymer.github.io/PATENTS.txt
+-->
 <!doctype html>
 
 <link rel="import" href="se-explorer.html"></link>
@@ -17,39 +25,40 @@
   </template>
 
 <script>
-
-var parentMap = new Map();
-var lastID = 0;
-
-document.idMap = new Map();
-document.pendingActions = new Map();
-
-</script>
-
-<script>
   Polymer({
     is: 'strategy-explorer',
     properties: {
       results: Array
     },
+    reset: function() {
+      this.set("results", []);
+      this.parentMap = new Map();
+      this.lastID = 0;
+      this.idMap = new Map();
+      this.pendingActions = new Map();
+    },
+    attached: function() {
+      document.strategyExplorer = this;
+      this.reset();
+    },
     preparePopulation: function(population) {
       population = population.map(recipe => {
-        let { result, score, derivation, hash } = recipe;
-        parentMap.set(recipe, lastID);
-        return { result, score, derivation, hash, id: lastID++ };
+        let { result, score, derivation, description, hash } = recipe;
+        this.parentMap.set(recipe, this.lastID);
+        return { result, score, derivation, description, hash, id: this.lastID++ };
       });
-
       population.forEach(item => {
         item.derivation = item.derivation.map(derivItem => {
           if (derivItem.parent)
-            var parent = parentMap.get(derivItem.parent);
+            var parent = this.parentMap.get(derivItem.parent);
           if (derivItem.strategy)
             var strategy = derivItem.strategy.constructor.name;
           return { parent, strategy };
         })
         item.original = undefined;
         item.resolved = item.result.isResolved();
-        item.result = item.result.toString();
+        let options = {showUnresolved: true, showInvalid: false, details: ""};
+        item.result = item.result.toString(options);
       });
       var populationMap = {};
       population.forEach(item => {
