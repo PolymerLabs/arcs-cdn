@@ -5,15 +5,7 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-#import 'https://sjmiles.github.io/arc-stories/arc.manifest'
-
-#import 'https://sjmiles.github.io/arc-stories/artifacts/HelloWorld/recipes.manifest'
-#import 'https://sjmiles.github.io/arc-stories/artifacts/Restaurants/recipes.manifest'
-#import 'https://sjmiles.github.io/arc-stories/artifacts/Accounts/recipes.manifest'
-#import 'https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest'
-#import 'https://sjmiles.github.io/arc-stories/artifacts/Products/recipes.manifest'
-
-import '../../../arc-stories/artifacts/Products/recipes.manifest'
-import '../../../arc-stories/artifacts/Restaurants/recipes.manifest'
-import '../../../arc-stories/artifacts/Accounts/recipes.manifest'
-import '../../../arc-stories/artifacts/Chat/recipes.manifest'
+import 'https://sjmiles.github.io/arc-stories/artifacts/Products/recipes.manifest'
+import 'https://sjmiles.github.io/arc-stories/artifacts/Restaurants/recipes.manifest'
+import 'https://sjmiles.github.io/arc-stories/artifacts/Accounts/recipes.manifest'
+import 'https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest'
