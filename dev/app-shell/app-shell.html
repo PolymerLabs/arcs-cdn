@@ -21,9 +21,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script src="../components/xen/xen-template.js"></script>
 <script src="../components/x-toast.js"></script>
 <script src="../components/suggestions-element.js"></script>
+<script src="../components/url-caster.js"></script>
 <link rel="import" href="../components/dancing-dots.html">
 <link rel="import" href="../components/user-data.html">
 <link rel="import" href="../components/manifest-data.html">
+<link rel="import" href="../components/metadata-storage.html">
 
 <!-- tooling -->
 <link rel="import" href="../components/explorer-hotkey.html">
@@ -151,15 +153,19 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._dom.set(state);
       }
     }
+    _getRootPath(urls) {
+      return (urls && urls.root) || AppShell.module.URL.split('/').slice(0, -2).join('/');
+    }
+    _getManifestPath(manifest) {
+      return manifest || './arc.manifest';
+    }
     _configure({urls, manifest}) {
       // find the path automagically
-      let root = (urls && urls.root) || AppShell.module.URL.split('/').slice(0, -2).join('/');
+      let root = this._getRootPath();
       // create default URL map
-      let urlMap = utils.createUrlMap(root);
-      // this special artifact requires an map entry for dynamic loading
-      urlMap['worker-entry-cdn.js'] = `${root}/lib/worker-entry-cdn.js`;
+      let urlMap = Arcs.utils.createUrlMap(root);
       // start application
-      this._start(urlMap, urls, manifest || './arc.manifest', this._container);
+      this._start(urlMap, urls, this._getManifestPath(manifest), this._container);
     }
     async _start(urlMap, metaUrls, manifestPath, container) {
       // create a system loader
@@ -171,7 +177,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         Object.keys(metaUrls).forEach(k => urlMap[k] = loader._resolve(metaUrls[k]));
       }
       // load manifest
-      let manifest = await Arcs.Manifest.load(manifestPath, loader);
+      let manifest = await this._loadManifest(manifestPath, loader);
+      //let manifest = await Arcs.Manifest.load(manifestPath, loader);
       // TODO(sjmiles): hack in ability to utilize imported recipes
       utils.collapseRecipes(manifest);
       console.log(manifest);
@@ -179,36 +186,72 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let slotComposer = new Arcs.SlotComposer({rootContext: container, affordance: "dom"});
       // Arc!
       this.arc = Arcs.utils.createArc({id: 'demo', urlMap, slotComposer, context: manifest});
+      // configure persistence layer
+      this._configureStorage(manifestPath);
+      // configure (chrome)-casting
+      UrlCaster.set(window.location.href);
       // invoke planner
       this._findSuggestions();
+    }
+    async _loadManifest(path, loader) {
+      //let content = await loader.loadResource(path);
+      let manifests = await this._fetchManifestList();
+      let content = manifests.map(u => `import '${u}'`).join('\n');
+      console.log(content);
+      return await Arcs.utils.parseManifest(content, loader);
+    }
+    async _fetchManifestList() {
+      // TODO(sjmiles): using the global `db` that is currently leaking out
+      // of metadata-storage.html
+      let snapshot = await db.ref('manifests').once('value');
+      let remotes = snapshot.val();
+      let defaults = [
+        //'https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest'
+      ];
+      let locals = JSON.parse(localStorage.getItem('manifests') || '[]');
+      // TODO(sjmiles): really necessary? should live elsewhere
+      let dedupe = arr => {
+        var i, out=[], obj={};
+        for (i=0; i<arr.length; i++) {
+          obj[arr[i]]=0;
+        }
+        for (i in obj) {
+          out.push(i);
+        }
+        return out;
+      };
+      return dedupe(defaults.concat(locals, remotes));
+    }
+    _configureStorage(manifestPath) {
+      let storage = new ArcMetadataStorage(this);
+      // Create an amkey=id if it doesn't already exist.
+      // TODO: support multiple arcs.
+      // TODO: we should probably associate the manifest path with the stored ID.
+      let amkey = new URL(document.location.href).searchParams.get('amkey');
+      if (!amkey) {
+        storage.sync({}).then(values => {
+          let url = new URL(document.location.href);
+          url.searchParams.set('amkey', values[0]);
+          window.location.href = url.href;
+        });
+      } else {
+        storage.sync({key: amkey});
+        // Store the manifest file path for the Arc to test out metadata storage.
+        // TODO: this should be the absolute URL.
+        storage.store('manifest', {url: manifestPath});
+      }
+      this._syncStorage = () => storage.sync({key: amkey});
     }
     async _findSuggestions() {
       this._setState({dotsActive: true, suggestions: []});
       //console.log('context:', this.arc.context);
       let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
-      plans.generations = generations;
       console.log('plans:', plans);
+      document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
+      plans.generations = generations;
       this._plans = plans;
       this._setState({dotsActive: false, dotsDisabled: plans && plans.length === 0});
-      document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
       this._searchPlans();
-    }
-    _onPlanSelected(e) {
-      let {plan, descriptionGenerator} = e.detail;
-      this._setState({toastOpen: false});
-      this.arc.instantiate(plan);
-      descriptionGenerator.setViewDescriptions(this.arc);
-      this._findSuggestions();
-    }
-    _onNavClick() {
-      this._page = (this._page === 'config') ? 'main' : 'config';
-      this._setState({
-        mainActive: this._page === 'main',
-        configActive: this._page === 'config'
-      });
-    }
-    _onSearch(e) {
-      this.search = e.target.value.toLowerCase();
     }
     _searchPlans() {
       let term = this._search, results;
@@ -223,6 +266,24 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
       }
       this._setState({suggestions: results || []});
+    }
+    _onPlanSelected(e) {
+      let {plan, descriptionGenerator} = e.detail;
+      this._setState({toastOpen: false});
+      this.arc.instantiate(plan);
+      descriptionGenerator.setViewDescriptions(this.arc);
+      this._syncStorage();
+      this._findSuggestions();
+    }
+    _onNavClick() {
+      this._page = (this._page === 'config') ? 'main' : 'config';
+      this._setState({
+        mainActive: this._page === 'main',
+        configActive: this._page === 'config'
+      });
+    }
+    _onSearch(e) {
+      this.search = e.target.value.toLowerCase();
     }
   }
   AppShell.module = document.currentScript.ownerDocument;

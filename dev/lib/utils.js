@@ -39,7 +39,7 @@ let utils = {
       'assets': `${cdnRoot}/assets`,
       'https://$cdn': `${cdnRoot}`,
       // TODO(sjmiles): map must always contain (explicitly, no prefixing) a mapping for `worker-entry-cdn.js`
-      'worker-entry-cdn.js': `${cdnRoot}/worker-entry-cdn.js`
+      'worker-entry-cdn.js': `${cdnRoot}/lib/worker-entry-cdn.js`
     };
   },
   collapseRecipes: manifest => {
@@ -55,6 +55,15 @@ let utils = {
     planner.init(arc);
     let plans = await planner.suggest(timeout || 5000, generations);
     return {plans, generations};
+  },
+  async parseManifest(content, loader) {
+    return await Arcs.Manifest.parse(content, {
+      id: null,
+      fileName: './arcs.manifest',
+      loader,
+      registry: null,
+      position: {line: 1, column: 0}
+    });
   }
 };
 
