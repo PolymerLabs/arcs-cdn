@@ -1,0 +1,230 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!-- icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Arcs engine -->
+<script src="../lib/ArcsLib.js"></script>
+
+<!-- Arcs helpers -->
+<script src="../lib/utils.js"></script>
+
+<!-- components (reusable) -->
+<script src="../components/xen/xen-template.js"></script>
+<script src="../components/x-toast.js"></script>
+<script src="../components/suggestions-element.js"></script>
+<link rel="import" href="../components/dancing-dots.html">
+<link rel="import" href="../components/user-data.html">
+<link rel="import" href="../components/manifest-data.html">
+
+<!-- tooling -->
+<link rel="import" href="../components/explorer-hotkey.html">
+
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    background-image: url(assets/linen.png);
+  }
+  app-shell {
+    flex: 1;
+    max-width: 414px;
+    max-height: 736px;
+    background-color: white;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  [header] {
+    display: flex;
+    align-items: center;
+    width: 414px;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 8px;
+    background-color: whitesmoke;
+  }
+  i {
+    cursor: pointer;
+  }
+  x-toast {
+    background-color: white;
+  }
+  [pages] {
+    display: flex;
+    flex: 1;
+  }
+  [main], [config] {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+  }
+  [active] {
+    display: flex;
+  }
+  [search] {
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    border-bottom: 1px dotted silver;
+  }
+  [search] input {
+    flex: 1;
+    padding: 7px;
+    border: none;
+    outline: none;
+  }
+  #particles {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    margin-bottom: 33px;
+    overflow: auto;
+    overflow-x: hidden;
+  }
+</style>
+
+<template>
+  <div header>
+    <i class="material-icons" on-click="_onNavClick">menu</i>
+  </div>
+  <div pages>
+
+    <div main active$="{{mainActive}}">
+      <div id="particles"></div>
+      <x-toast open="{{toastOpen}}" suggestion-container>
+        <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
+        <div search>
+          <input value="{{searchText}}" on-input="_onSearch">
+          <i class="material-icons">search</i>
+        </div>
+        <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
+      </x-toast>
+    </div>
+
+    <div config active$="{{configActive}}">
+      <div>
+        <user-data></user-data>
+        <hr>
+        <manifest-data></manifest-data>
+    </div>
+    </div>
+
+  </div>
+</template>
+
+<script>
+  class AppShell extends HTMLElement {
+    connectedCallback() {
+      if (!this._mounted) {
+        this._mounted = true;
+        this._dom = Xen.stamp(AppShell.module.querySelector('template')).events(this).appendTo(this);
+        this._setState({dotsActive: true, toastOpen: true, mainActive: true});
+        this._container = this._dom.$('#particles');
+        try {
+          this._configure(window);
+        } catch(x) {
+          this._setState({dotsDisabled: true});
+          throw x;
+        }
+      }
+    }
+    set search(search) {
+      this._search = search;
+      this._searchPlans();
+    }
+    _setState(state) {
+      if (this._dom) {
+        this._dom.set(state);
+      }
+    }
+    _configure({urls, manifest}) {
+      // find the path automagically
+      let root = (urls && urls.root) || AppShell.module.URL.split('/').slice(0, -2).join('/');
+      // create default URL map
+      let urlMap = utils.createUrlMap(root);
+      // this special artifact requires an map entry for dynamic loading
+      urlMap['worker-entry-cdn.js'] = `${root}/lib/worker-entry-cdn.js`;
+      // start application
+      this._start(urlMap, urls, manifest || './arc.manifest', this._container);
+    }
+    async _start(urlMap, metaUrls, manifestPath, container) {
+      // create a system loader
+      // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
+      // but we have to create one by hand for manifest loading
+      let loader = new Arcs.BrowserLoader(urlMap);
+      // add metaUrls to urlMap after a resolve pass
+      if (metaUrls) {
+        Object.keys(metaUrls).forEach(k => urlMap[k] = loader._resolve(metaUrls[k]));
+      }
+      // load manifest
+      let manifest = await Arcs.Manifest.load(manifestPath, loader);
+      // TODO(sjmiles): hack in ability to utilize imported recipes
+      utils.collapseRecipes(manifest);
+      console.log(manifest);
+      // renderer
+      let slotComposer = new Arcs.SlotComposer({rootContext: container, affordance: "dom"});
+      // Arc!
+      this.arc = Arcs.utils.createArc({id: 'demo', urlMap, slotComposer, context: manifest});
+      // invoke planner
+      this._findSuggestions();
+    }
+    async _findSuggestions() {
+      this._setState({dotsActive: true, suggestions: []});
+      //console.log('context:', this.arc.context);
+      let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
+      plans.generations = generations;
+      console.log('plans:', plans);
+      this._plans = plans;
+      this._setState({dotsActive: false, dotsDisabled: plans && plans.length === 0});
+      document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
+      this._searchPlans();
+    }
+    _onPlanSelected(e) {
+      let {plan, descriptionGenerator} = e.detail;
+      this._setState({toastOpen: false});
+      this.arc.instantiate(plan);
+      descriptionGenerator.setViewDescriptions(this.arc);
+      this._findSuggestions();
+    }
+    _onNavClick() {
+      this._page = (this._page === 'config') ? 'main' : 'config';
+      this._setState({
+        mainActive: this._page === 'main',
+        configActive: this._page === 'config'
+      });
+    }
+    _onSearch(e) {
+      this.search = e.target.value.toLowerCase();
+    }
+    _searchPlans() {
+      let term = this._search, results;
+      if (this._plans && term) {
+        if (term === '*') {
+          results = this._plans;
+        } else if (term.length > 2) {
+          results = this._plans.filter(p => {
+            let desc = p.descriptionGenerator.description.toLowerCase();
+            return desc.indexOf(term) >= 0;
+          });
+        }
+      }
+      this._setState({suggestions: results || []});
+    }
+  }
+  AppShell.module = document.currentScript.ownerDocument;
+  customElements.define('app-shell', AppShell);
+</script>

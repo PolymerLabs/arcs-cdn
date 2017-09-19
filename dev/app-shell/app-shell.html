@@ -14,16 +14,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <!-- Arcs engine -->
 <script src="../lib/ArcsLib.js"></script>
 
-<!-- demo helpers -->
+<!-- Arcs helpers -->
 <script src="../lib/utils.js"></script>
 
-<!-- components (reusable commodities) -->
+<!-- components (reusable) -->
 <script src="../components/xen/xen-template.js"></script>
 <script src="../components/x-toast.js"></script>
+<script src="../components/suggestions-element.js"></script>
 <link rel="import" href="../components/dancing-dots.html">
 <link rel="import" href="../components/user-data.html">
-<script src="../components/suggestions-element.js"></script>
-<!--<script src="../../../arcs/runtime/browser/lib/suggestions-element.js"></script>-->
+<link rel="import" href="../components/manifest-data.html">
 
 <!-- tooling -->
 <link rel="import" href="../components/explorer-hotkey.html">
@@ -68,6 +68,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   }
   [main], [config] {
     display: none;
+    flex-direction: column;
     flex: 1;
   }
   [active] {
@@ -101,6 +102,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <i class="material-icons" on-click="_onNavClick">menu</i>
   </div>
   <div pages>
+
     <div main active$="{{mainActive}}">
       <div id="particles"></div>
       <x-toast open="{{toastOpen}}" suggestion-container>
@@ -112,9 +114,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
       </x-toast>
     </div>
+
     <div config active$="{{configActive}}">
-      <user-data></user-data>
+      <div>
+        <user-data></user-data>
+        <hr>
+        <manifest-data></manifest-data>
     </div>
+    </div>
+
   </div>
 </template>
 
@@ -126,8 +134,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._dom = Xen.stamp(AppShell.module.querySelector('template')).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
         this._container = this._dom.$('#particles');
-        this._configure(window);
+        try {
+          this._configure(window);
+        } catch(x) {
+          this._setState({dotsDisabled: true});
+          throw x;
+        }
       }
+    }
+    set search(search) {
+      this._search = search;
+      this._searchPlans();
     }
     _setState(state) {
       if (this._dom) {
@@ -136,7 +153,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _configure({urls, manifest}) {
       // find the path automagically
-      let root = AppShell.module.URL.split('/').slice(0, -2).join('/');
+      let root = (urls && urls.root) || AppShell.module.URL.split('/').slice(0, -2).join('/');
       // create default URL map
       let urlMap = utils.createUrlMap(root);
       // this special artifact requires an map entry for dynamic loading
@@ -166,20 +183,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._findSuggestions();
     }
     async _findSuggestions() {
-      this._setState({dotsActive: true});
+      this._setState({dotsActive: true, suggestions: []});
       //console.log('context:', this.arc.context);
       let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
+      plans.generations = generations;
       console.log('plans:', plans);
       this._plans = plans;
-      this._plans.generations = generations;
+      this._setState({dotsActive: false, dotsDisabled: plans && plans.length === 0});
       document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
-      this._setState({dotsActive: false, dotsDisabled: plans.length === 0});
-      //this._setState({dotsDisabled: plans.length === 0, dotsActive: false, suggestions: plans});
-      //document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
-    }
-    _suggestPlans(plans) {
-      this._setState({dotsDisabled: plans.length === 0, dotsActive: false, suggestions: plans});
-      //document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
+      this._searchPlans();
     }
     _onPlanSelected(e) {
       let {plan, descriptionGenerator} = e.detail;
@@ -196,21 +208,21 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       });
     }
     _onSearch(e) {
-      let term = e.target.value.toLowerCase();
-      let plans;
-      if (term === '*') {
-        plans = this._plans;
-      } else if (term.length > 2) {
-        //console.group(term);
-        plans = this._plans.filter(p => {
-          let desc = p.descriptionGenerator.description.toLowerCase();
-          //console.log(desc, desc.indexOf(term));
-          return desc.indexOf(term) >= 0;
-        });
-        //console.groupEnd();
+      this.search = e.target.value.toLowerCase();
+    }
+    _searchPlans() {
+      let term = this._search, results;
+      if (this._plans && term) {
+        if (term === '*') {
+          results = this._plans;
+        } else if (term.length > 2) {
+          results = this._plans.filter(p => {
+            let desc = p.descriptionGenerator.description.toLowerCase();
+            return desc.indexOf(term) >= 0;
+          });
+        }
       }
-      //console.log('search results (plans):', plans);
-      this._suggestPlans(plans || []);
+      this._setState({suggestions: results || []});
     }
   }
   AppShell.module = document.currentScript.ownerDocument;
