@@ -11,7 +11,7 @@ window.UrlCaster = (function () {
     var apiConfig = new chrome.cast.ApiConfig(sessionRequest,
             sessionListener,
             receiverListener,
-            chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED);
+            chrome.cast.AutoJoinPolicy.TAB_AND_ORIGIN_SCOPED);
     chrome.cast.initialize(apiConfig, null, null);
   }
 
