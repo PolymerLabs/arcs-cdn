@@ -104,4 +104,4 @@ let XenStaterMixin = Base => class extends Base {
   }
 };
 
-module.exports = XenStaterMixin;
+window.XenState = XenStaterMixin;

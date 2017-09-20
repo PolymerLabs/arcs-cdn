@@ -19,6 +19,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <!-- components (reusable) -->
 <script src="../components/xen/xen-template.js"></script>
+<script src="../components/xen/xen-element.js"></script>
+<script src="../components/xen/xen-state.js"></script>
+
 <script src="../components/x-toast.js"></script>
 <script src="../components/suggestions-element.js"></script>
 <link rel="import" href="../components/dancing-dots.html">
@@ -201,7 +204,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       //let content = await loader.loadResource(path);
       let manifests = await this._fetchManifestList();
       let content = manifests.map(u => `import '${u}'`).join('\n');
-      console.log(content);
+      //console.log(content);
       return await Arcs.utils.parseManifest(content, loader);
     }
     async _fetchManifestList() {

@@ -70,4 +70,4 @@ class XenElement extends HTMLElement {
   }
 }
 
-module.exports = XenElement;
+window.XenElement = XenElement;

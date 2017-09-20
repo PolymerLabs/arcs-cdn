@@ -1,0 +1,56 @@
+<style>
+  data-item {
+    display: flex;
+  }
+  data-item > * {
+    padding: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  data-item > left {
+    /*
+    flex: 1;
+    min-width: 40px;
+    */
+    width: 64px;
+    background-color: lightgray;
+    border-right: 1px solid gray;
+  }
+  data-item > right {
+    flex: 3;
+  }
+</style>
+
+<template>
+  <left>{{name}}</left>
+  <right>
+    <div hidden="{{isobject}}" title="{{title}}">{{value}}</div>
+    <data-explorer hidden="{{isconcrete}}" object="{{object}}"></data-explorer>
+  </right>
+</template>
+
+<script>
+  class DataItem extends XenState(XenElement) {
+    static get observedAttributes() { return ['name','value']; }
+    _doMount() {
+      this._dom = Xen.stamp(DataItem.module.querySelector('template')).events(this).appendTo(this);
+    }
+    _update(props, state) {
+      this._dom.set(this._render(props, state));
+    }
+    _render(props, state) {
+      let isobject = (typeof props.value === 'object');
+      return {
+        name: props.name,
+        isobject: isobject,
+        object: isobject ? props.value : null,
+        isconcrete: !isobject,
+        value: isobject ? '' : props.value.slice(-54),
+        title: isobject ? '' : props.value
+      };
+    }
+  }
+  DataItem.module = document.currentScript.ownerDocument;
+  window.customElements.define('data-item', DataItem);
+</script>

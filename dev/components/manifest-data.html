@@ -3,32 +3,36 @@
     manifest-data {
       display: flex;
       min-height: 240px;
-      font-size: 0.7em;
+      /*font-size: 0.7em;*/
       font-family: monospace;
     }
-    textarea {
+    manifest-data > * {
+      flex: 1;
+    }
+    /*manifest-data textarea {
       flex: 1;
       width: 100%;
       border: none;
       outline: none;
       font: inherit;
-    }
+    }*/
   </style>
-  <textarea spellcheck="false">{{json}}</textarea>
+  <data-explorer object="{{object}}"></data-explorer>
+  <!--<textarea spellcheck="false">{{json}}</textarea>-->
 </template>
 
 <script>
   class ManifestData extends HTMLElement {
     connectedCallback() {
       this.text = '';
-      this.json = [
+      this.data = [
         "https://sjmiles.github.io/arc-stories/artifacts/Products/recipes.manifest",
         "https://sjmiles.github.io/arc-stories/artifacts/Restaurants/recipes.manifest",
         "https://sjmiles.github.io/arc-stories/artifacts/Accounts/recipes.manifest",
         "https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest"
       ];
       this._dom = Xen.stamp(ManifestData.module.querySelector("template")).events(this).appendTo(this);
-      this._dom.set({json: JSON.stringify(this.json, null, " ")})
+      this._dom.set({json: JSON.stringify(this.data, null, " "), object: this.data});
     }
   }
   ManifestData.module = document.currentScript.ownerDocument;

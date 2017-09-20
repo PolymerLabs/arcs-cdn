@@ -1,32 +1,37 @@
+<link rel="import" href="data-explorer.html">
+
 <template>
   <style>
     user-data {
       display: flex;
       min-height: 240px;
-      font-size: 1em;
+      /*font-size: 1em;*/
       font-family: monospace;
     }
-    textarea {
+    user-data > * {
       flex: 1;
+    }
+    user-data textarea {
       width: 100%;
       border: none;
       outline: none;
       font: inherit;
     }
   </style>
-  <textarea spellcheck="false">{{json}}</textarea>
+  <data-explorer object="{{object}}"></data-explorer>
+  <!--<textarea spellcheck="false">{{json}}</textarea>-->
 </template>
 
 <script>
   class UserData extends HTMLElement {
     connectedCallback() {
       this.text = '';
-      this.json = {
+      this.data = {
         name: 'Scott',
         manifest: './arcs.manifest'
       };
       this._dom = Xen.stamp(UserData.module.querySelector('template')).events(this).appendTo(this);
-      this._dom.set({json: JSON.stringify(this.json, null, '  ')})
+      this._dom.set({json: JSON.stringify(this.data, null, '  '), object: this.data})
     }
   }
   UserData.module = document.currentScript.ownerDocument;
