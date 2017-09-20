@@ -40,6 +40,9 @@
     _getRemoteViewId(localView) {
       return localView.id.replace(this._arc.id, '~');
     }
+    _getLocalViewId(remoteView) {
+      return this._arc.id + remoteView.substring(1);
+    }
 
     // Synchronize a local view with a remote view.
     _syncView(localView, remoteView) {
@@ -153,9 +156,9 @@
 
         let remoteViewMeta = this._remoteRef.child('views/' + this._getRemoteViewId(localView));
         remoteViewMeta.child('metadata').update(removeUndefined({
-          // TODO: also write tags here.
           type: localView.type,
-          name: localView.name
+          name: localView.name,
+          tags: [],  // TODO: populate tags here.
         }));
         let remoteView = remoteViewMeta.child('values');
 
@@ -168,8 +171,39 @@
       });
 
       // ... second, we synchronize remote views with their local representations.
-      // TODO: call this function for every remote view: createView(type, name, id, tags).
-      this._remoteRef.child('views').orderByKey()
+      // TODO: fix this.
+      /* this._remoteRef.child('views').orderByKey().once('value').then(remoteViews => {
+        remoteViews.forEach(remoteViewMeta => {
+          let localViewId = this._getLocalViewId(remoteViewMeta.key);
+          if (this._syncedViews.has(localViewId)) {
+            return;
+          }
+          this._syncedViews.add(localViewId);
+          console.log('Unsynced remove view: ', remoteViewMeta.key);
+          let metadata = remoteViewMeta.child('metadata').val();
+          // TODO: This is totally broken. I somehow need to get to the Type constructor
+          // without this hack.
+          let Type = undefined;
+          if (this._arc._views.length) {
+            Type = this._arc._views[0].type.constructor;
+          } else if (this._arc.context.views.length) {
+            Type = this._arc.context.views[0].type.constructor;
+          }
+          if (!Type) {
+            console.warn('Unable to sync remote view:', remoteViewMeta.key);
+            return;
+          }
+          let type = new Type(metadata.type.tag, metadata.type.data);
+          let localView = this._arc.createView(type, metadata.name, localViewId, metadata.tags);
+          let remoteView = remoteViewMeta.child('values').ref;
+          if (localView.type.isView) {
+            this._syncView(localView, remoteView);
+          }
+          if (localView.type.isVariable) {
+            this._syncVariable(localView, remoteView);
+          }
+        });
+      });*/
 
       // Just for consistency.
       return Promise.resolve(key);
