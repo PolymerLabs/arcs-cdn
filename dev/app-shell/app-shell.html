@@ -131,7 +131,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         <user-data></user-data>
         <hr>
         <manifest-data></manifest-data>
-    </div>
+      </div>
     </div>
 
   </div>
@@ -162,16 +162,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._dom.set(state);
       }
     }
-    /*
-    _getRootPath(urls) {
-      return (urls && urls.root) || AppShell.module.URL.split('/').slice(0, -2).join('/');
-    }
-    _getManifestPath(manifest) {
-      let params = (new URL(document.location)).searchParams;
-      let manifestParam = params.get('manifest');
-      return manifestParam || manifest; // || './arc.manifest';
-    }
-    */
     _configure({urls, manifest}) {
       let params = (new URL(document.location)).searchParams;
       let config = {
@@ -189,7 +179,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       //let root = this._getRootPath();
       // start application
       this._start(config);
-      //this._start(urlMap, urls, this._getManifestPath(manifest), this._container);
     }
     async _start(config) {
       // create default URL map
@@ -219,9 +208,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._currentUser = config.user;
       this._fetchUsersAndSetupSharing();
       // configure (chrome)-casting
-      UrlCaster.set(window.location.href);
+      this._configureCasting();
       // invoke planner
       this._findSuggestions();
+    }
+    _configureCasting() {
+      UrlCaster.set(window.location.href.replace('app', 'chromecast'));
     }
     async _loadManifest(path, loader) {
       let content;
@@ -384,9 +376,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _findOriginatingStep(plan) {
       let first_generation = this._findFirstGeneration(plan);
-
       if (!first_generation) return null;
-
       // Really, we should only store the string and upon loading normalize it
       // again and create a new hash. But really, really we should probably
       // do something smarter than literal matching anyway...
@@ -397,10 +387,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _addAcceptedStep(step) {
       console.log("accepting step", step);
-
       if (!this._steps) this._steps = [];
       if (!this._appliedSteps) this._appliedSteps = {};
-
       this._steps.push(step);
       this._appliedSteps[step.hash] = true;
       this._syncAcceptedSteps();
@@ -408,9 +396,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async _newAcceptedSteps(steps) {
       // Assume same length means we just get our own latest state
       if (this._steps && steps.length == this._steps.length) return;
-
       console.log("new accepted stuggestions from database", steps);
-
       this._steps = steps;
       this._applyAcceptedSteps();
       this._findSuggestions();
@@ -418,7 +404,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _applyAcceptedSteps() {
       if (!this._steps || !this._plans) return;
       if (!this._appliedSteps) this._appliedSteps = {};
-
       this._plans.forEach(suggestion => {
         let first_generation = this._findFirstGeneration(suggestion.plan);
         if (!first_generation) {
@@ -444,11 +429,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onPlanSelected(e) {
       let {plan, descriptionGenerator} = e.detail;
-
       this._setState({toastOpen: false});
-
       this._applySuggestion(plan, descriptionGenerator);
-
       this._addAcceptedStep(this._findOriginatingStep(plan));
       this._findSuggestions();
     }
