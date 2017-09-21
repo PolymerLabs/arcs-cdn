@@ -244,6 +244,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _syncStorage() {
       // dummy, replaced in _configureStorage
     }
+    _syncSharedViews() {
+      // If storage is enabled and sharing is enabled we will pull in all shared
+      // Arcs.
+    }
     _configureStorage(manifestPath) {
       let storage = new ArcMetadataStorage(this);
       // Create an amkey=id if it doesn't already exist.
