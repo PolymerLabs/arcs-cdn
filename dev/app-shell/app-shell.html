@@ -20,6 +20,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script src="../components/xen/xen-template.js"></script>
 <script src="../components/xen/xen-element.js"></script>
 <script src="../components/xen/xen-state.js"></script>
+<!-- whitelist components (reusable) -->
+<link rel="import" href="../components/video-controller.html">
 <!-- components (reusable) -->
 <script src="../components/x-toast.js"></script>
 <script src="../components/suggestions-element.js"></script>
@@ -177,7 +179,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         container: this._dom.$('#particles'),
         urls
       };
-      dispatchEvent(new CustomEvent('configure'), {detail: config});
+      document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
       // find the path automagically
       //let root = this._getRootPath();
@@ -207,7 +209,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.arc = Arcs.utils.createArc({id: 'demo', urlMap, slotComposer, context: manifest});
       // configure persistence layer
       if (!config.nokey) {
-        this._configureStorage(manifestPath);
+        this._configureStorage(config.manifestPath);
       }
       // configure (chrome)-casting
       UrlCaster.set(window.location.href);
