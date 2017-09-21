@@ -1,1 +1,2 @@
-import '../particles/Chromecast/recipes.manifest'
+
+import 'https://arcs-firebase-playground.glitch.me/arc.manifest'
