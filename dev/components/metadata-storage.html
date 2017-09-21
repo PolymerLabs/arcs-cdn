@@ -135,14 +135,13 @@
       }
 
       this._remoteRef = db.ref('arcs/' + key);
-      console.assert(this.key, {'Invalid id: ': this.key});
 
       // Arc is loading or recently changed. We need to synchronize the views.
 
       // First we synchronize all of the local views with their remote copies.
       this._arc._viewsById.forEach((localView) => {
         let viewId = this._getViewId(localView);
-        // Make sure we only synchronize reach view at most once.
+        // Make sure we only synchronize each view at most once.
         if (this._syncedViews.has(viewId)) {
           return;
         }
