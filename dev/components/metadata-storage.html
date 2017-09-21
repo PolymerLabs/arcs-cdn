@@ -84,8 +84,7 @@
         // Apply remote changes to local view.
         remoteView.on('child_added', function(data) {
           if (data.val().id.startsWith(arcId)) {
-            // This addition was generated locally. It's already
-            console.log('Skip element that was added locally', data.val(), arcId);
+            console.log('Skip remote entity because it was created in this Arc', data.val(), arcId);
             return;
           }
           localView.store(data.val());
