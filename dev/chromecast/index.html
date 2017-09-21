@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+  <title>Arcs</title>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+  <style>
+    app-shell {
+      max-width: none !important;
+      max-height: none !important;
+    }
+    app-shell [header], app-shell x-toast {
+      Xdisplay: none;
+    }
+  </style>
+
+</head>
+<body>
+
+  <link rel="import" href="../app-shell/app-shell.html">
+
+  <script>
+    document.addEventListener('configure', e => {
+      //e.detail.affordance = 'voice';
+    });
+  </script>
+
+  <app-shell></app-shell>
+
+</body>
+</html>
