@@ -237,7 +237,7 @@
     // an instance doesn’t get events for storage operations it performed).
     // The callback is expected to be of the form: function(key, value).
     on(callback) {
-      var metadataRef = this.remoteRef.child('metadata');
+      var metadataRef = this._remoteRef.child('metadata');
 
       metadataRef.on('child_added', function(data) {
         callback(data.key, data.val());

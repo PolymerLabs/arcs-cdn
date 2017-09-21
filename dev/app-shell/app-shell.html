@@ -271,17 +271,26 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // TODO: this should be the absolute URL.
         storage.store('manifest', {url: manifestPath});
       }
+
+      // Sync views, e.g. after a new plan was incorporated to the arc
       this._syncStorage = () => storage.sync({key: amkey});
+
+      // Storing and reloading steps (keeping too storage specific stuff local)
+      this._syncAcceptedSteps = () => storage.store("accepted_steps", this._steps);
+      storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
     }
     async _findSuggestions() {
       this._setState({dotsActive: true, suggestions: []});
       //console.log('context:', this.arc.context);
-      let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
-      console.log('plans:', plans);
-      document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
-      plans.generations = generations;
-      this._plans = plans;
-      this._setState({dotsActive: false, dotsDisabled: plans && plans.length === 0});
+      let max_recursion = 3;
+      do {
+        let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
+        console.log('plans:', plans);
+        document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
+        plans.generations = generations;
+        this._plans = plans;
+      } while (this._applyAcceptedSteps() && --max_recursion > 0);
+      this._setState({dotsActive: false, dotsDisabled: this._plans && this._plans.length === 0});
       this._searchPlans();
     }
     _searchPlans() {
@@ -298,12 +307,98 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       this._setState({suggestions: results || []});
     }
-    _onPlanSelected(e) {
-      let {plan, descriptionGenerator} = e.detail;
-      this._setState({toastOpen: false});
+    _findFirstGeneration(plan) {
+      let last_generation = undefined;
+
+      // Search generations in reverse order for the accepted plan
+      [...this._plans.generations].reverse().find(
+        generation => {
+          return last_generation =
+            generation.find(member => member.result == plan);
+        });
+
+      if (!last_generation) {
+        console.log("no originating generation found for", plan);
+        return null;
+      }
+
+      // Walk derivation tree up to root. All paths will lead to the same root,
+      // hence we can always take the first branch.
+      let first_generation = last_generation;
+      while (first_generation.derivation[0].parent) {
+        first_generation = first_generation.derivation[0].parent;
+      }
+
+      return first_generation;
+    }
+    _findOriginatingStep(plan) {
+      let first_generation = this._findFirstGeneration(plan);
+
+      if (!first_generation) return null;
+
+      // Really, we should only store the string and upon loading normalize it
+      // again and create a new hash. But really, really we should probably
+      // do something smarter than literal matching anyway...
+      return {
+        recipe: first_generation.result.toString(),
+        hash: first_generation.hash
+      };
+    }
+    _addAcceptedStep(step) {
+      console.log("accepting step", step);
+
+      if (!this._steps) this._steps = [];
+      if (!this._appliedSteps) this._appliedSteps = {};
+
+      this._steps.push(step);
+      this._appliedSteps[step.hash] = true;
+      this._syncAcceptedSteps();
+    }
+    async _newAcceptedSteps(steps) {
+      // Assume same length means we just get our own latest state
+      if (this._steps && steps.length == this._steps.length) return;
+
+      console.log("new accepted stuggestions from database", steps);
+
+      this._steps = steps;
+      this._applyAcceptedSteps();
+      this._findSuggestions();
+    }
+    _applyAcceptedSteps() {
+      if (!this._steps || !this._plans) return;
+      if (!this._appliedSteps) this._appliedSteps = {};
+
+      this._plans.forEach(suggestion => {
+        let first_generation = this._findFirstGeneration(suggestion.plan);
+        if (!first_generation) {
+          console.warn("can't find first generation of", plan, "in", this._plans.generations);
+          return;
+        }
+        // TODO: Allow re-applying same step unless its on the root slot.
+        // Will make sense once verbs, etc. work and different slots, etc.
+        // resolve differently.
+        if (this._appliedSteps[first_generation.hash]) return;
+        let matching_step = this._steps.find(step => step.hash == first_generation.hash);
+        if (matching_step) {
+          console.log("Auto applying: ", matching_step, suggestion);
+          this._appliedSteps[matching_step.hash] = true;
+          this._applySuggestion(suggestion.plan, suggestion.descriptionGenerator);
+        }
+      });
+    }
+    _applySuggestion(plan, descriptionGenerator) {
       this.arc.instantiate(plan);
       descriptionGenerator.setViewDescriptions(this.arc);
       this._syncStorage();
+    }
+    _onPlanSelected(e) {
+      let {plan, descriptionGenerator} = e.detail;
+
+      this._setState({toastOpen: false});
+
+      this._applySuggestion(plan, descriptionGenerator);
+
+      this._addAcceptedStep(this._findOriginatingStep(plan));
       this._findSuggestions();
     }
     _onNavClick() {
