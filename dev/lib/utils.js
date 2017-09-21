@@ -63,6 +63,10 @@ let utils = {
       registry: null,
       position: {line: 1, column: 0}
     });
+  },
+  // TODO: move this randomId to the backend.
+  randomId() {
+    return Date.now().toString(36).substr(2) + Math.random().toString(36).substr(2);
   }
 };
 

@@ -206,7 +206,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // renderer
       let slotComposer = new Arcs.SlotComposer({rootContext: config.container, affordance: config.affordance});
       // Arc!
-      this.arc = Arcs.utils.createArc({id: 'demo', urlMap, slotComposer, context: manifest});
+      this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
       // configure persistence layer
       if (!config.nokey) {
         this._configureStorage(config.manifestPath);
