@@ -201,10 +201,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._configureStorage(config.manifestPath);
       }
       // configure (chrome)-casting
-      let url = new URL(window.location.href);
-      UrlCaster.set(window.location.href);
+      this._configureCasting();
       // invoke planner
       this._findSuggestions();
+    }
+    _configureCasting() {
+      UrlCaster.set(window.location.href.replace('app', 'chromecast'));
     }
     async _loadManifest(path, loader) {
       let content;
