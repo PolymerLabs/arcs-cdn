@@ -108,6 +108,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <div header>
     <i class="material-icons" on-click="_onNavClick">menu</i>
     <span style="flex: 1;"></span>
+    <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
+    <span>&nbsp;</span>
     <i class="material-icons" on-click="_onCastClick">cast</i>
   </div>
   <div pages>
@@ -142,6 +144,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._mounted = true;
         this._dom = Xen.stamp(AppShell.module.querySelector('template')).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
+        this._updateSharedStateIcon();
         try {
           this._configure(window);
         } catch(x) {
@@ -165,6 +168,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         affordance: 'dom',
         root: params.get('root') || AppShell.module.URL.split('/').slice(0, -2).join('/'),
         manifestPath: params.get('manifest'),
+        user: params.get('user'),
         nokey: params.has('nokey'),
         container: this._dom.$('#particles'),
         urls
@@ -200,6 +204,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!config.nokey) {
         this._configureStorage(config.manifestPath);
       }
+      // configure users
+      this._currentUser = config.user;
+      this._fetchUsersAndSetupSharing();
       // configure (chrome)-casting
       this._configureCasting();
       // invoke planner
@@ -241,6 +248,47 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       return dedupe(defaults.concat(locals, remotes));
     }
+    _updateCurrentUsersData(data) {
+      if (data.manifest != this._currentUsersManifest) {
+        this._currentUsersManifest = data.manifest;
+        // TODO: Update context
+      }
+
+      // Restoring shared arc or other instance changed sharing state
+      // or currentUser changed and has different sharing setting
+      if (data.shared[this._amkey] && data.shared[this._amkey].shared != this._shared) {
+        this._setSharedState(data.shared[this._amkey].shared);
+      }
+    }
+    _fetchUsersAndSetupSharing() {
+      // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
+      // out of metadata-storage.html
+      db.ref('users').on('value', snapshot => {
+        let users = snapshot.val() || {};
+
+        this._users = users;
+
+        if (this._currentUser && users[this._currentUser]) {
+          this._updateCurrentUsersData(users[this._currentUser]);
+        }
+
+        // TODO: For users in context, see whether shared arcs changed.
+
+      });
+    }
+    _saveSharedState() {
+      if (!this._currentUser || !this._amkey) {
+        console.warn("attempt to save shared state without selected user failed");
+        return;
+      }
+
+      // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
+      // out of metadata-storage.html
+      db.ref('users').child(this._currentUser).child('shared').child(this._amkey).set({
+          shared: this._shared,
+          when: Date.now()
+      });
+    }
     _syncStorage() {
       // dummy, replaced in _configureStorage
     }
@@ -254,6 +302,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO: support multiple arcs.
       // TODO: we should probably associate the manifest path with the stored ID.
       let amkey = new URL(document.location.href).searchParams.get('amkey');
+
       if (!amkey) {
         storage.sync({}).then(values => {
           let url = new URL(document.location.href);
@@ -267,6 +316,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // TODO: this should be the absolute URL.
         storage.store('manifest', {url: manifestPath});
       }
+
+      this._amkey = amkey;
 
       // Sync views, e.g. after a new plan was incorporated to the arc
       this._syncStorage = () => storage.sync({key: amkey});
@@ -396,6 +447,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onCastClick() {
       UrlCaster.cast();
+    }
+    _updateSharedStateIcon() {
+      let icon = "";
+
+      if (this._currentUser) {
+        icon = this._shared ? "supervisor_account" : "lock_outline";
+      }
+      this._setState({ sharedStateIcon: icon });
+    }
+    _setSharedState(shared) {
+      this._shared = shared;
+      this._updateSharedStateIcon();
+    }
+    _onShareClick() {
+      this._setSharedState(!this._shared);
+      this._saveSharedState();
     }
     _onSearch(e) {
       this.search = e.target.value.toLowerCase();
