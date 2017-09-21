@@ -207,7 +207,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.arc = Arcs.utils.createArc({id: 'demo', urlMap, slotComposer, context: manifest});
       // configure persistence layer
       if (!config.nokey) {
-        this._configureStorage(manifestPath);
+        this._configureStorage(config.manifestPath);
       }
       // configure (chrome)-casting
       UrlCaster.set(window.location.href);
