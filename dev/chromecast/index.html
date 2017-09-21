@@ -18,6 +18,9 @@
     app-shell #particles {
       margin-bottom: 0 !important;
     }
+    app-shell #particles > div:first-child {
+      display: none;
+    }
   </style>
 
 </head>
@@ -27,7 +30,7 @@
 
   <script>
     document.addEventListener('configure', e => {
-      //e.detail.affordance = 'voice';
+      e.detail.manifestPath = 'arcs.manifest';
     });
   </script>
 
