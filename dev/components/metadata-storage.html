@@ -32,16 +32,9 @@
       this._syncedViews = new Set();
       console.log("Storing arc:", this._arc);
     }
-
-    // We need an ID that identifies the view across devices. The Arc ID is
-    // unique but the view ID suffix is the same across devices.
-    // Ideally we would be using the view name here but it's not set for
-    // some reason.
-    _getRemoteViewId(localView) {
-      return localView.id.replace(this._arc.id, '~');
-    }
-    _getLocalViewId(remoteView) {
-      return this._arc.id + remoteView.substring(1);
+    
+    _getViewId(localView) {
+      return localView.type.toString().replace(' ', '-');
     }
 
     // Synchronize a local view with a remote view.
@@ -148,13 +141,14 @@
 
       // First we synchronize all of the local views with their remote copies.
       this._arc._viewsById.forEach((localView) => {
+        let viewId = this._getViewId(localView);
         // Make sure we only synchronize reach view at most once.
-        if (this._syncedViews.has(localView.id)) {
+        if (this._syncedViews.has(viewId)) {
           return;
         }
-        this._syncedViews.add(localView.id);
+        this._syncedViews.add(viewId);
 
-        let remoteViewMeta = this._remoteRef.child('views/' + this._getRemoteViewId(localView));
+        let remoteViewMeta = this._remoteRef.child('views/' + viewId);
         remoteViewMeta.child('metadata').update(removeUndefined({
           type: localView.type,
           name: localView.name,
