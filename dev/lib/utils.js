@@ -15,8 +15,7 @@ let utils = {
       if (path[0] === '/') {
         path = `${location.origin}${path}`;
       } else if (path.indexOf('//') < 0) {
-        let root = location.href.split('/').slice(0, -1).join('/');
-        //console.log(`expanding relative path [${path}] to [${root}/${path}]`);
+        let root = location.origin + location.pathname.split('/').slice(0, -1).join('/');
         path = `${root}/${path}`;
       }
       remap[k] = path;

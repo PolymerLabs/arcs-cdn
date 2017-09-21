@@ -12,6 +12,12 @@
 
   <link rel="import" href="../app-shell/app-shell.html">
 
+  <script>
+    document.addEventListener('configure', e => {
+      console.log(e.details);
+    });
+  </script>
+
   <app-shell></app-shell>
 
 </body>

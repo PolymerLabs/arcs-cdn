@@ -13,25 +13,24 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <!-- Arcs engine -->
 <script src="../lib/ArcsLib.js"></script>
-
 <!-- Arcs helpers -->
 <script src="../lib/utils.js"></script>
 
-<!-- components (reusable) -->
+<!-- component dependencies -->
 <script src="../components/xen/xen-template.js"></script>
 <script src="../components/xen/xen-element.js"></script>
 <script src="../components/xen/xen-state.js"></script>
-
+<!-- components (reusable) -->
 <script src="../components/x-toast.js"></script>
 <script src="../components/suggestions-element.js"></script>
 <link rel="import" href="../components/dancing-dots.html">
 <link rel="import" href="../components/user-data.html">
 <link rel="import" href="../components/manifest-data.html">
+<!-- view-persistence via front-end -->
 <link rel="import" href="../components/metadata-storage.html">
-
+<!-- chrome-cast integration -->
 <script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js"></script>
 <script src="../components/url-caster.js"></script>
-
 <!-- tooling -->
 <link rel="import" href="../components/explorer-hotkey.html">
 
@@ -57,8 +56,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   [header] {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: 414px;
     height: 32px;
     box-sizing: border-box;
     padding: 0 8px;
@@ -108,6 +105,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <template>
   <div header>
     <i class="material-icons" on-click="_onNavClick">menu</i>
+    <span style="flex: 1;"></span>
     <i class="material-icons" on-click="_onCastClick">cast</i>
   </div>
   <div pages>
@@ -142,7 +140,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._mounted = true;
         this._dom = Xen.stamp(AppShell.module.querySelector('template')).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
-        this._container = this._dom.$('#particles');
         try {
           this._configure(window);
         } catch(x) {
@@ -160,50 +157,71 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._dom.set(state);
       }
     }
+    /*
     _getRootPath(urls) {
       return (urls && urls.root) || AppShell.module.URL.split('/').slice(0, -2).join('/');
     }
     _getManifestPath(manifest) {
-      return manifest || './arc.manifest';
+      let params = (new URL(document.location)).searchParams;
+      let manifestParam = params.get('manifest');
+      return manifestParam || manifest; // || './arc.manifest';
     }
+    */
     _configure({urls, manifest}) {
+      let params = (new URL(document.location)).searchParams;
+      let config = {
+        affordance: 'dom',
+        root: params.get('root') || AppShell.module.URL.split('/').slice(0, -2).join('/'),
+        manifestPath: params.get('manifest'),
+        nokey: params.has('nokey'),
+        container: this._dom.$('#particles'),
+        urls
+      };
+      dispatchEvent(new CustomEvent('configure'), {detail: config});
+      console.log(config);
       // find the path automagically
-      let root = this._getRootPath();
-      // create default URL map
-      let urlMap = Arcs.utils.createUrlMap(root);
+      //let root = this._getRootPath();
       // start application
-      this._start(urlMap, urls, this._getManifestPath(manifest), this._container);
+      this._start(config);
+      //this._start(urlMap, urls, this._getManifestPath(manifest), this._container);
     }
-    async _start(urlMap, metaUrls, manifestPath, container) {
+    async _start(config) {
+      // create default URL map
+      let urlMap = Arcs.utils.createUrlMap(config.root);
       // create a system loader
       // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
       // but we have to create one by hand for manifest loading
       let loader = new Arcs.BrowserLoader(urlMap);
-      // add metaUrls to urlMap after a resolve pass
-      if (metaUrls) {
-        Object.keys(metaUrls).forEach(k => urlMap[k] = loader._resolve(metaUrls[k]));
+      // add `urls` to `urlMap` after a resolve pass
+      if (config.urls) {
+        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
       }
       // load manifest
-      let manifest = await this._loadManifest(manifestPath, loader);
-      //let manifest = await Arcs.Manifest.load(manifestPath, loader);
+      let manifest = await this._loadManifest(config.manifestPath, loader);
       // TODO(sjmiles): hack in ability to utilize imported recipes
       utils.collapseRecipes(manifest);
       console.log(manifest);
       // renderer
-      let slotComposer = new Arcs.SlotComposer({rootContext: container, affordance: "dom"});
+      let slotComposer = new Arcs.SlotComposer({rootContext: config.container, affordance: config.affordance});
       // Arc!
       this.arc = Arcs.utils.createArc({id: 'demo', urlMap, slotComposer, context: manifest});
       // configure persistence layer
-      this._configureStorage(manifestPath);
+      if (!config.nokey) {
+        this._configureStorage(manifestPath);
+      }
       // configure (chrome)-casting
       UrlCaster.set(window.location.href);
       // invoke planner
       this._findSuggestions();
     }
     async _loadManifest(path, loader) {
-      //let content = await loader.loadResource(path);
-      let manifests = await this._fetchManifestList();
-      let content = manifests.map(u => `import '${u}'`).join('\n');
+      let content;
+      if (path) {
+        content = await loader.loadResource(path);
+      } else {
+        let manifests = await this._fetchManifestList();
+        content = manifests.map(u => `import '${u}'`).join('\n');
+      }
       //console.log(content);
       return await Arcs.utils.parseManifest(content, loader);
     }
@@ -239,6 +257,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         storage.sync({}).then(values => {
           let url = new URL(document.location.href);
           url.searchParams.set('amkey', values[0]);
+          // TODO(sjmiles): can we do this without refreshing?
           window.location.href = url.href;
         });
       } else {

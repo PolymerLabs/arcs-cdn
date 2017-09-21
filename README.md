@@ -1,6 +1,51 @@
 # arcs-cdn
 
-Build Process
+## Arcs Applications
+
+### Arcs Webapp
+
+https://polymerlabs.github.io/arcs-cdn/v0.1/app/
+
+The webapp can be configured with URL parameters:
+
+* manifest=[path]
+  * Uses manifest at [path] to bootstrap the Arc context. Otherwise, the context is comprised of the set of manifests published in the Arcs (admin) database.
+* nokey
+  * do not persist this arc (i.e. no `amkey` is assigned)
+* root=[path]
+  * override the root path used to locate CDN resources (advanced).
+
+Example:
+
+https://polymerlabs.github.io/arcs-cdn/v0.1/app/?nokey&manifest=arcs.manifest
+
+### Arcs VR
+
+https://polymerlabs.github.io/arcs-cdn/v0.1/vr/ (currently broken)
+
+### Arcs ChromeCast
+
+TBD.
+
+### Arcs Home
+
+TBD.
+
+## Versions and Development
+
+Generally the pattern for resources is:
+
+`...arcs-cdn/[version]/...`
+
+Where `[version]` is `v[Major].[Minor].[Release]`.
+
+There is some basic semver support, so `arcs-cdn/v0.1/app` will call up the latest version of `app` that matches `0.1.*`.
+
+The _in-development_ version is at version `dev` (e.g. https://polymerlabs.github.io/arcs-cdn/dev/app/). This version has no SLA (it may be broken at any particular time).
+
+## Build Process
+
+The Arcs engine and some other primary resources live in PolymerLabs/Arcs repository. Here are instructions on how to rebuild
 
 1. Have local checkouts of **arcs** and **arcs-cdn** as siblings (i.e. the gulpfile in arcs-cdn expects to find mainline source code in ../arcs).
 
