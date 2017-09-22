@@ -266,13 +266,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // out of metadata-storage.html
       db.ref('users').on('value', snapshot => {
         let users = snapshot.val() || {};
-
         this._users = users;
-
         if (this._currentUser && users[this._currentUser]) {
           this._updateCurrentUsersData(users[this._currentUser]);
         }
-
         // Pull in all of the views from all public Arcs and add them to
         // the current context.
         // TODO: restrict that to a set of users that we care about.
@@ -291,7 +288,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         console.warn("attempt to save shared state without selected user failed");
         return;
       }
-
       // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
       // out of metadata-storage.html
       db.ref('users').child(this._currentUser).child('shared').child(this._amkey).set({
@@ -312,7 +308,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO: support multiple arcs.
       // TODO: we should probably associate the manifest path with the stored ID.
       let amkey = new URL(document.location.href).searchParams.get('amkey');
-
       if (!amkey) {
         storage.sync({}).then(values => {
           let url = new URL(document.location.href);
@@ -326,12 +321,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // TODO: this should be the absolute URL.
         storage.store('manifest', {url: manifestPath});
       }
-
       this._amkey = amkey;
-
       // Sync views, e.g. after a new plan was incorporated to the arc
       this._syncStorage = () => storage.sync({key: amkey});
-
       // Storing and reloading steps (keeping too storage specific stuff local)
       this._syncAcceptedSteps = () => storage.store("accepted_steps", this._steps);
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
@@ -365,26 +357,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _findFirstGeneration(plan) {
       let last_generation = undefined;
-
       // Search generations in reverse order for the accepted plan
       [...this._plans.generations].reverse().find(
         generation => {
           return last_generation =
             generation.find(member => member.result == plan);
         });
-
       if (!last_generation) {
         console.log("no originating generation found for", plan);
         return null;
       }
-
       // Walk derivation tree up to root. All paths will lead to the same root,
       // hence we can always take the first branch.
       let first_generation = last_generation;
       while (first_generation.derivation[0].parent) {
         first_generation = first_generation.derivation[0].parent;
       }
-
       return first_generation;
     }
     _findOriginatingStep(plan) {
