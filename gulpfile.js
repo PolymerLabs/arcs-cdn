@@ -72,5 +72,5 @@ gulp.task('copy', function () {
   gulp.src(`${arcs}${browserlib}${suggestionsElement}`).pipe(gulp.dest(`${components}`));
 });
 
-gulp.task('default', ['build','copy']);
+gulp.task('default', ['build'/*,'copy'*/]);
 
