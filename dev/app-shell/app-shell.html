@@ -144,7 +144,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._mounted = true;
         this._dom = Xen.stamp(AppShell.module.querySelector('template')).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
-        this._updateSharedStateIcon();
         try {
           this._configure(window);
         } catch(x) {
@@ -179,6 +178,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       //let root = this._getRootPath();
       // start application
       this._start(config);
+
+      // configure users
+      this._currentUser = config.user;
+      this._updateSharedStateIcon();
     }
     async _start(config) {
       // create default URL map
@@ -204,8 +207,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!config.nokey) {
         this._configureStorage(config.manifestPath);
       }
-      // configure users
-      this._currentUser = config.user;
       this._fetchUsersAndSetupSharing();
       // configure (chrome)-casting
       this._configureCasting();
@@ -272,8 +273,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           this._updateCurrentUsersData(users[this._currentUser]);
         }
 
-        // TODO: For users in context, see whether shared arcs changed.
-
+        // Pull in all of the views from all public Arcs and add them to
+        // the current context.
+        // TODO: restrict that to a set of users that we care about.
+        snapshot.forEach(user => {
+          if (user.key == this._currentUser) return;
+          user.child('shared').forEach(s => {
+            if (!s.val().shared) return;
+            console.log('Import view into the context from amkey=', s.key);
+            //this.arc.context.newView(type, name, id, tags);
+          });
+        });
       });
     }
     _saveSharedState() {
@@ -328,7 +338,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     async _findSuggestions() {
       this._setState({dotsActive: true, suggestions: []});
-      //console.log('context:', this.arc.context);
       let max_recursion = 3;
       do {
         let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
