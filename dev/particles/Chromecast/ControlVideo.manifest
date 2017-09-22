@@ -6,10 +6,10 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import 'VideoPlayback.manifest'
+import 'https://arcs-firebase-playground.glitch.me/entities/VideoPlayback.manifest'
 
-particle CastVideo in 'CastVideo.js'
-  CastVideo(in [VideoPlayback] controls)
-  #affordance voice
+particle ControlVideo in 'ControlVideo.js'
+  # Should be a Variable but those don't get synced... yet.
+  ControlVideo(inout [VideoPlayback] controls)
   consume root
-  description `Cast Video`
+  description `Control Video`
