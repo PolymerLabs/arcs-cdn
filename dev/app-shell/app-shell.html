@@ -318,17 +318,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let amkey = new URL(document.location.href).searchParams.get('amkey');
       if (!amkey) {
         storage.sync({}).then(values => {
+          amkey = values[0];
           let url = new URL(document.location.href);
-          url.searchParams.set('amkey', values[0]);
-          // TODO(sjmiles): can we do this without refreshing?
-          window.location.href = url.href;
+          url.searchParams.set('amkey', amkey);
+          window.history.replaceState({}, "", url.href);
         });
       } else {
         storage.sync({key: amkey});
-        // Store the manifest file path for the Arc to test out metadata storage.
-        // TODO: this should be the absolute URL.
-        storage.store('manifest', {url: manifestPath});
       }
+      // Store the manifest file path for the Arc to test out metadata storage.
+      // TODO: this should be the absolute URL.
+      storage.store('manifest', {url: manifestPath});
       this._amkey = amkey;
       // Sync views, e.g. after a new plan was incorporated to the arc
       this._syncStorage = () => storage.sync({key: amkey});
