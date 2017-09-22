@@ -204,8 +204,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!config.nokey) {
         this._configureStorage(config.manifestPath);
       }
+      // set current user or read it from local storage
+      if (config.user) {
+        this._currentUser = config.user;
+        this._currentUser = localStorage.setItem('currentUser', config.user);
+      } else {
+        this._currentUser = localStorage.getItem('currentUser');
+      }
       // configure users
-      this._currentUser = config.user;
       this._fetchUsersAndSetupSharing();
       // configure (chrome)-casting
       this._configureCasting();
