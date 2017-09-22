@@ -1,3 +1,4 @@
+
 # Copyright (c) 2017 Google Inc. All rights reserved.
 # This code may only be used under the BSD style license found at
 # http://polymer.github.io/LICENSE.txt
@@ -5,13 +6,14 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import 'VideoPlayback.manifest'
+import 'https://arcs-firebase-playground.glitch.me/controls-data.manifest'
 
-view Controller of [VideoPlayback] in 'controller.json'
-
-import 'CastVideo.manifest'
+import 'ControlVideo.manifest'
+import 'ShowVideo.manifest'
 
 recipe
   copy Controller as controls
-  CastVideo
+  ControlVideo
+    controls = controls
+  ShowVideo
     controls <- controls
