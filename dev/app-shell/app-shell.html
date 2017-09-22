@@ -174,13 +174,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
+
+      // set current user or read it from local storage
+      if (config.user) {
+        this._currentUser = config.user;
+        localStorage.setItem('currentUser', config.user);
+      } else {
+        this._currentUser = localStorage.getItem('currentUser');
+      }
+
       // find the path automagically
       //let root = this._getRootPath();
       // start application
       this._start(config);
 
-      // configure users
-      this._currentUser = config.user;
       this._updateSharedStateIcon();
     }
     async _start(config) {
@@ -206,13 +213,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // configure persistence layer
       if (!config.nokey) {
         this._configureStorage(config.manifestPath);
-      }
-      // set current user or read it from local storage
-      if (config.user) {
-        this._currentUser = config.user;
-        this._currentUser = localStorage.setItem('currentUser', config.user);
-      } else {
-        this._currentUser = localStorage.getItem('currentUser');
       }
       // configure users
       this._fetchUsersAndSetupSharing();
