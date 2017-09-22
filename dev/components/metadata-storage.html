@@ -253,41 +253,34 @@
       console.warn('Variable syncing not supported');
     }
 
+    // Call initialize if you don't yet have an amkey. The method
+    // will return a promise that contains an amkey.
+    init() {
+      // This is the first time we see this Arc. Create the basic Arc metadata
+      // in Firebase.
+      let ref = db.ref('arcs').push();
+      let promises = [Promise.resolve(ref.key)];
+      // TODO: serialize doesn't work properly as far as I can tell...
+      promises.push(ref.set(this._arc.serialize()));
+      // TODO: should we sync views here? The way the system is current setup
+      // there will never be any (non-static) views at this stage.
+      return firebase.Promise.all(promises);
+    }
+
     // Sync the Arc metadata with a backend. Whenever this method is called
     // we look for new views that may need to be synced.
     //
-    // If key is unspecified, we assume that nothing in the Arc has been stored
-    // and will create a new remote instance that contains whatever is
-    // currently present in the given Arc.
-    //
-    // If key is specified, we clear all of the local views in the given
+    // The key must be specified. We clear all of the local views in the given
     // Arc and replace their contents with whatever was stored remotely.
     //
-    // Note: views that are created after the constructor is called will not be
-    // synchronized.
+    // Note: views that are created after sync is called will not be synchronized.
+    // You have to call sync again whenever new views are added to the Arc.
     // TODO: change arc.js to fire an event when a new view is added to an Arc.
-    //
-    // Returns a promise that resolves to the key identifying the remote
-    // Arc metadata once syncing has successfully been initialized.
     sync({ key }) {
-      console.log(this._arc, key);
-
-      if (!key) {
-        // This is the first time we see this Arc. Create the basic Arc metadata
-        // in Firebase.
-        let ref = db.ref('arcs').push();
-        let promises = [Promise.resolve(ref.key)];
-        // TODO: serialize doesn't work properly as far as I can tell...
-        promises.push(ref.set(this._arc.serialize()));
-        // TODO: should we sync views here? The way the system is current setup
-        // there will never be any (non-static) views at this stage.
-        return firebase.Promise.all(promises);
-      }
-
+      console.assert(key);
       this._remoteRef = db.ref('arcs/' + key);
 
       // Arc is loading or recently changed. We need to synchronize the views.
-
       // First we synchronize all of the local views with their remote copies.
       this._arc._viewsById.forEach((localView) => {
         let viewId = this._getViewId(localView);
@@ -336,9 +329,6 @@
           }
         });
       });
-
-      // Just for consistency.
-      return Promise.resolve(key);
     }
 
     // TODO: also sync views that don't yet exist locally but do exist remotely.

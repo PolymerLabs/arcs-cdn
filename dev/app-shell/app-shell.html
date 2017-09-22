@@ -174,13 +174,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
+
+      // set current user or read it from local storage
+      if (config.user) {
+        this._currentUser = config.user;
+        localStorage.setItem('currentUser', config.user);
+      } else {
+        this._currentUser = localStorage.getItem('currentUser');
+      }
+
       // find the path automagically
       //let root = this._getRootPath();
       // start application
       this._start(config);
 
-      // configure users
-      this._currentUser = config.user;
       this._updateSharedStateIcon();
     }
     async _start(config) {
@@ -207,7 +214,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!config.nokey) {
         this._configureStorage(config.manifestPath);
       }
-      this._fetchUsersAndSetupSharing();
+      // configure users
+      await this._fetchUsersAndSetupSharing();
       // configure (chrome)-casting
       this._configureCasting();
       // invoke planner
@@ -264,15 +272,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _fetchUsersAndSetupSharing() {
       // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
       // out of metadata-storage.html
-      db.ref('users').on('value', snapshot => {
+      return db.ref('users').on('value', snapshot => {
         let users = snapshot.val() || {};
-
         this._users = users;
-
         if (this._currentUser && users[this._currentUser]) {
           this._updateCurrentUsersData(users[this._currentUser]);
         }
-
         // Pull in all of the views from all public Arcs and add them to
         // the current context.
         // TODO: restrict that to a set of users that we care about.
@@ -291,7 +296,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         console.warn("attempt to save shared state without selected user failed");
         return;
       }
-
       // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
       // out of metadata-storage.html
       db.ref('users').child(this._currentUser).child('shared').child(this._amkey).set({
@@ -306,29 +310,28 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // If storage is enabled and sharing is enabled we will pull in all shared
       // Arcs.
     }
-    _configureStorage(manifestPath) {
+    async _configureStorage(manifestPath) {
       let storage = new ArcMetadataStorage(this);
       // Create an amkey=id if it doesn't already exist.
       // TODO: support multiple arcs.
       // TODO: we should probably associate the manifest path with the stored ID.
       let amkey = new URL(document.location.href).searchParams.get('amkey');
-
       if (!amkey) {
-        storage.sync({}).then(values => {
+        // Wait for the initial storage to be done.
+        // TODO: don't call this initial method sync but something else. E.g.
+        await storage.init().then(values => {
+          amkey = values[0];
           let url = new URL(document.location.href);
-          url.searchParams.set('amkey', values[0]);
-          // TODO(sjmiles): can we do this without refreshing?
-          window.location.href = url.href;
+          url.searchParams.set('amkey', amkey);
+          window.history.replaceState({}, "", url.href);
         });
-      } else {
-        storage.sync({key: amkey});
-        // Store the manifest file path for the Arc to test out metadata storage.
-        // TODO: this should be the absolute URL.
-        storage.store('manifest', {url: manifestPath});
       }
-
+      storage.sync({key: amkey});
+      
+      // Store the manifest file path for the Arc to test out metadata storage.
+      // TODO: this should be the absolute URL.
+      storage.store('manifest', {url: manifestPath});
       this._amkey = amkey;
-
       // Sync views, e.g. after a new plan was incorporated to the arc
       this._syncStorage = () => storage.sync({key: amkey});
 
@@ -367,26 +370,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _findFirstGeneration(plan) {
       let last_generation = undefined;
-
       // Search generations in reverse order for the accepted plan
       [...this._plans.generations].reverse().find(
         generation => {
           return last_generation =
             generation.find(member => member.result == plan);
         });
-
       if (!last_generation) {
         console.log("no originating generation found for", plan);
         return null;
       }
-
       // Walk derivation tree up to root. All paths will lead to the same root,
       // hence we can always take the first branch.
       let first_generation = last_generation;
       while (first_generation.derivation[0].parent) {
         first_generation = first_generation.derivation[0].parent;
       }
-
       return first_generation;
     }
     _findOriginatingStep(plan) {
