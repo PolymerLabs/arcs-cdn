@@ -4137,7 +4137,7 @@ const DEBUGGING = false;
  * instead use DOMParticle.
  */
 class Particle {
-  constructor() {
+  constructor(capabilities) {
     this.spec = this.constructor.spec;
     if (this.spec.inputs.length == 0)
       this.extraData = true;
@@ -4149,6 +4149,7 @@ class Particle {
     this.stateHandlers = new Map();
     this.states = new Map();
     this._slotByName = new Map();
+    this.capabilities = capabilities || {};
   }
 
   /** @method setViews(views)
@@ -4161,6 +4162,12 @@ class Particle {
    */
   setViews(views) {
 
+  }
+
+  constructInnerArc() {
+    if (!this.capabilities.constructInnerArc)
+      throw new Error("This particle is not allowed to construct inner arcs");
+    return this.capabilities.constructInnerArc(this);
   }
 
   get busy() {
@@ -4235,7 +4242,7 @@ class Particle {
    *
    * views is a map from names to view handles
    * names indicates the views which should have a callback installed on them
-   * kind is the kind of event that should ve registered for
+   * kind is the kind of event that should be registered for
    * f is the callback function
    */
   on(views, names, kind, f) {
@@ -7023,6 +7030,7 @@ class ParticleSpec {
       model.args = [];
     this._model = model;
     this.name = model.name;
+    this.verbs = model.verbs;
     var typeVarMap = new Map();
     this.connections = model.args.map(a => new ConnectionSpec(a, typeVarMap));
     this.connectionMap = new Map();
@@ -7056,18 +7064,24 @@ class ParticleSpec {
     return this.slots.get(slotName);
   }
 
+  get primaryVerb() {
+    if (this.verbs.length > 0) {
+      return this.verbs[0];
+    }
+  }
+
   matchAffordance(affordance) {
     return this.slots.size <= 0 || this.affordance.includes(affordance);
   }
 
   toLiteral() {
-    let {args, name, transient, description, implFile, affordance, slots} = this._model;
+    let {args, name, verbs, transient, description, implFile, affordance, slots} = this._model;
     args = args.map(a => {
       let {type, direction, name} = a;
       type = type.toLiteral();
       return {type, direction, name};
     });
-    return {args, name, transient, description, implFile, affordance, slots};
+    return {args, name, verbs, transient, description, implFile, affordance, slots};
   }
 
   static fromLiteral(literal) {
@@ -9053,7 +9067,8 @@ class DomParticle extends XenStateMixin(Particle) {
   async setViews(views) {
     this._views = views;
     let config = this.config;
-    this.when([new ViewChanges(views, config.views, 'change')], async () => {
+    let readableViews = config.views.filter(name => views.get(name).canRead);
+    this.when([new ViewChanges(views, readableViews, 'change')], async () => {
       //log(`${this.info()}: invalidated by [ViewChanges]`);
       // acquire (async) list data from views
       let data = await Promise.all(config.views
@@ -9654,6 +9669,8 @@ class InnerPEC {
 
     this._apiPort.onViewCallback = ({callback, data}) => callback(data);
 
+    this._apiPort.onParticleCallback = ({callback}) => callback();
+
     this._apiPort.onAwaitIdle = ({version}) =>
       this.idle.then(a => this._apiPort.Idle({version, relevance: this.relevance}));
 
@@ -9719,13 +9736,27 @@ class InnerPEC {
     return `${this._idBase}:${this._nextLocalID++}`;
   }
 
+  innerArcHandle() {
+    return {};
+  }
+
+  defaultCapabilitySet() {
+    return {
+      constructInnerArc: particle => {
+        return new Promise((resolve, reject) =>
+          this._apiPort.ConstructInnerArc({ callback: () => {resolve(this.innerArcHandle())}, particle }));
+      }
+    }
+  }
+
   async _instantiateParticle(spec, views) {
     let name = spec.name;
     var resolve = null;
     var p = new Promise((res, rej) => resolve = res);
     this._pendingLoads.push(p);
     let clazz = await this._loader.loadParticleClass(spec);
-    let particle = new clazz();
+    let capabilities = this.defaultCapabilitySet();
+    let particle = new clazz(capabilities);
     this._particles.push(particle);
 
     var viewMap = new Map();
@@ -18719,6 +18750,9 @@ class PECOuterPort extends APIPort {
     this.registerHandler("ViewStore", {view: this.Mapped, data: this.Direct});
     this.registerHandler("ViewClear", {view: this.Mapped});
     this.registerHandler("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
+
+    this.registerHandler("ConstructInnerArc", {callback: this.Direct, particle: this.Mapped});
+    this.registerCall("ParticleCallback", {callback: this.Direct});
   }
 }
 
@@ -18750,6 +18784,9 @@ class PECInnerPort extends APIPort {
     this.registerCall("ViewStore", {view: this.Mapped, data: this.Direct});
     this.registerCall("ViewClear", {view: this.Mapped});
     this.registerCall("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
+
+    this.registerCall("ConstructInnerArc", {callback: this.LocalMapped, particle: this.Mapped});
+    this.registerHandler("ParticleCallback", {callback: this.LocalMapped});
   }
 }
 

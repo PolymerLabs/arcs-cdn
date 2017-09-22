@@ -8,8 +8,10 @@
 
 const gulp = require('gulp');
 
+const target = `./dev/`;
+
 const paths = {
-  build: './master/lib',
+  build: `${target}lib`
 };
 
 const sources = {
@@ -23,13 +25,11 @@ const sources = {
 let pack = async (files) => {
   try {
     const webpack = require('webpack');
-
     let node = {
       fs: 'empty',
       mkdirp: 'empty',
       minimist: 'empty',
     };
-
     for (let file of files) {
       await new Promise((resolve, reject) => {
         webpack({
@@ -59,5 +59,18 @@ gulp.task('build', async function() {
   await pack(sources.cdn);
 });
 
-gulp.task('default', ['build']);
+const components = `${target}components/`;
+const arcs = `../arcs/`;
+const browserlib = `runtime/browser/lib/`;
+
+const strategyExplorer = `strategy-explorer`;
+const suggestionsElement = `suggestions-element.js`;
+const glob = `/**/*`;
+
+gulp.task('copy', function () {
+  gulp.src(`${arcs}${strategyExplorer}${glob}`).pipe(gulp.dest(`${components}${strategyExplorer}`));
+  gulp.src(`${arcs}${browserlib}${suggestionsElement}`).pipe(gulp.dest(`${components}`));
+});
+
+gulp.task('default', ['build'/*,'copy'*/]);
 

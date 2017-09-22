@@ -13,7 +13,8 @@ let Arcs = {
   Manifest: require("../../arcs/runtime/manifest.js"),
   BrowserLoader: require(`./browser-cdn-loader.js`),
   SlotComposer: require(`../../arcs/runtime/slot-composer.js`),
-  Planner: require(`../../arcs/runtime/planner.js`)
+  Planner: require(`../../arcs/runtime/planner.js`),
+  Type: require('../../arcs/runtime/type.js')
 };
 
 window.Arcs = Arcs;
