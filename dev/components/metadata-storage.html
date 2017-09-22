@@ -6,6 +6,155 @@
 -->
 
 <script>
+  const assert = console.assert;
+
+  let nextVariableId = 0;
+
+  function addType(name, tag, args) {
+    var lowerName = name[0].toLowerCase() + name.substring(1);
+    if (args.length == 1) {
+      Object.defineProperty(Type, `new${name}`, {
+        value: function () {
+          return new Type(tag, arguments[0]);
+        }
+      });
+      var upperArg = args[0][0].toUpperCase() + args[0].substring(1);
+      Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
+        get: function () {
+          assert(this[`is${name}`]);
+          return this.data;
+        }
+      });
+    } else {
+      Object.defineProperty(Type, `new${name}`, {
+        value: function () {
+          var data = {};
+          for (var i = 0; i < args.length; i++)
+            data[args[i]] = arguments[i];
+          return new Type(tag, data);
+        }
+      });
+      for (var arg of args) {
+        var upperArg = arg[0].toUpperCase() + arg.substring(1);
+        Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
+          get: function () {
+            assert(this[`is${name}`]);
+            return this.data[arg];
+          }
+        });
+      }
+    }
+    Object.defineProperty(Type.prototype, `is${name}`, {
+      get: function () {
+        return this.tag == tag;
+      }
+    });
+  }
+
+  class Type {
+    constructor(tag, data) {
+      assert(typeof tag == 'string');
+      assert(data);
+      if (tag == 'entity')
+        assert(data.tag == undefined);
+      this.tag = tag;
+      this.data = data;
+    }
+
+    // TODO: Replace these static functions with operations on Types directly.
+    // Replaces 'prevariable' types with 'variable'+id types .
+    assignVariableIds(variableMap) {
+      if (this.isVariableReference) {
+        var name = this.data.name;
+        var id = variableMap.get(name);
+        if (id == undefined) {
+          id = nextVariableId++;
+          variableMap.set(name, id);
+        }
+        return Type.newVariable(name, id);
+      }
+
+      if (this.isView) {
+        return this.primitiveType().assignVariableIds(variableMap).viewOf();
+      }
+
+      return this;
+    }
+
+    // Replaces raw strings with resolved schemas.
+    resolveSchemas(resolveSchema) {
+      if (this.isEntityReference) {
+        // TODO: This should probably all happen during type construction so that
+        //       we can cache the schema objet.
+        return Type.newEntity(resolveSchema(this.data).toLiteral());
+      }
+
+      if (this.isView) {
+        return this.primitiveType().resolveSchemas(resolveSchema).viewOf();
+      }
+
+      return this;
+    }
+
+    equals(type) {
+      if (this.tag !== type.tag)
+        return false;
+      if (this.tag == 'entity') {
+        // TODO: Remove this hack that allows the old resolver to match
+        //       types by schema name.
+        return this.data.name == type.data.name;
+      }
+      if (this.isView) {
+        return this.data.equals(type.data);
+      }
+      return JSON.stringify(this.data) == JSON.stringify(type.data);
+    }
+
+    get isValid() {
+      return !this.variableReference;
+    }
+
+    primitiveType() {
+      var type = this.viewType;
+      return new Type(type.tag, type.data);
+    }
+
+    toLiteral() {
+      return this;
+    }
+
+    static fromLiteral(literal) {
+      return new Type(literal.tag, literal.data);
+    }
+
+    viewOf() {
+      return Type.newView(this);
+    }
+
+    // TODO: rename toString to describe
+    toString() {
+      if (this.isRelation)
+        return JSON.stringify(this.data);
+      if (this.isView)
+        return `${this.primitiveType().toString()} List`;
+      if (this.isVariable)
+        return `[${this.variableName}]`;
+      if (this.isVariableReference)
+        return `[${this.variableReferenceName}]`;
+      if (this.isEntity)
+        return this.entitySchema.name;
+      if (this.isEntityReference)
+        return this.entityReferenceName;
+    }
+  }
+
+  addType('EntityReference', 'entityReference', ['name']);
+  addType('Entity', 'entity', ['schema']);
+  addType('VariableReference', 'variableReference', ['name']);
+  addType('Variable', 'variable', ['name', 'id']);
+  addType('View', 'list', ['type']);
+  addType('Relation', 'relation', ['entities']);
+
   let firebaseConfig = {
     apiKey: "AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8",
     authDomain: "arcs-storage.firebaseapp.com",
@@ -168,7 +317,8 @@
       this._remoteRef.child('views').orderByKey().once('value').then(remoteViews => {
         remoteViews.forEach(remoteViewMeta => {
           let metadata = remoteViewMeta.child('metadata').val();
-          let viewId = this._getViewId(metadata);
+          let type = new Type(metadata.type.tag, metadata.type.data);
+          let viewId = this._getViewId({type});
           if (this._syncedViews.has(viewId)) {
             return;
           }
@@ -176,17 +326,6 @@
           console.log('Unsynced remove view: ', remoteViewMeta.key);
           // TODO: This is totally broken. I somehow need to get to the Type constructor
           // without this hack.
-          let Type = undefined;
-          if (this._arc._views.length) {
-            Type = this._arc._views[0].type.constructor;
-          } else if (this._arc.context.views.length) {
-            Type = this._arc.context.views[0].type.constructor;
-          }
-          if (!Type) {
-            console.warn('Unable to sync remote view:', remoteViewMeta.key);
-            return;
-          }
-          let type = new Type(metadata.type.tag, metadata.type.data);
           let localView = this._arc.createView(type, metadata.name);
           let remoteView = remoteViewMeta.child('values').ref;
           if (localView.type.isView) {
@@ -208,6 +347,31 @@
     // PRE: sync() was called and returned a key.
     get key() {
       return this._remoteRef.key;
+    }
+
+    // Adds all of the views in the given Arc to the local context.
+    syncSharedViews({key}) {
+      let arc = db.ref('arcs/' + key);
+      arc.child('views').on('value', remoteViews => {
+        remoteViews.forEach(remoteViewMeta => {
+          let metadata = remoteViewMeta.child('metadata').val();
+          let type = new Type(metadata.type.tag, metadata.type.data);
+          let viewId = this._getViewId({type});
+          if (this._syncedViews.has(viewId)) {
+            console.warn(`View id already synced in Arc: ${key}:${viewId}`);
+            return;
+          }
+          this._syncedViews.add(viewId);
+          let localView = this._arc.context.newView(type, metadata.name);
+          let remoteView = remoteViewMeta.child('values').ref;
+          if (localView.type.isView) {
+            this._syncView(localView, remoteView);
+          }
+          if (localView.type.isVariable) {
+            this._syncVariable(localView, remoteView);
+          }
+        })
+      });
     }
 
     // Stores arbitrary metadata associated with that arc. The key here
