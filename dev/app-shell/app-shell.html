@@ -20,6 +20,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script src="../components/xen/xen-template.js"></script>
 <script src="../components/xen/xen-element.js"></script>
 <script src="../components/xen/xen-state.js"></script>
+
 <!-- whitelist components (reusable) -->
 <link rel="import" href="../components/video-controller.html">
 <!-- components (reusable) -->
@@ -28,6 +29,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <link rel="import" href="../components/dancing-dots.html">
 <link rel="import" href="../components/user-data.html">
 <link rel="import" href="../components/manifest-data.html">
+
 <!-- view-persistence via front-end -->
 <link rel="import" href="../components/metadata-storage.html">
 <!-- chrome-cast integration -->
@@ -174,7 +176,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
-
       // set current user or read it from local storage
       if (config.user) {
         this._currentUser = config.user;
@@ -182,12 +183,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       } else {
         this._currentUser = localStorage.getItem('currentUser');
       }
-
       // find the path automagically
       //let root = this._getRootPath();
       // start application
       this._start(config);
-
       this._updateSharedStateIcon();
     }
     async _start(config) {
@@ -229,11 +228,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (path) {
         content = await loader.loadResource(path);
       } else {
+        path = './arcs.manifest';
         let manifests = await this._fetchManifestList();
         content = manifests.map(u => `import '${u}'`).join('\n');
       }
       //console.log(content);
-      return await Arcs.utils.parseManifest(content, loader);
+      return await Arcs.utils.parseManifest(path, content, loader);
     }
     async _fetchManifestList() {
       // TODO(sjmiles): using the global `db` that is currently leaking out
@@ -262,7 +262,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._currentUsersManifest = data.manifest;
         // TODO: Update context
       }
-
       // Restoring shared arc or other instance changed sharing state
       // or currentUser changed and has different sharing setting
       if (data.shared[this._amkey] && data.shared[this._amkey].shared != this._shared) {
@@ -304,6 +303,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       });
     }
     _syncStorage() {
+      // dummy, replaced in _configureStorage
+    }
+    _syncAcceptedSteps() {
       // dummy, replaced in _configureStorage
     }
     _syncSharedViews() {
@@ -405,7 +407,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async _newAcceptedSteps(steps) {
       // Assume same length means we just get our own latest state
       if (this._steps && steps.length == this._steps.length) return;
-      console.log("new accepted stuggestions from database", steps);
+      console.log("new accepted suggestions from database", steps);
       this._steps = steps;
       this._applyAcceptedSteps();
       this._findSuggestions();
@@ -455,7 +457,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _updateSharedStateIcon() {
       let icon = "";
-
       if (this._currentUser) {
         icon = this._shared ? "supervisor_account" : "lock_outline";
       }
