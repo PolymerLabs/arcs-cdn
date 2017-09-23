@@ -108,6 +108,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <div header>
     <i class="material-icons" on-click="_onNavClick">menu</i>
     <span style="flex: 1;"></span>
+    <select on-change="_onUserSelected">{{usersOptions}}</select>
     <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
     <span>&nbsp;</span>
     <i class="material-icons" on-click="_onCastClick">cast</i>
@@ -135,7 +136,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </div>
 
   </div>
+
+  <template users-options>
+    <option value={{value}} selected$={{selected}}>{{user}}</option>
+  </template>
+
 </template>
+
 
 <script>
   class AppShell extends HTMLElement {
@@ -177,18 +184,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
       // set current user or read it from local storage
       if (config.user) {
-        this._currentUser = config.user;
-        localStorage.setItem('currentUser', config.user);
+        this._setCurrentUser(config.user);
       } else {
-        this._currentUser = localStorage.getItem('currentUser');
+        this._setCurrentUser(localStorage.getItem('currentUser'), true);
       }
 
       // find the path automagically
       //let root = this._getRootPath();
       // start application
       this._start(config);
-
-      this._updateSharedStateIcon();
     }
     async _start(config) {
       // create default URL map
@@ -257,16 +261,50 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       return dedupe(defaults.concat(locals, remotes));
     }
+    _setCurrentUser(user, dontUpdateLocalStorage) {
+      this._currentUser = user;
+
+      if (!dontUpdateLocalStorage) {
+        localStorage.setItem('currentUser', user);
+      }
+
+      this._updateSharedStateIcon();
+
+      if (this._users) {
+        if (this._currentUser && this._users[this._currentUser]) {
+          this._updateCurrentUsersData(this._users[this._currentUser]);
+        }
+
+        // Pull in all of the views from all public Arcs and add them to
+        // the current context.
+        // TODO: restrict that to a set of users that we care about.
+        Object.keys(this._users).forEach(user => {
+          if (user.key == this._currentUser || !user.shared) return;
+          Object.keys(users.shared).forEach(s => {
+            if (!s.shared) return;
+            console.log('Import view into the context from amkey=', s);
+            //this.arc.context.newView(type, name, id, tags);
+          });
+        });
+      }
+    }
     _updateCurrentUsersData(data) {
       if (data.manifest != this._currentUsersManifest) {
         this._currentUsersManifest = data.manifest;
+        console.log("new user manifest", data.manifest);
         // TODO: Update context
       }
 
       // Restoring shared arc or other instance changed sharing state
       // or currentUser changed and has different sharing setting
-      if (data.shared[this._amkey] && data.shared[this._amkey].shared != this._shared) {
-        this._setSharedState(data.shared[this._amkey].shared);
+      if (data.shared[this._amkey]) {
+        if (data.shared[this._amkey].shared != this._shared) {
+          this._setSharedState(data.shared[this._amkey].shared);
+        }
+      } else { // nothing yet in Firebase about this arc
+        if (this._shared) {
+          this._setSharedState(false);
+        }
       }
     }
     _fetchUsersAndSetupSharing() {
@@ -275,20 +313,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       db.ref('users').on('value', snapshot => {
         let users = snapshot.val() || {};
         this._users = users;
-        if (this._currentUser && users[this._currentUser]) {
-          this._updateCurrentUsersData(users[this._currentUser]);
-        }
-        // Pull in all of the views from all public Arcs and add them to
-        // the current context.
-        // TODO: restrict that to a set of users that we care about.
-        snapshot.forEach(user => {
-          if (user.key == this._currentUser) return;
-          user.child('shared').forEach(s => {
-            if (!s.val().shared) return;
-            console.log('Import view into the context from amkey=', s.key);
-            //this.arc.context.newView(type, name, id, tags);
-          });
-        });
+
+        // In case there are new users
+        this._updateUserSelectWidget();
+
+        // Trigger other updates, incl. about shared arcs
+        this._setCurrentUser(this._currentUser, true);
       });
     }
     _saveSharedState() {
@@ -468,6 +498,30 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onShareClick() {
       this._setSharedState(!this._shared);
       this._saveSharedState();
+    }
+    _updateUserSelectWidget() {
+      let model = [{ user: "(none)", value: "" }];
+
+      for (let user in this._users) {
+        model.push({
+        });
+      }
+
+      this._setState({
+        usersOptions: {
+          $template: 'users-options',
+          models: ["", ...Object.keys(this._users)].map(user => {
+            return {
+              user: user ? user : "(none)",
+              value: user,
+              selected: user == this._currentUser
+            }
+          })
+        }
+      })
+    }
+    _onUserSelected(e) {
+      this._setCurrentUser(e.target.value);
     }
     _onSearch(e) {
       this.search = e.target.value.toLowerCase();
