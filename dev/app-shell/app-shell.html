@@ -216,12 +216,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
       // configure persistence layer
       if (!config.nokey) {
-        this._configureStorage(config.manifestPath);
+        await this._configureStorage(config.manifestPath);
+        // configure users
+        await this._fetchUsersAndSetupSharing();
+        // configure (chrome)-casting
+        this._configureCasting();
       }
-      // configure users
-      this._fetchUsersAndSetupSharing();
-      // configure (chrome)-casting
-      this._configureCasting();
       // invoke planner
       this._findSuggestions();
     }
@@ -297,7 +297,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       // Restoring shared arc or other instance changed sharing state
       // or currentUser changed and has different sharing setting
-      if (data.shared[this._amkey]) {
+      if (this._amkey && data.shared[this._amkey]) {
         if (data.shared[this._amkey].shared != this._shared) {
           this._setSharedState(data.shared[this._amkey].shared);
         }
@@ -307,18 +307,27 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
       }
     }
-    _fetchUsersAndSetupSharing() {
-      // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
-      // out of metadata-storage.html
-      db.ref('users').on('value', snapshot => {
-        let users = snapshot.val() || {};
-        this._users = users;
+    async _fetchUsersAndSetupSharing() {
+      return new Promise((accept) => {
+        // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
+        // out of metadata-storage.html
+        db.ref('users').on('value', snapshot => {
+          let users = snapshot.val() || {};
+          this._users = users;
 
-        // In case there are new users
-        this._updateUserSelectWidget();
+          // In case there are new users
+          this._updateUserSelectWidget();
 
-        // Trigger other updates, incl. about shared arcs
-        this._setCurrentUser(this._currentUser, true);
+          // Trigger other updates, incl. about shared arcs
+          this._setCurrentUser(this._currentUser, true);
+
+          // On first load, resolve Promise
+          if (accept) {
+            let f = accept;
+            accept = null;
+            f();
+          }
+        });
       });
     }
     _saveSharedState() {
@@ -343,19 +352,19 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // If storage is enabled and sharing is enabled we will pull in all shared
       // Arcs.
     }
-    _configureStorage(manifestPath) {
+    async _configureStorage(manifestPath) {
       let storage = new ArcMetadataStorage(this);
       // Create an amkey=id if it doesn't already exist.
       // TODO: support multiple arcs.
       // TODO: we should probably associate the manifest path with the stored ID.
       let amkey = new URL(document.location.href).searchParams.get('amkey');
       if (!amkey) {
-        storage.sync({}).then(values => {
-          amkey = values[0];
-          let url = new URL(document.location.href);
-          url.searchParams.set('amkey', amkey);
-          window.history.replaceState({}, "", url.href);
-        });
+        let values = await storage.sync({});
+        amkey = values[0];
+        let url = new URL(document.location.href);
+        url.searchParams.set('amkey', amkey);
+        window.history.replaceState({}, "", url.href);
+        storage.sync({key: amkey});
       } else {
         storage.sync({key: amkey});
       }
