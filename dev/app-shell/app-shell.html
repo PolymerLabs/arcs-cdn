@@ -280,11 +280,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // the current context.
         // TODO: restrict that to a set of users that we care about.
         Object.keys(this._users).forEach(user => {
-          if (user.key == this._currentUser || !user.shared) return;
-          Object.keys(users.shared).forEach(s => {
-            if (!s.shared) return;
-            console.log('Import view into the context from amkey=', s);
-            //this.arc.context.newView(type, name, id, tags);
+          if (user == this._currentUser || !this._users[user].shared) return;
+          Object.keys(this._users[user].shared).forEach(amkey => {
+            if (!this._users[user].shared[amkey].shared)
+              return;
+            console.log('Import view into the context from amkey=', amkey);
+            this._syncSharedViews({key: amkey});
           });
         });
       }
@@ -320,19 +321,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
           // Trigger other updates, incl. about shared arcs
           this._setCurrentUser(this._currentUser, true);
-
-          // Pull in all of the views from all public Arcs and add them to
-          // the current context.
-          // TODO: restrict that to a set of users that we care about.
-          snapshot.forEach(user => {
-            if (user.key == this._currentUser)
-              return;
-            user.child('shared').forEach(s => {
-              if (!s.val().shared) return;
-              console.log('Import view into the context from amkey=', s.key);
-              this._syncSharedViews({key: s.key});
-            });
-          });
 
           // On first load, resolve Promise
           if (accept) {
