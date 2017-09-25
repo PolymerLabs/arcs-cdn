@@ -83,6 +83,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   [active] {
     display: flex;
   }
+  [hidebydefault] {
+    display: none;
+  }
+  [show] {
+    display: inline
+  }
   [search] {
     display: flex;
     align-items: center;
@@ -110,10 +116,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <div header>
     <i class="material-icons" on-click="_onNavClick">menu</i>
     <span style="flex: 1;"></span>
-    <select on-change="_onUserSelected">{{usersOptions}}</select>
+    <span hidebydefault show$={{usersShown}}><select on-change="_onUserSelected">{{usersOptions}}</select></span>
     <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
     <span>&nbsp;</span>
-    <i class="material-icons" on-click="_onCastClick">cast</i>
+    <i class="material-icons" on-click="_onCastClick">{{castIcon}}</i>
   </div>
   <div pages>
 
@@ -183,12 +189,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
-      // set current user or read it from local storage
-      if (config.user) {
-        this._setCurrentUser(config.user);
-      } else {
-        this._setCurrentUser(localStorage.getItem('currentUser'), true);
-      }
       // find the path automagically
       //let root = this._getRootPath();
       // start application
@@ -216,6 +216,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
       // configure persistence layer
       if (!config.nokey) {
+        // set current user or read it from local storage
+        if (config.user) {
+          this._setCurrentUser(config.user);
+        } else {
+          this._setCurrentUser(localStorage.getItem('currentUser'), true);
+        }
         await this._configureStorage(config.manifestPath);
         // configure users
         await this._fetchUsersAndSetupSharing();
@@ -227,6 +233,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _configureCasting() {
       UrlCaster.set(window.location.href.replace('app', 'chromecast'));
+      this._setState({ castIcon: 'cast' });
     }
     async _loadManifest(path, loader) {
       let content;
@@ -517,17 +524,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._saveSharedState();
     }
     _updateUserSelectWidget() {
-      let model = [{ user: "(none)", value: "" }];
-
-      for (let user in this._users) {
-        model.push({
-        });
-      }
-
+      let usernames = Object.keys(this._users || {});
       this._setState({
+        usersShown: this._users && usernames.length > 0,
         usersOptions: {
           $template: 'users-options',
-          models: ["", ...Object.keys(this._users)].map(user => {
+          models: ["", ...usernames].map(user => {
             return {
               user: user ? user : "(none)",
               value: user,
