@@ -6,155 +6,6 @@
 -->
 
 <script>
-  const assert = console.assert;
-
-  let nextVariableId = 0;
-
-  function addType(name, tag, args) {
-    var lowerName = name[0].toLowerCase() + name.substring(1);
-    if (args.length == 1) {
-      Object.defineProperty(Type, `new${name}`, {
-        value: function () {
-          return new Type(tag, arguments[0]);
-        }
-      });
-      var upperArg = args[0][0].toUpperCase() + args[0].substring(1);
-      Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
-        get: function () {
-          assert(this[`is${name}`]);
-          return this.data;
-        }
-      });
-    } else {
-      Object.defineProperty(Type, `new${name}`, {
-        value: function () {
-          var data = {};
-          for (var i = 0; i < args.length; i++)
-            data[args[i]] = arguments[i];
-          return new Type(tag, data);
-        }
-      });
-      for (var arg of args) {
-        var upperArg = arg[0].toUpperCase() + arg.substring(1);
-        Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
-          get: function () {
-            assert(this[`is${name}`]);
-            return this.data[arg];
-          }
-        });
-      }
-    }
-    Object.defineProperty(Type.prototype, `is${name}`, {
-      get: function () {
-        return this.tag == tag;
-      }
-    });
-  }
-
-  class Type {
-    constructor(tag, data) {
-      assert(typeof tag == 'string');
-      assert(data);
-      if (tag == 'entity')
-        assert(data.tag == undefined);
-      this.tag = tag;
-      this.data = data;
-    }
-
-    // TODO: Replace these static functions with operations on Types directly.
-    // Replaces 'prevariable' types with 'variable'+id types .
-    assignVariableIds(variableMap) {
-      if (this.isVariableReference) {
-        var name = this.data.name;
-        var id = variableMap.get(name);
-        if (id == undefined) {
-          id = nextVariableId++;
-          variableMap.set(name, id);
-        }
-        return Type.newVariable(name, id);
-      }
-
-      if (this.isView) {
-        return this.primitiveType().assignVariableIds(variableMap).viewOf();
-      }
-
-      return this;
-    }
-
-    // Replaces raw strings with resolved schemas.
-    resolveSchemas(resolveSchema) {
-      if (this.isEntityReference) {
-        // TODO: This should probably all happen during type construction so that
-        //       we can cache the schema objet.
-        return Type.newEntity(resolveSchema(this.data).toLiteral());
-      }
-
-      if (this.isView) {
-        return this.primitiveType().resolveSchemas(resolveSchema).viewOf();
-      }
-
-      return this;
-    }
-
-    equals(type) {
-      if (this.tag !== type.tag)
-        return false;
-      if (this.tag == 'entity') {
-        // TODO: Remove this hack that allows the old resolver to match
-        //       types by schema name.
-        return this.data.name == type.data.name;
-      }
-      if (this.isView) {
-        return this.data.equals(type.data);
-      }
-      return JSON.stringify(this.data) == JSON.stringify(type.data);
-    }
-
-    get isValid() {
-      return !this.variableReference;
-    }
-
-    primitiveType() {
-      var type = this.viewType;
-      return new Type(type.tag, type.data);
-    }
-
-    toLiteral() {
-      return this;
-    }
-
-    static fromLiteral(literal) {
-      return new Type(literal.tag, literal.data);
-    }
-
-    viewOf() {
-      return Type.newView(this);
-    }
-
-    // TODO: rename toString to describe
-    toString() {
-      if (this.isRelation)
-        return JSON.stringify(this.data);
-      if (this.isView)
-        return `${this.primitiveType().toString()} List`;
-      if (this.isVariable)
-        return `[${this.variableName}]`;
-      if (this.isVariableReference)
-        return `[${this.variableReferenceName}]`;
-      if (this.isEntity)
-        return this.entitySchema.name;
-      if (this.isEntityReference)
-        return this.entityReferenceName;
-    }
-  }
-
-  addType('EntityReference', 'entityReference', ['name']);
-  addType('Entity', 'entity', ['schema']);
-  addType('VariableReference', 'variableReference', ['name']);
-  addType('Variable', 'variable', ['name', 'id']);
-  addType('View', 'list', ['type']);
-  addType('Relation', 'relation', ['entities']);
-
   let firebaseConfig = {
     apiKey: "AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8",
     authDomain: "arcs-storage.firebaseapp.com",
@@ -168,7 +19,7 @@
 
   // Firebase doesn't like undefined attributes in objects. Converting
   // to JSON will filter out undefined attributes.
-  let removeUndefined = function(o) {
+  let removeUndefined = function (o) {
     return JSON.parse(JSON.stringify(o));
   }
 
@@ -181,7 +32,7 @@
       this._syncedViews = new Set();
       console.log("Storing arc:", this._arc);
     }
-    
+
     _getViewId(view) {
       return view.type.toString().replace(' ', '-');
     }
@@ -193,8 +44,8 @@
       // One-time sync from remote => local.
       // TODO: simplify the code here. on('child_added') will be called for
       // every element that is already there. No need to do once('value').
-      remoteView.once('value').then(function(snapshot) {
-        snapshot.forEach(function(e) {
+      remoteView.once('value').then(function (snapshot) {
+        snapshot.forEach(function (e) {
           localView.store(e.val());
           remoteIds.add(e.val().id);
         });
@@ -221,8 +72,8 @@
             });
           } else if (change.remove) {
             change.remove.forEach((r) => {
-              remoteView.orderByChild('id').equalTo(r.id).on("value", function(snapshot) {
-                snapshot.forEach(function(data) {
+              remoteView.orderByChild('id').equalTo(r.id).on("value", function (snapshot) {
+                snapshot.forEach(function (data) {
                   removeView.child(data.key()).remove();
                 });
               });
@@ -233,14 +84,14 @@
         }, {});
 
         // Apply remote changes to local view.
-        remoteView.on('child_added', function(data) {
+        remoteView.on('child_added', function (data) {
           if (data.val().id.startsWith(arcId)) {
             console.log('Skip remote entity because it was created in this Arc', data.val(), arcId);
             return;
           }
           localView.store(data.val());
         });
-        remoteView.on('child_removed', function(data) {
+        remoteView.on('child_removed', function (data) {
           // Note: element will only be removed and 'remove' event will only be
           // fired iff the ID is present in the view.
           localView.remove(data.val().id);
@@ -307,19 +158,27 @@
       });
 
       // ... second, we synchronize remote views with their local representations.
-      this._remoteRef.child('views').orderByKey().once('value').then(remoteViews => {
+      // This needs fixing.
+      /*
+      this._remoteRef.child('views').on('value', remoteViews => {
         remoteViews.forEach(remoteViewMeta => {
           let metadata = remoteViewMeta.child('metadata').val();
-          let type = new Type(metadata.type.tag, metadata.type.data);
-          let viewId = this._getViewId({type});
+          let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
+          let viewId = this._getViewId({ type });
           if (this._syncedViews.has(viewId)) {
+            console.log(viewId);
+            
             return;
           }
+          console.log(viewId);
           this._syncedViews.add(viewId);
+          return;
           console.log('Unsynced remove view: ', remoteViewMeta.key);
-          // TODO: This is totally broken. I somehow need to get to the Type constructor
-          // without this hack.
-          let localView = this._arc.createView(type, metadata.name);
+          // Use or create; if a view of this type exists then we edit it. Otherwise,
+          // we create a new view of the given type.
+          let localView = ((
+            this._arc.findViewsByType(type) && this._arc.findViewsByType(type)[0]) ||
+            this._arc.createView(type, metadata.name));
           let remoteView = remoteViewMeta.child('values').ref;
           if (localView.type.isView) {
             this._syncView(localView, remoteView);
@@ -328,10 +187,8 @@
             this._syncVariable(localView, remoteView);
           }
         });
-      });
+      });*/
     }
-
-    // TODO: also sync views that don't yet exist locally but do exist remotely.
 
     // Returns the storage key.
     // PRE: sync() was called and returned a key.
@@ -340,25 +197,37 @@
     }
 
     // Adds all of the views in the given Arc to the local context.
-    syncSharedViews({key}) {
+    syncSharedViews({ key }) {
+      if (key == this.key) return;
+      // TODO: there is a lot of code duplication here with sync() above.
+      // //
       let arc = db.ref('arcs/' + key);
       arc.child('views').on('value', remoteViews => {
         remoteViews.forEach(remoteViewMeta => {
           let metadata = remoteViewMeta.child('metadata').val();
-          let type = new Type(metadata.type.tag, metadata.type.data);
-          let viewId = this._getViewId({type});
-          if (this._syncedViews.has(viewId)) {
-            console.warn(`View id already synced in Arc: ${key}:${viewId}`);
+          let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
+          let sharedViewId = 'Shared:' + key + '-' + this._getViewId({ type });
+          if (this._syncedViews.has(sharedViewId)) {
+            console.warn(`View id already synced in Arc: ${this.key}:${sharedViewId}`);
             return;
           }
-          this._syncedViews.add(viewId);
-          let localView = this._arc.context.newView(type, metadata.name);
+          this._syncedViews.add(sharedViewId);
+          let localView = ((
+            this._arc.context.findViewsByType(type) && this._arc.context.findViewsByType(type)[0]) ||
+            this._arc.context.newView(type, metadata.name));
           let remoteView = remoteViewMeta.child('values').ref;
           if (localView.type.isView) {
-            this._syncView(localView, remoteView);
+            // One-way syncing. Whenever a new entity is added / removed in the remote
+            // view it should get reflected in the context.
+            remoteView.on('child_added', function (data) {
+              localView.store(data.val());
+            });
+            remoteView.on('child_removed', function (data) {
+              localView.remove(data.val().id);
+            });
           }
           if (localView.type.isVariable) {
-            this._syncVariable(localView, remoteView);
+            console.warn('Shared Variable syncing not implemented');
           }
         })
       });
@@ -386,16 +255,17 @@
     on(callback) {
       var metadataRef = this._remoteRef.child('metadata');
 
-      metadataRef.on('child_added', function(data) {
+      metadataRef.on('child_added', function (data) {
         callback(data.key, data.val());
       });
-      metadataRef.on('child_changed', function(data) {
+      metadataRef.on('child_changed', function (data) {
         callback(data.key, data.val());
       });
-      metadataRef.on('child_removed', function(data) {
+      metadataRef.on('child_removed', function (data) {
         callback(data.key, undefined);
       });
     }
   }
   window.ArcMetadataStorage = ArcMetadataStorage;
+
 </script>
