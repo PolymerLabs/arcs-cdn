@@ -3,20 +3,22 @@
 <style>
   data-explorer:not([hidden]) {
     display: block;
+    /*
     border: 1px solid gray;
     border-bottom: none;
+    */
   }
   data-explorer > x-list {
     display: block;
   }
   data-explorer > x-list > data-item {
-    border-bottom: 1px solid gray;
+   /*
+   border-bottom: 1px solid gray;
+   */
   }
 </style>
 
-<template>
-  <div>{{items}}</div>
-</template>
+<template><div>{{items}}</div></template>
 
 <template data-item>
   <data-item name="{{name}}" value="{{value}}"></data-item>

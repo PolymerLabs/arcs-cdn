@@ -3,8 +3,8 @@
     manifest-data {
       display: flex;
       min-height: 240px;
-      /*font-size: 0.7em;*/
-      font-family: monospace;
+      font-size: 0.7em;
+      /*font-family: monospace;*/
     }
     manifest-data > * {
       flex: 1;
@@ -25,12 +25,21 @@
   class ManifestData extends HTMLElement {
     connectedCallback() {
       this.text = '';
-      this.data = [
-        "https://sjmiles.github.io/arc-stories/artifacts/Products/recipes.manifest",
-        "https://sjmiles.github.io/arc-stories/artifacts/Restaurants/recipes.manifest",
-        "https://sjmiles.github.io/arc-stories/artifacts/Accounts/recipes.manifest",
-        "https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest"
-      ];
+        this.data = [
+          {
+            include: true,
+            path: "https://sjmiles.github.io/arc-stories/artifacts/Products/recipes.manifest"
+          }, {
+            include: true,
+            path: "https://sjmiles.github.io/arc-stories/artifacts/Restaurants/recipes.manifest"
+          }, {
+            include: true,
+            path: "https://sjmiles.github.io/arc-stories/artifacts/Accounts/recipes.manifest"
+          }, {
+            include: true,
+            path: "https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest"
+          }
+        ];
       this._dom = Xen.stamp(ManifestData.module.querySelector("template")).events(this).appendTo(this);
       this._dom.set({json: JSON.stringify(this.data, null, " "), object: this.data});
     }

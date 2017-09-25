@@ -49,8 +49,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   }
   app-shell {
     flex: 1;
+    /*
     max-width: 414px;
     max-height: 736px;
+    */
     background-color: white;
     display: flex;
     flex-direction: column;
@@ -79,6 +81,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     display: none;
     flex-direction: column;
     flex: 1;
+  }
+  [config] {
+    position: absolute;
+    top: 32px;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: gray;
+  }
+  [config] > * {
+    background-color: white;
   }
   [active] {
     display: flex;
@@ -136,11 +149,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </div>
 
     <div config active$="{{configActive}}">
-      <div>
-        <user-data></user-data>
-        <hr>
-        <manifest-data></manifest-data>
-      </div>
+      <user-data></user-data>
+      <br><br>
+      <manifest-data></manifest-data>
     </div>
 
   </div>
@@ -154,6 +165,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script>
   class AppShell extends HTMLElement {
+    set search(search) {
+      this._search = search;
+      this._searchPlans();
+    }
     connectedCallback() {
       if (!this._mounted) {
         this._mounted = true;
@@ -166,10 +181,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           throw x;
         }
       }
-    }
-    set search(search) {
-      this._search = search;
-      this._searchPlans();
     }
     _setState(state) {
       if (this._dom) {
@@ -513,7 +524,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (this._currentUser) {
         icon = this._shared ? "supervisor_account" : "lock_outline";
       }
-      this._setState({ sharedStateIcon: icon });
+      this._setState({sharedStateIcon: icon});
     }
     _setSharedState(shared) {
       this._shared = shared;

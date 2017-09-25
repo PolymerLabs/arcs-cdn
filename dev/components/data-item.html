@@ -3,30 +3,42 @@
     display: flex;
   }
   data-item > * {
-    padding: 6px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    border: 1px dotted silver;
+    /*
+    border-bottom: none;
+    border-right: none;
+    */
   }
   data-item > left {
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    justify-content: flex-end;
     /*
     flex: 1;
     min-width: 40px;
+    border-right: 1px solid gray;
     */
     width: 64px;
-    background-color: lightgray;
-    border-right: 1px solid gray;
+    background-color: whitesmoke;
   }
   data-item > right {
     flex: 3;
+  }
+  data-item > right > div {
+    padding: 4px;
   }
 </style>
 
 <template>
   <left>{{name}}</left>
   <right>
-    <div hidden="{{isobject}}" title="{{title}}">{{value}}</div>
-    <data-explorer hidden="{{isconcrete}}" object="{{object}}"></data-explorer>
+    <div hidden="{{notbool}}" title="{{name}}"><input type="checkbox" checked="{{value}}"></div>
+    <div hidden="{{notstring}}" title="{{title}}">{{value}}</div>
+    <data-explorer hidden="{{notobject}}" object="{{object}}"></data-explorer>
   </right>
 </template>
 
@@ -40,14 +52,16 @@
       this._dom.set(this._render(props, state));
     }
     _render(props, state) {
-      let isobject = (typeof props.value === 'object');
+      let type = typeof props.value;
+      let isobject = (type === 'object'), isstring = (type === 'string'), isbool = (type==='boolean');
       return {
         name: props.name,
-        isobject: isobject,
+        notstring: !isstring,
+        notobject: !isobject,
+        notbool: !isbool,
         object: isobject ? props.value : null,
-        isconcrete: !isobject,
-        value: isobject ? '' : props.value.slice(-54),
-        title: isobject ? '' : props.value
+        value: /*isstring ? props.value.slice(-54) :*/ props.value,
+        title: isstring ? props.value : props.name
       };
     }
   }
