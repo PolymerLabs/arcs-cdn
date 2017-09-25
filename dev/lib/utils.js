@@ -55,10 +55,10 @@ let utils = {
     let plans = await planner.suggest(timeout || 5000, generations);
     return {plans, generations};
   },
-  async parseManifest(content, loader) {
+  async parseManifest(fileName, content, loader) {
     return await Arcs.Manifest.parse(content, {
       id: null,
-      fileName: './arcs.manifest',
+      fileName,
       loader,
       registry: null,
       position: {line: 1, column: 0}
