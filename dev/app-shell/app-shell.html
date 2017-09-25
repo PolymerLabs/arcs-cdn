@@ -287,11 +287,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // the current context.
         // TODO: restrict that to a set of users that we care about.
         Object.keys(this._users).forEach(user => {
-          if (user.key == this._currentUser || !user.shared) return;
-          Object.keys(users.shared).forEach(s => {
-            if (!s.shared) return;
-            console.log('Import view into the context from amkey=', s);
-            //this.arc.context.newView(type, name, id, tags);
+          if (user == this._currentUser || !this._users[user].shared) return;
+          Object.keys(this._users[user].shared).forEach(amkey => {
+            if (!this._users[user].shared[amkey].shared)
+              return;
+            console.log('Import view into the context from amkey=', amkey);
+            this._syncSharedViews({key: amkey});
           });
         });
       }
@@ -366,21 +367,26 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO: we should probably associate the manifest path with the stored ID.
       let amkey = new URL(document.location.href).searchParams.get('amkey');
       if (!amkey) {
-        let values = await storage.sync({});
-        amkey = values[0];
-        let url = new URL(document.location.href);
-        url.searchParams.set('amkey', amkey);
-        window.history.replaceState({}, "", url.href);
-        storage.sync({key: amkey});
-      } else {
-        storage.sync({key: amkey});
+        // Wait for the initial storage to be done.
+        // TODO: don't call this initial method sync but something else. E.g.
+        await storage.init().then(values => {
+          amkey = values[0];
+          let url = new URL(document.location.href);
+          url.searchParams.set('amkey', amkey);
+          window.history.replaceState({}, "", url.href);
+        });
       }
+      storage.sync({key: amkey});
+      
       // Store the manifest file path for the Arc to test out metadata storage.
       // TODO: this should be the absolute URL.
       storage.store('manifest', {url: manifestPath});
       this._amkey = amkey;
       // Sync views, e.g. after a new plan was incorporated to the arc
       this._syncStorage = () => storage.sync({key: amkey});
+
+      this._syncSharedViews = ({key}) => storage.syncSharedViews({key});
+
       // Storing and reloading steps (keeping too storage specific stuff local)
       this._syncAcceptedSteps = () => storage.store("accepted_steps", this._steps);
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
