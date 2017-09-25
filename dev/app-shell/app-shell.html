@@ -20,6 +20,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script src="../components/xen/xen-template.js"></script>
 <script src="../components/xen/xen-element.js"></script>
 <script src="../components/xen/xen-state.js"></script>
+
 <!-- whitelist components (reusable) -->
 <link rel="import" href="../components/video-controller.html">
 <!-- components (reusable) -->
@@ -28,6 +29,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <link rel="import" href="../components/dancing-dots.html">
 <link rel="import" href="../components/user-data.html">
 <link rel="import" href="../components/manifest-data.html">
+
 <!-- view-persistence via front-end -->
 <link rel="import" href="../components/metadata-storage.html">
 <!-- chrome-cast integration -->
@@ -108,6 +110,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <div header>
     <i class="material-icons" on-click="_onNavClick">menu</i>
     <span style="flex: 1;"></span>
+    <select on-change="_onUserSelected">{{usersOptions}}</select>
     <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
     <span>&nbsp;</span>
     <i class="material-icons" on-click="_onCastClick">cast</i>
@@ -135,7 +138,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </div>
 
   </div>
+
+  <template users-options>
+    <option value={{value}} selected$={{selected}}>{{user}}</option>
+  </template>
+
 </template>
+
 
 <script>
   class AppShell extends HTMLElement {
@@ -174,21 +183,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
-
       // set current user or read it from local storage
       if (config.user) {
-        this._currentUser = config.user;
-        localStorage.setItem('currentUser', config.user);
+        this._setCurrentUser(config.user);
       } else {
-        this._currentUser = localStorage.getItem('currentUser');
+        this._setCurrentUser(localStorage.getItem('currentUser'), true);
       }
-
       // find the path automagically
       //let root = this._getRootPath();
       // start application
       this._start(config);
-
-      this._updateSharedStateIcon();
     }
     async _start(config) {
       // create default URL map
@@ -212,12 +216,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
       // configure persistence layer
       if (!config.nokey) {
-        this._configureStorage(config.manifestPath);
+        await this._configureStorage(config.manifestPath);
+        // configure users
+        await this._fetchUsersAndSetupSharing();
+        // configure (chrome)-casting
+        this._configureCasting();
       }
-      // configure users
-      await this._fetchUsersAndSetupSharing();
-      // configure (chrome)-casting
-      this._configureCasting();
       // invoke planner
       this._findSuggestions();
     }
@@ -229,11 +233,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (path) {
         content = await loader.loadResource(path);
       } else {
+        path = './arcs.manifest';
         let manifests = await this._fetchManifestList();
         content = manifests.map(u => `import '${u}'`).join('\n');
       }
       //console.log(content);
-      return await Arcs.utils.parseManifest(content, loader);
+      return await Arcs.utils.parseManifest(path, content, loader);
     }
     async _fetchManifestList() {
       // TODO(sjmiles): using the global `db` that is currently leaking out
@@ -257,37 +262,84 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       return dedupe(defaults.concat(locals, remotes));
     }
-    _updateCurrentUsersData(data) {
-      if (data.manifest != this._currentUsersManifest) {
-        this._currentUsersManifest = data.manifest;
-        // TODO: Update context
+    _setCurrentUser(user, dontUpdateLocalStorage) {
+      this._currentUser = user;
+
+      if (!dontUpdateLocalStorage) {
+        localStorage.setItem('currentUser', user);
       }
 
-      // Restoring shared arc or other instance changed sharing state
-      // or currentUser changed and has different sharing setting
-      if (data.shared[this._amkey] && data.shared[this._amkey].shared != this._shared) {
-        this._setSharedState(data.shared[this._amkey].shared);
-      }
-    }
-    _fetchUsersAndSetupSharing() {
-      // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
-      // out of metadata-storage.html
-      return db.ref('users').on('value', snapshot => {
-        let users = snapshot.val() || {};
-        this._users = users;
-        if (this._currentUser && users[this._currentUser]) {
-          this._updateCurrentUsersData(users[this._currentUser]);
+      this._updateSharedStateIcon();
+
+      if (this._users) {
+        if (this._currentUser && this._users[this._currentUser]) {
+          this._updateCurrentUsersData(this._users[this._currentUser]);
         }
+
         // Pull in all of the views from all public Arcs and add them to
         // the current context.
         // TODO: restrict that to a set of users that we care about.
-        snapshot.forEach(user => {
-          if (user.key == this._currentUser) return;
-          user.child('shared').forEach(s => {
-            if (!s.val().shared) return;
-            console.log('Import view into the context from amkey=', s.key);
-            this._syncSharedViews({key: s.key});
+        Object.keys(this._users).forEach(user => {
+          if (user.key == this._currentUser || !user.shared) return;
+          Object.keys(users.shared).forEach(s => {
+            if (!s.shared) return;
+            console.log('Import view into the context from amkey=', s);
+            //this.arc.context.newView(type, name, id, tags);
           });
+        });
+      }
+    }
+    _updateCurrentUsersData(data) {
+      if (data.manifest != this._currentUsersManifest) {
+        this._currentUsersManifest = data.manifest;
+        console.log("new user manifest", data.manifest);
+        // TODO: Update context
+      }
+      // Restoring shared arc or other instance changed sharing state
+      // or currentUser changed and has different sharing setting
+      if (this._amkey && data.shared[this._amkey]) {
+        if (data.shared[this._amkey].shared != this._shared) {
+          this._setSharedState(data.shared[this._amkey].shared);
+        }
+      } else { // nothing yet in Firebase about this arc
+        if (this._shared) {
+          this._setSharedState(false);
+        }
+      }
+    }
+    async _fetchUsersAndSetupSharing() {
+      return new Promise((accept) => {
+        // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
+        // out of metadata-storage.html
+        db.ref('users').on('value', snapshot => {
+          let users = snapshot.val() || {};
+          this._users = users;
+
+          // In case there are new users
+          this._updateUserSelectWidget();
+
+          // Trigger other updates, incl. about shared arcs
+          this._setCurrentUser(this._currentUser, true);
+
+          // Pull in all of the views from all public Arcs and add them to
+          // the current context.
+          // TODO: restrict that to a set of users that we care about.
+          snapshot.forEach(user => {
+            if (user.key == this._currentUser)
+              return;
+            user.child('shared').forEach(s => {
+              if (!s.val().shared) return;
+              console.log('Import view into the context from amkey=', s.key);
+              this._syncSharedViews({key: s.key});
+            });
+          });
+
+          // On first load, resolve Promise
+          if (accept) {
+            let f = accept;
+            accept = null;
+            f();
+          }
         });
       });
     }
@@ -306,7 +358,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _syncStorage() {
       // dummy, replaced in _configureStorage
     }
-    _syncSharedViews({key}) {
+    _syncAcceptedSteps() {
+      // dummy, replaced in _configureStorage
+    }
+    _syncSharedViews() {
       // If storage is enabled and sharing is enabled we will pull in all shared
       // Arcs.
     }
@@ -410,7 +465,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async _newAcceptedSteps(steps) {
       // Assume same length means we just get our own latest state
       if (this._steps && steps.length == this._steps.length) return;
-      console.log("new accepted stuggestions from database", steps);
+      console.log("new accepted suggestions from database", steps);
       this._steps = steps;
       this._applyAcceptedSteps();
       this._findSuggestions();
@@ -460,7 +515,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _updateSharedStateIcon() {
       let icon = "";
-
       if (this._currentUser) {
         icon = this._shared ? "supervisor_account" : "lock_outline";
       }
@@ -473,6 +527,30 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onShareClick() {
       this._setSharedState(!this._shared);
       this._saveSharedState();
+    }
+    _updateUserSelectWidget() {
+      let model = [{ user: "(none)", value: "" }];
+
+      for (let user in this._users) {
+        model.push({
+        });
+      }
+
+      this._setState({
+        usersOptions: {
+          $template: 'users-options',
+          models: ["", ...Object.keys(this._users)].map(user => {
+            return {
+              user: user ? user : "(none)",
+              value: user,
+              selected: user == this._currentUser
+            }
+          })
+        }
+      })
+    }
+    _onUserSelected(e) {
+      this._setCurrentUser(e.target.value);
     }
     _onSearch(e) {
       this.search = e.target.value.toLowerCase();
