@@ -56,7 +56,7 @@
       this._dom = Xen.stamp(LocalData.module.querySelector('template')).events(this).appendTo(this);
     }
     set manifest(manifest) {
-      let {host, pathname} = manifest ? new URL(manifest) : {host: '', pathname: ''};
+      let {host, pathname} = manifest ? new URL(manifest, location.href) : {host: '', pathname: ''};
       this._dom.set({host, pathname});
     }
     _onPromoteClick(e) {
