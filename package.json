@@ -4,6 +4,7 @@
   "private": true,
   "devDependencies": {
     "gulp": "^3.9.1",
+    "gulp-babili": "^0.1.4",
     "webpack": "^2.6.1"
   }
 }

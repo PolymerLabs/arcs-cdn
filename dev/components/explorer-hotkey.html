@@ -10,7 +10,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <link rel="import" href="strategy-explorer/strategy-explorer.html"></link>
 <link rel="import" href="arc-explorer.html"></link>
-<!--<link rel="import" href="../../../arcs/strategy-explorer/strategy-explorer.html">-->
 
 <style>
   .explorer {
@@ -28,16 +27,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
   let explorer = document.body.appendChild(document.createElement('strategy-explorer'));
   explorer.className = 'explorer';
-
   window.addEventListener('keydown', e => {
     if (e.ctrlKey && (e.key == "e")) {
       e.preventDefault();
       explorer.style.display = explorer.style.display == 'block' ? 'none' : 'block';
     }
   });
-
   let populate = (population) => explorer.results = population.map(pop => explorer.preparePopulation(pop));
-
   document.addEventListener('generations', e => {
     explorer.reset();
     setTimeout(()=>populate(e.detail), 0);
@@ -45,7 +41,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
   let arcExplorer = document.body.appendChild(document.createElement('arc-explorer'));
   arcExplorer.className = 'explorer';
-
   window.addEventListener('keydown', e => {
     if (e.ctrlKey && (e.key == 'a')) {
       e.preventDefault();
@@ -53,9 +48,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       console.log(arcExplorer.arc);
     }
   });
-  
   document.addEventListener('apply', e => {
     arcExplorer.arc = e.detail.arc;
   });
+
 })();
 </script>

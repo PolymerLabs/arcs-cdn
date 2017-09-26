@@ -7,7 +7,17 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
+(function(global) {
+
 'use strict';
+
+if (typeof document !== 'undefined' && !('currentImport' in document)) {
+  Object.defineProperty(document, 'currentImport', {
+    get() {
+      return (document._currentScript || document.currentScript || document).ownerDocument;
+    }
+  });
+}
 
 /* Annotator */
 // tree walker that generates arbitrary data using visitor function `cb`
@@ -313,10 +323,19 @@ let stamp = function(template, opts) {
       return this;
     }
   };
+  // TODO(sjmiles): BC
+  dom.mapEvents = dom.events;
   return dom;
 };
 
-window.Xen = {
+let Xen = {
   setBoolAttribute,
   stamp
 };
+
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
+  module.exports = Xen;
+else
+  global.Xen = Xen;
+
+})(this);

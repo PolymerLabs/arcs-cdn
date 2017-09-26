@@ -9,11 +9,15 @@ https://polymerlabs.github.io/arcs-cdn/v0.1/app/
 The webapp can be configured with URL parameters:
 
 * manifest=[path]
-  * Uses manifest at [path] to bootstrap the Arc context. Otherwise, the context is comprised of the set of manifests published in the Arcs (admin) database.
+  * Uses manifest at [path] in addition to the set of manifests published in the Arcs (admin) database.
+* solo=[path]
+  * Uses only the manifest at [path] to bootstrap the Arc context.
 * nokey
   * do not persist this arc (i.e. no `amkey` is assigned)
 * root=[path]
   * override the root path used to locate CDN resources (advanced).
+* user=[name]
+  * select or create user with [name]
 
 Example:
 

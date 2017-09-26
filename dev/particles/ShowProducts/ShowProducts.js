@@ -26,7 +26,7 @@ defineParticle(({DomParticle, resolver}) => {
     font-weight: bold;
   }
   ${host} > x-list [item] {
-    padding: 4px 8px;
+    /*padding: 4px 8px;*/
     background-color: white;
     border-bottom: 1px solid #eeeeee;
   }
@@ -92,6 +92,7 @@ defineParticle(({DomParticle, resolver}) => {
   let productTemplate = `
 <template>
   <div item>
+    <div slotid="prenotation" subid$="{{subId}}"></div>
     <div row>
       <div col0>
         <div name title="{{name}}">{{name}}</div>
@@ -103,8 +104,7 @@ defineParticle(({DomParticle, resolver}) => {
         <img src="{{image}}">
       </div>
     </div>
-    <div slotid="annotation" subid$="{{subId}}">
-    </div>
+    <div slotid="annotation" subid$="{{subId}}"></div>
   </div>
 </template>
   `;
@@ -116,15 +116,10 @@ ${productStyles}
   <div head>
     <span>Your shortlist</span>
   </div>
-
   <div slotid="preamble"></div>
-
   <div empty hidden="{{haveItems}}">List is empty</div>
-
   <x-list items="{{items}}">${productTemplate}</x-list>
-
   <div slotid="action"></div>
-
   <div slotid="postamble"></div>
 </div>
     `.trim();
