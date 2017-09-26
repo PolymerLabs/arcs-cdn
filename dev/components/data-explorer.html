@@ -1,27 +1,15 @@
 <link rel="import" href="data-item.html">
 
 <style>
-  data-explorer:not([hidden]) {
+  data-explorer {
     display: block;
-    /*
-    border: 1px solid gray;
-    border-bottom: none;
-    */
-  }
-  data-explorer > x-list {
-    display: block;
-  }
-  data-explorer > x-list > data-item {
-   /*
-   border-bottom: 1px solid gray;
-   */
   }
 </style>
 
 <template><div>{{items}}</div></template>
 
 <template data-item>
-  <data-item name="{{name}}" value="{{value}}"></data-item>
+  <data-item name="{{name}}" value="{{value}}" on-item-change="_onItemChange"></data-item>
 </template>
 
 <script>
@@ -66,6 +54,11 @@
           value: v
         };
       });
+    }
+    _onItemChange(e) {
+      console.log(e.target.name, e.detail);
+      this.object[e.target.name] = e.detail;
+      this.dispatchEvent(new CustomEvent('object-change', {bubbles: true}));
     }
   }
   DataExplorer.module = document.currentScript.ownerDocument;

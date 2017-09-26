@@ -290,11 +290,6 @@ let stamp = function(template, opts) {
     $(slctr) {
       return this.root.querySelector(slctr);
     },
-    /*
-    dispatch(handler, e) {
-      // abstract
-    },
-    */
     set: function(scope) {
       set(notes, map, scope, this.controller);
       return this;
@@ -318,11 +313,6 @@ let stamp = function(template, opts) {
       return this;
     }
   };
-  /*
-  mapEvents(notes, map, (node, event, handler) => {
-    node.addEventListener(event, e => dom.dispatch(handler, e));
-  });
-  */
   return dom;
 };
 

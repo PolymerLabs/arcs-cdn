@@ -42,35 +42,52 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   body {
     font-family: sans-serif;
     margin: 0;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    background-image: url(assets/linen.png);
+    /*background-image: url(assets/linen.png);*/
   }
   app-shell {
-    flex: 1;
-    /*
-    max-width: 414px;
-    max-height: 736px;
-    */
     background-color: white;
     display: flex;
-    flex-direction: column;
-    position: relative;
     overflow: hidden;
+    padding-top: 32px;
+    padding-bottom: 64px;
   }
-  [header] {
+  [arc-panel] {
+    flex: 1;
+  }
+  app-tools {
+    display: none;
+  }
+  app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
     display: flex;
     align-items: center;
-    height: 32px;
-    box-sizing: border-box;
     padding: 0 8px;
+    box-sizing: border-box;
     background-color: whitesmoke;
   }
-  i {
+  .material-icons {
     cursor: pointer;
+    vertical-align: middle;
+  }
+  app-header select {
+    border: none;
+    background-color: transparent;
+    outline: none;
+    height: 100%;
   }
   x-toast {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    /*
+    transform: translate3d(0, 100%, 0) translateY(-64px);
+    transition: transform 80ms ease-out;
+    */
     background-color: white;
   }
   [pages] {
@@ -82,6 +99,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     flex-direction: column;
     flex: 1;
   }
+  /*
   [config] {
     position: absolute;
     top: 32px;
@@ -93,6 +111,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   [config] > * {
     background-color: white;
   }
+  */
   [active] {
     display: flex;
   }
@@ -100,7 +119,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     display: none;
   }
   [show] {
-    display: inline
+    display: initial;
   }
   [search] {
     display: flex;
@@ -119,49 +138,70 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
-    margin-bottom: 33px;
     overflow: auto;
     overflow-x: hidden;
+  }
+  /* wider-than-mobile */
+  @media (min-width: 500px) {
+    app-shell, app-header, [app-footer] {
+      width: 414px;
+      max-width: 414px;
+      box-sizing: border-box;
+    }
+    app-tools {
+      display: block;
+      position: fixed;
+      left: 414px;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      overflow: auto;
+      border-left: 1px solid silver;
+    }
   }
 </style>
 
 <template>
-  <div header>
-    <i class="material-icons" on-click="_onNavClick">menu</i>
-    <span style="flex: 1;"></span>
-    <span hidebydefault show$={{usersShown}}><select on-change="_onUserSelected">{{usersOptions}}</select></span>
-    <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
-    <span>&nbsp;</span>
-    <i class="material-icons" on-click="_onCastClick">{{castIcon}}</i>
-  </div>
-  <div pages>
-
-    <div main active$="{{mainActive}}">
-      <div id="particles"></div>
-      <x-toast open="{{toastOpen}}" suggestion-container>
-        <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
-        <div search>
-          <input value="{{searchText}}" on-input="_onSearch">
-          <i class="material-icons">search</i>
-        </div>
-        <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
-      </x-toast>
+  <!-- arc panel -->
+  <div arc-panel>
+    <!-- header -->
+    <app-header>
+      <i class="material-icons" on-click="_onNavClick">menu</i>
+      <span style="flex: 1;"></span>
+      <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
+        <i class="material-icons">person</i>
+        <select on-change="_onUserSelected">{{usersOptions}}</select>
+        <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
+      </span>
+      <i class="material-icons" style="padding-left: 4px;" on-click="_onCastClick">{{castIcon}}</i>
+    </app-header>
+    <!-- pages -->
+    <div pages>
+      <!-- main page -->
+      <div main active$="{{mainActive}}">
+        <div id="particles"></div>
+        <x-toast app-footer open="{{toastOpen}}" suggestion-container>
+          <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
+          <div search>
+            <input value="{{searchText}}" on-input="_onSearch">
+            <i class="material-icons" on-click="_onSearchClick">search</i>
+          </div>
+          <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
+        </x-toast>
+      </div>
     </div>
-
-    <div config active$="{{configActive}}">
-      <user-data></user-data>
-      <br><br>
-      <manifest-data></manifest-data>
-    </div>
-
   </div>
-
+  <!-- config panel -->
+  <app-tools>
+    <user-data></user-data>
+    <br><br>
+    <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-object-change="_onManifestsChange"></manifest-data>
+  </app-tools>
+  <!-- sub-templates -->
   <template users-options>
-    <option value={{value}} selected$={{selected}}>{{user}}</option>
+    <option value="{{value}}" selected="{{selected}}">{{user}}</option>
   </template>
-
 </template>
-
 
 <script>
   class AppShell extends HTMLElement {
@@ -188,38 +228,36 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     _configure({urls, manifest}) {
+      let appShellPath = AppShell.module.URL.split('/').slice(0, -2).join('/');
       let params = (new URL(document.location)).searchParams;
       let config = {
         affordance: 'dom',
-        root: params.get('root') || AppShell.module.URL.split('/').slice(0, -2).join('/'),
+        root: params.get('root') || appShellPath,
         manifestPath: params.get('manifest'),
-        user: params.get('user'),
+        user: params.get('user') || localStorage.getItem('currentUser'),
         nokey: params.has('nokey'),
         container: this._dom.$('#particles'),
         urls
       };
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
-      // find the path automagically
-      //let root = this._getRootPath();
       // start application
       this._start(config);
     }
     async _start(config) {
+      this._config = config;
       // create default URL map
       let urlMap = Arcs.utils.createUrlMap(config.root);
       // create a system loader
       // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
       // but we have to create one by hand for manifest loading
-      let loader = new Arcs.BrowserLoader(urlMap);
+      this._loader = new Arcs.BrowserLoader(urlMap);
       // add `urls` to `urlMap` after a resolve pass
       if (config.urls) {
-        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
+        Object.keys(config.urls).forEach(k => urlMap[k] = this._loader._resolve(config.urls[k]));
       }
       // load manifest
-      let manifest = await this._loadManifest(config.manifestPath, loader);
-      // TODO(sjmiles): hack in ability to utilize imported recipes
-      utils.collapseRecipes(manifest);
+      let manifest = await this._loadManifest(config.manifestPath);
       console.log(manifest);
       // renderer
       let slotComposer = new Arcs.SlotComposer({rootContext: config.container, affordance: config.affordance});
@@ -230,8 +268,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // set current user or read it from local storage
         if (config.user) {
           this._setCurrentUser(config.user);
-        } else {
-          this._setCurrentUser(localStorage.getItem('currentUser'), true);
         }
         await this._configureStorage(config.manifestPath);
         // configure users
@@ -246,17 +282,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       UrlCaster.set(window.location.href.replace('app', 'chromecast'));
       this._setState({ castIcon: 'cast' });
     }
-    async _loadManifest(path, loader) {
+    async _loadManifest(path) {
       let content;
       if (path) {
-        content = await loader.loadResource(path);
+        content = await this._loader.loadResource(path);
       } else {
         path = './arcs.manifest';
         let manifests = await this._fetchManifestList();
         content = manifests.map(u => `import '${u}'`).join('\n');
       }
+      let folder = path.split('/').slice(0, -1).join('/') || '.';
       //console.log(content);
-      return await Arcs.utils.parseManifest(path, content, loader);
+      return await Arcs.utils.parseManifest(`${folder}/`, content, this._loader);
     }
     async _fetchManifestList() {
       // TODO(sjmiles): using the global `db` that is currently leaking out
@@ -266,7 +303,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let defaults = [
         //'https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest'
       ];
-      let locals = JSON.parse(localStorage.getItem('manifests') || '[]');
+      let locals, exclusions;
+      try {
+        locals = JSON.parse(localStorage.getItem('manifests') || '[]');
+        exclusions = JSON.parse(localStorage.getItem('exclusions') || '[]');
+      } catch(x) {
+        console.warn(x);
+        locals = [];
+        exclusions = [];
+      }
+      this._setState({manifests: remotes, exclusions: exclusions});
       // TODO(sjmiles): really necessary? should live elsewhere
       let dedupe = arr => {
         var i, out=[], obj={};
@@ -278,22 +324,25 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
         return out;
       };
-      return dedupe(defaults.concat(locals, remotes));
+      let set = dedupe(defaults.concat(locals, remotes)).filter(m => exclusions.indexOf(m) < 0);
+      return set;
     }
-    _setCurrentUser(user, dontUpdateLocalStorage) {
+    async _onManifestsChange(e) {
+      let exclusions = e.currentTarget.exclusions;
+      console.log(exclusions);
+      localStorage.setItem('exclusions', JSON.stringify(exclusions));
+      this._setState({dotsActive: true});
+      this.arc._context = await this._loadManifest(this._config.manifestPath);
+      this._findSuggestions();
+    }
+    _setCurrentUser(user) {
       this._currentUser = user;
-
-      if (!dontUpdateLocalStorage) {
-        localStorage.setItem('currentUser', user);
-      }
-
+      localStorage.setItem('currentUser', user);
       this._updateSharedStateIcon();
-
       if (this._users) {
         if (this._currentUser && this._users[this._currentUser]) {
           this._updateCurrentUsersData(this._users[this._currentUser]);
         }
-
         // Pull in all of the views from all public Arcs and add them to
         // the current context.
         // TODO: restrict that to a set of users that we care about.
@@ -327,19 +376,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     async _fetchUsersAndSetupSharing() {
-      return new Promise((accept) => {
+      return new Promise(accept => {
         // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
         // out of metadata-storage.html
         db.ref('users').on('value', snapshot => {
           let users = snapshot.val() || {};
           this._users = users;
-
           // In case there are new users
           this._updateUserSelectWidget();
-
           // Trigger other updates, incl. about shared arcs
-          this._setCurrentUser(this._currentUser, true);
-
+          this._setCurrentUser(this._currentUser);
           // On first load, resolve Promise
           if (accept) {
             let f = accept;
@@ -388,16 +434,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         });
       }
       storage.sync({key: amkey});
-      
       // Store the manifest file path for the Arc to test out metadata storage.
       // TODO: this should be the absolute URL.
       storage.store('manifest', {url: manifestPath});
       this._amkey = amkey;
       // Sync views, e.g. after a new plan was incorporated to the arc
       this._syncStorage = () => storage.sync({key: amkey});
-
       this._syncSharedViews = ({key}) => storage.syncSharedViews({key});
-
       // Storing and reloading steps (keeping too storage specific stuff local)
       this._syncAcceptedSteps = () => storage.store("accepted_steps", this._steps);
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
@@ -510,11 +553,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._findSuggestions();
     }
     _onNavClick() {
+      /*
       this._page = (this._page === 'config') ? 'main' : 'config';
       this._setState({
         mainActive: this._page === 'main',
         configActive: this._page === 'config'
       });
+      */
     }
     _onCastClick() {
       UrlCaster.cast();
@@ -555,6 +600,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onSearch(e) {
       this.search = e.target.value.toLowerCase();
+    }
+    _onSearchClick(e) {
+      this._setState({searchText: '*'});
+      this._onSearch({target: e.currentTarget.previousElementSibling});
     }
   }
   AppShell.module = document.currentScript.ownerDocument;

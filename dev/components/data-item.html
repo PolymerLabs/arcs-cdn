@@ -36,7 +36,7 @@
 <template>
   <left>{{name}}</left>
   <right>
-    <div hidden="{{notbool}}" title="{{name}}"><input type="checkbox" checked="{{value}}"></div>
+    <div hidden="{{notbool}}" title="{{name}}"><input type="checkbox" checked="{{value}}" on-click="_onCheckInput"></div>
     <div hidden="{{notstring}}" title="{{title}}">{{value}}</div>
     <data-explorer hidden="{{notobject}}" object="{{object}}"></data-explorer>
   </right>
@@ -45,6 +45,10 @@
 <script>
   class DataItem extends XenState(XenElement) {
     static get observedAttributes() { return ['name','value']; }
+    _onCheckInput(e) {
+      e.stopPropagation();
+      this.dispatchEvent(new CustomEvent('item-change', {detail: e.target.checked}));
+    }
     _doMount() {
       this._dom = Xen.stamp(DataItem.module.querySelector('template')).events(this).appendTo(this);
     }

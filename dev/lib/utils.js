@@ -41,13 +41,6 @@ let utils = {
       'worker-entry-cdn.js': `${cdnRoot}/lib/worker-entry-cdn.js`
     };
   },
-  collapseRecipes: manifest => {
-    let collapse = (recipes, manifest) => {
-      recipes = recipes.concat(manifest._recipes);
-      return manifest._imports.reduce((recipes, m) => collapse(recipes, m), recipes);
-    };
-    manifest._recipes = collapse([], manifest);
-  },
   async makePlans(arc, timeout) {
     let generations = [];
     let planner = new Arcs.Planner();
