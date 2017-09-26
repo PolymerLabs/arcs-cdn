@@ -9,10 +9,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 -->
 
 <link rel="import" href="strategy-explorer/strategy-explorer.html"></link>
+<link rel="import" href="arc-explorer.html"></link>
 <!--<link rel="import" href="../../../arcs/strategy-explorer/strategy-explorer.html">-->
 
 <style>
   strategy-explorer {
+    display: none;
+    background-color: white;
+    width: 100%;
+  }
+  arc-explorer {
     display: none;
     background-color: white;
     width: 100%;
@@ -38,5 +44,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     setTimeout(()=>populate(e.detail), 0);
   });
 
+  let arcExplorer = document.body.appendChild(document.createElement('arc-explorer'));
+
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey && (e.key == 'a')) {
+      e.preventDefault();
+      arcExplorer.style.display = arcExplorer.style.display == 'block' ? 'none' : 'block';
+      console.log(arcExplorer.arc);
+    }
+  });
+  
+  document.addEventListener('apply', e => {
+    arcExplorer.arc = e.detail.arc;
+  });
 })();
 </script>

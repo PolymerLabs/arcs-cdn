@@ -1,0 +1,50 @@
+<template>
+    <style>
+    </style>
+    <div arc>
+      <x-list items="{{particles}}">
+            <template>
+                    <div particle>
+                      <div name title="{{name}}"><a href="{{file}}">{{name}}</a></div>
+                      <x-list items="{{slots}}">
+                          <template>
+                              <div slot>consumes: <span>{{name}}</span></div>
+                          </template>
+                      </x-list>
+                    </div>
+                  </template>
+      </x-list>
+    </div>
+  </template>
+  
+  <script>
+    class ArcExplorer extends XenState(XenElement) {
+      static get observedAttributes() { return ['arc']; }
+
+      _doMount() {
+        this._arc = {};
+        this._dom = Xen.stamp(ArcExplorer.module.querySelector('template')).events(this).appendTo(this);
+      }
+      _update(props, state) {
+        this._dom.set(this._render(props, state));
+      }
+      _render(props, state) {
+        let particles = {};
+        if (props.arc) {
+            particles = props.arc._activeRecipe._particles.map(p => {
+                return {
+                    name: p.name,
+                    file: p.spec.implFile,
+                    slots: [...p.spec.slots.values()].map(s => {return {name: s.name}})
+                };
+            });
+        }
+        return {
+            arc: props.arc || {},
+            particles: particles
+        };
+      }
+    }
+    ArcExplorer.module = document.currentScript.ownerDocument;
+    customElements.define("arc-explorer", ArcExplorer);
+  </script>

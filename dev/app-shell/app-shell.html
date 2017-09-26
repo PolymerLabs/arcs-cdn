@@ -367,8 +367,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO: we should probably associate the manifest path with the stored ID.
       let amkey = new URL(document.location.href).searchParams.get('amkey');
       if (!amkey) {
-        // Wait for the initial storage to be done.
-        // TODO: don't call this initial method sync but something else. E.g.
+        // Initialize storage and wait for the new remote Arc metadata entry
+        // to be created.
         await storage.init().then(values => {
           amkey = values[0];
           let url = new URL(document.location.href);
@@ -490,6 +490,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.arc.instantiate(plan);
       descriptionGenerator.setViewDescriptions(this.arc);
       this._syncStorage();
+      document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
     }
     _onPlanSelected(e) {
       let {plan, descriptionGenerator} = e.detail;
