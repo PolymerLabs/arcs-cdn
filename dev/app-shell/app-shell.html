@@ -236,6 +236,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         manifestPath: params.get('manifest'),
         user: params.get('user') || localStorage.getItem('currentUser'),
         nokey: params.has('nokey'),
+        nosync: params.has('nosync'),
+        shared: params.getAll('shared'),
         container: this._dom.$('#particles'),
         urls
       };
@@ -426,8 +428,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!amkey) {
         // Initialize storage and wait for the new remote Arc metadata entry
         // to be created.
-        await storage.init().then(values => {
-          amkey = values[0];
+        await storage.init().then(amkey => {
           let url = new URL(document.location.href);
           url.searchParams.set('amkey', amkey);
           window.history.replaceState({}, "", url.href);
