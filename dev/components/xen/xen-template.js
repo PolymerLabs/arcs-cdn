@@ -7,6 +7,8 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
+(function(global) {
+
 'use strict';
 
 /* Annotator */
@@ -316,7 +318,14 @@ let stamp = function(template, opts) {
   return dom;
 };
 
-window.Xen = {
+let Xen = {
   setBoolAttribute,
   stamp
 };
+
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
+  module.exports = Xen;
+else
+  global.Xen = Xen;
+
+})(this);
