@@ -212,9 +212,9 @@
 
     // Adds all of the views in the given Arc to the local context.
     syncSharedViews({ key }) {
-      if (key == this.key) return;
+      if (this._remoteRef && key == this.key) return;
       // TODO: there is a lot of code duplication here with sync() above.
-      // //
+      //
       let arc = db.ref('arcs/' + key);
       arc.child('views').on('value', remoteViews => {
         remoteViews.forEach(remoteViewMeta => {
@@ -222,7 +222,7 @@
           let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
           let sharedViewId = 'Shared:' + key + '-' + this._getViewId({ type }, metadata.tags);
           if (this._syncedViews.has(sharedViewId)) {
-            console.warn(`View id already synced in Arc: ${this.key}:${sharedViewId}`);
+            console.warn(`View id already synced in Arc: ${sharedViewId}`);
             return;
           }
           this._syncedViews.add(sharedViewId);

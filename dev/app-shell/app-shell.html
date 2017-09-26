@@ -274,7 +274,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         if (config.user) {
           this._setCurrentUser(config.user);
         }
-        await this._configureStorage(config.manifestPath);
+        await this._configureStorage(config);
         // configure users
         await this._fetchUsersAndSetupSharing();
         // configure (chrome)-casting
@@ -461,7 +461,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // If storage is enabled and sharing is enabled we will pull in all shared
       // Arcs.
     }
-    async _configureStorage(manifestPath) {
+    async _configureStorage(config) {
       let storage = new ArcMetadataStorage(this);
       // Create an amkey=id if it doesn't already exist.
       // TODO: support multiple arcs.
@@ -476,13 +476,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           window.history.replaceState({}, "", url.href);
         });
       }
-      storage.sync({key: amkey});
+      if (!config.nosync) {
+        // If sync is enabled, sync views after a new plan was incorporated to the Arc.
+        this._syncStorage = () => storage.sync({key: amkey});
+      }
+      this._syncStorage();  // Initial sync for the current Arc.
+
       // Store the manifest file path for the Arc to test out metadata storage.
       // TODO: this should be the absolute URL.
-      storage.store('manifest', {url: manifestPath});
+      storage.store('manifest', {url: config.manifestPath});
       this._amkey = amkey;
-      // Sync views, e.g. after a new plan was incorporated to the arc
-      this._syncStorage = () => storage.sync({key: amkey});
       this._syncSharedViews = ({key}) => storage.syncSharedViews({key});
       // Storing and reloading steps (keeping too storage specific stuff local)
       this._syncAcceptedSteps = () => storage.store("accepted_steps", this._steps);
