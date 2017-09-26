@@ -470,7 +470,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!amkey) {
         // Initialize storage and wait for the new remote Arc metadata entry
         // to be created.
-        await storage.init().then(amkey => {
+        await storage.init().then(k => {
+          amkey = k;
           let url = new URL(document.location.href);
           url.searchParams.set('amkey', amkey);
           window.history.replaceState({}, "", url.href);
