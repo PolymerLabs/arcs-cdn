@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+  <title>Form Factor Tests</title>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      background-image: url(assets/linen.png);
+    }
+    app-shell {
+      display: block;
+      background-color: white;
+      overflow: hidden;
+      padding-top: 32px;
+      padding-bottom: 64px;
+    }
+    app-tools {
+      display: none;
+    }
+    app-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      box-sizing: border-box;
+      background-color: whitesmoke;
+    }
+    app-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      transform: translate3d(0, 100%, 0) translateY(-64px);
+      transition: transform 80ms ease-out;
+      background-color: silver;
+    }
+    app-footer[open] {
+      transform: translate3d(0, 0, 0);
+    }
+    @media (min-width: 500px) {
+      app-shell, app-header, app-footer {
+        width: 414px;
+        max-width: 414px;
+        box-sizing: border-box;
+      }
+      app-tools {
+        display: block;
+        position: fixed;
+        left: 414px;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        overflow: auto;
+      }
+    }
+    /**/
+    app-footer {
+      border: 6px solid green;
+    }
+    app-tools {
+      border: 6px solid red;
+    }
+  </style>
+
+</head>
+<body>
+
+  <app-header>
+    <span>(icon)</span>
+    <span style="flex: 1;"></span>
+    <span>(icon)</span>
+    <span>(icon)</span>
+  </app-header>
+  <app-shell>
+    <div style="height: 2048px; border: 6px solid orange;">main</div>
+  </app-shell>
+  <app-tools>
+    <div style="height: 1024px; border: 3px solid green;">tools</div>
+  </app-tools>
+  <app-footer onclick="this.hasAttribute('open') ? this.removeAttribute('open') : this.setAttribute('open', '');">
+    <div style="height: 256px; border: 3px solid magenta;">drawer content</div>
+  </app-footer>
+
+</body>
+</html>

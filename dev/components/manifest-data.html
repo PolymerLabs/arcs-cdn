@@ -3,8 +3,8 @@
     manifest-data {
       display: flex;
       min-height: 240px;
-      /*font-size: 0.7em;*/
-      font-family: monospace;
+      font-size: 0.7em;
+      /*font-family: monospace;*/
     }
     manifest-data > * {
       flex: 1;
@@ -23,16 +23,35 @@
 
 <script>
   class ManifestData extends HTMLElement {
+    constructor() {
+      super();
+      this._manifests = [];
+      this._exclusions = [];
+      this._data = [];
+    }
     connectedCallback() {
       this.text = '';
-      this.data = [
-        "https://sjmiles.github.io/arc-stories/artifacts/Products/recipes.manifest",
-        "https://sjmiles.github.io/arc-stories/artifacts/Restaurants/recipes.manifest",
-        "https://sjmiles.github.io/arc-stories/artifacts/Accounts/recipes.manifest",
-        "https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest"
-      ];
       this._dom = Xen.stamp(ManifestData.module.querySelector("template")).events(this).appendTo(this);
-      this._dom.set({json: JSON.stringify(this.data, null, " "), object: this.data});
+    }
+    set manifests(manifests) {
+      this._manifests = manifests;
+      this._updateData();
+    }
+    set exclusions(exclusions) {
+      this._exclusions = exclusions;
+      this._updateData();
+    }
+    get exclusions() {
+      return this._data.map(m => m.include ? false : m.path).filter(m => Boolean(m));
+    }
+    _updateData() {
+      this._data = this._manifests.map(m => {
+        return {
+          include: this._exclusions.indexOf(m) < 0,
+          path: m
+        };
+      })
+      this._dom.set({object: this._data});
     }
   }
   ManifestData.module = document.currentScript.ownerDocument;
