@@ -33,8 +33,12 @@
       console.log("Storing arc:", this._arc);
     }
 
-    _getViewId(view) {
-      return view.type.toString().replace(' ', '-');
+    _getViewId(view, tags) {
+      let viewid = view.type.toString().replace(' ', '-');
+      if (tags && [...tags].length) {
+        viewid += '-' + [...tags][0].replace(/#/g, '');
+      }
+      return viewid;
     }
 
     // Synchronize a local view with a remote view.
@@ -133,8 +137,12 @@
 
       // Arc is loading or recently changed. We need to synchronize the views.
       // First we synchronize all of the local views with their remote copies.
-      this._arc._viewsById.forEach((localView) => {
-        let viewId = this._getViewId(localView);
+      //
+      // Currently, only one tag per view is supported. If a view has multiple
+      // tags then one will be picked (at random). Views that have a tag will
+      // only be synced with other views that have tags.
+      this._arc._viewTags.forEach((tags, localView) => {
+        let viewId = this._getViewId(localView, tags);
         // Make sure we only synchronize each view at most once.
         if (this._syncedViews.has(viewId)) {
           return;
@@ -145,7 +153,7 @@
         remoteViewMeta.child('metadata').update(removeUndefined({
           type: localView.type,
           name: localView.name,
-          tags: [],  // TODO: populate tags here.
+          tags: tags,
         }));
         let remoteView = remoteViewMeta.child('values');
 
@@ -196,6 +204,15 @@
       return this._remoteRef.key;
     }
 
+    _getContextView(type, metadata) {
+      let existingViews = this._arc.context.findViewsByType(type, {tags: metadata.tags});
+      if (existingViews.length) {
+        return existingViews[0];
+      }
+      // No local context view exists for that type + tags => create a new one.
+      return this._arc.context.newView(type, metadata.name, /* id */ null, metadata.tags);
+    }
+
     // Adds all of the views in the given Arc to the local context.
     syncSharedViews({ key }) {
       if (key == this.key) return;
@@ -206,15 +223,13 @@
         remoteViews.forEach(remoteViewMeta => {
           let metadata = remoteViewMeta.child('metadata').val();
           let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
-          let sharedViewId = 'Shared:' + key + '-' + this._getViewId({ type });
+          let sharedViewId = 'Shared:' + key + '-' + this._getViewId({ type }, metadata.tags);
           if (this._syncedViews.has(sharedViewId)) {
             console.warn(`View id already synced in Arc: ${this.key}:${sharedViewId}`);
             return;
           }
           this._syncedViews.add(sharedViewId);
-          let localView = ((
-            this._arc.context.findViewsByType(type) && this._arc.context.findViewsByType(type)[0]) ||
-            this._arc.context.newView(type, metadata.name));
+          let localView = this._getContextView(type, metadata);
           let remoteView = remoteViewMeta.child('values').ref;
           if (localView.type.isView) {
             // One-way syncing. Whenever a new entity is added / removed in the remote
