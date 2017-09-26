@@ -11,6 +11,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 'use strict';
 
+if (typeof document !== 'undefined' && !('currentImport' in document)) {
+  Object.defineProperty(document, 'currentImport', {
+    get() {
+      return (document._currentScript || document.currentScript || document).ownerDocument;
+    }
+  });
+}
+
 /* Annotator */
 // tree walker that generates arbitrary data using visitor function `cb`
 // `cb` is called as `cb(node, key, notes)`
@@ -315,6 +323,8 @@ let stamp = function(template, opts) {
       return this;
     }
   };
+  // TODO(sjmiles): BC
+  dom.mapEvents = dom.events;
   return dom;
 };
 

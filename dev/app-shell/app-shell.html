@@ -28,6 +28,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script src="../components/suggestions-element.js"></script>
 <link rel="import" href="../components/dancing-dots.html">
 <link rel="import" href="../components/user-data.html">
+<link rel="import" href="../components/local-data.html">
 <link rel="import" href="../components/manifest-data.html">
 
 <!-- view-persistence via front-end -->
@@ -193,8 +194,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   </div>
   <!-- config panel -->
   <app-tools>
-    <user-data></user-data>
-    <br><br>
+    <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
+    <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest"></local-data>
     <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-object-change="_onManifestsChange"></manifest-data>
   </app-tools>
   <!-- sub-templates -->
@@ -239,6 +240,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         container: this._dom.$('#particles'),
         urls
       };
+      // hook allows outer scope to modify `config`
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
       // start application
@@ -283,6 +285,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({ castIcon: 'cast' });
     }
     async _loadManifest(path) {
+      this._setState({localManifest: path});
+      let manifests = await this._fetchManifestList();
+      if (path) {
+        manifests.push(path);
+      }
+      path = './arcs.manifest';
+      let content = manifests.map(u => `import '${u}'`).join('\n');
+      /*
       let content;
       if (path) {
         content = await this._loader.loadResource(path);
@@ -291,6 +301,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         let manifests = await this._fetchManifestList();
         content = manifests.map(u => `import '${u}'`).join('\n');
       }
+      */
       let folder = path.split('/').slice(0, -1).join('/') || '.';
       //console.log(content);
       return await Arcs.utils.parseManifest(`${folder}/`, content, this._loader);
@@ -327,11 +338,35 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let set = dedupe(defaults.concat(locals, remotes)).filter(m => exclusions.indexOf(m) < 0);
       return set;
     }
-    async _onManifestsChange(e) {
+    async _onPromoteManifest(e) {
+      let path = this._config.manifestPath;
+      if (path) {
+        let snapshot = await db.ref('manifests').once('value');
+        let remotes = snapshot.val();
+        if (remotes.indexOf(path) < 0) {
+          remotes.push(path);
+          db.ref('manifests').set(remotes);
+          // remove path
+          this._config.manifestPath = '';
+          // update ui
+          this._setState({manifests: remotes, localManifest: ''});
+          // remove url param
+          let url = new URL(document.location.href);
+          url.searchParams.delete('manifest');
+          window.history.replaceState({}, "", url.href);
+          // apply
+          this._reloadManifests();
+        }
+      }
+    }
+    _onManifestsChange(e) {
       let exclusions = e.currentTarget.exclusions;
       console.log(exclusions);
       localStorage.setItem('exclusions', JSON.stringify(exclusions));
       this._setState({dotsActive: true});
+      this._reloadManifests();
+    }
+    async _reloadManifests() {
       this.arc._context = await this._loadManifest(this._config.manifestPath);
       this._findSuggestions();
     }
@@ -346,16 +381,19 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // Pull in all of the views from all public Arcs and add them to
         // the current context.
         // TODO: restrict that to a set of users that we care about.
-        Object.keys(this._users).forEach(user => {
-          if (user == this._currentUser || !this._users[user].shared) return;
-          Object.keys(this._users[user].shared).forEach(amkey => {
-            if (!this._users[user].shared[amkey].shared)
-              return;
-            console.log('Import view into the context from amkey=', amkey);
-            this._syncSharedViews({key: amkey});
-          });
+        Object.keys(this._users).forEach(name => {
+          let user = this._users[name];
+          if (name !== this._currentUser && user.shared) {
+            Object.keys(user.shared).forEach(amkey => {
+              if (user.shared[amkey].shared) {
+                console.log('Import view into the context from amkey=', amkey);
+                this._syncSharedViews({key: amkey});
+              }
+            });
+          }
         });
       }
+      this._setState({user, users: this._users});
     }
     _updateCurrentUsersData(data) {
       if (data.manifest != this._currentUsersManifest) {
@@ -380,6 +418,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
         // out of metadata-storage.html
         db.ref('users').on('value', snapshot => {
+          console.log('server: users data updated');
           let users = snapshot.val() || {};
           this._users = users;
           // In case there are new users
@@ -394,6 +433,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
         });
       });
+    }
+    _onUserDataChanged() {
+      if (this._users) {
+        db.ref('users').set(this._users);
+      }
     }
     _saveSharedState() {
       if (!this._currentUser || !this._amkey) {
