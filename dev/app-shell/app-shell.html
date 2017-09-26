@@ -235,6 +235,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         affordance: 'dom',
         root: params.get('root') || appShellPath,
         manifestPath: params.get('manifest'),
+        soloPath: params.get('solo'),
         user: params.get('user') || localStorage.getItem('currentUser'),
         nokey: params.has('nokey'),
         container: this._dom.$('#particles'),
@@ -259,7 +260,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         Object.keys(config.urls).forEach(k => urlMap[k] = this._loader._resolve(config.urls[k]));
       }
       // load manifest
-      let manifest = await this._loadManifest(config.manifestPath);
+      let manifest = await this._loadManifest();
       console.log(manifest);
       // renderer
       let slotComposer = new Arcs.SlotComposer({rootContext: config.container, affordance: config.affordance});
@@ -284,26 +285,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       UrlCaster.set(window.location.href.replace('app', 'chromecast'));
       this._setState({ castIcon: 'cast' });
     }
-    async _loadManifest(path) {
-      this._setState({localManifest: path});
-      let manifests = await this._fetchManifestList();
-      if (path) {
-        manifests.push(path);
-      }
-      path = './arcs.manifest';
-      let content = manifests.map(u => `import '${u}'`).join('\n');
-      /*
-      let content;
-      if (path) {
-        content = await this._loader.loadResource(path);
+    async _loadManifest() {
+      let {manifestPath, soloPath} = this._config
+      this._setState({localManifest: manifestPath || soloPath});
+      let path, content;
+      if (soloPath) {
+        content = await this._loader.loadResource(soloPath);
+        path = soloPath;
       } else {
-        path = './arcs.manifest';
         let manifests = await this._fetchManifestList();
+        if (manifestPath) {
+          manifests.push(manifestPath);
+        }
         content = manifests.map(u => `import '${u}'`).join('\n');
+        path = './arcs.manifest';
       }
-      */
       let folder = path.split('/').slice(0, -1).join('/') || '.';
-      //console.log(content);
       return await Arcs.utils.parseManifest(`${folder}/`, content, this._loader);
     }
     async _fetchManifestList() {
@@ -339,35 +336,36 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return set;
     }
     async _onPromoteManifest(e) {
-      let path = this._config.manifestPath;
+      let path = this._config.manifestPath || this._config.soloPath;
       if (path) {
         let snapshot = await db.ref('manifests').once('value');
         let remotes = snapshot.val();
         if (remotes.indexOf(path) < 0) {
           remotes.push(path);
           db.ref('manifests').set(remotes);
-          // remove path
-          this._config.manifestPath = '';
-          // update ui
-          this._setState({manifests: remotes, localManifest: ''});
-          // remove url param
-          let url = new URL(document.location.href);
-          url.searchParams.delete('manifest');
-          window.history.replaceState({}, "", url.href);
-          // apply
-          this._reloadManifests();
         }
+        // remove path
+        this._config.manifestPath = this._config.soloPath = '';
+        // update ui
+        this._setState({manifests: remotes, localManifest: ''});
+        // remove url param
+        let url = new URL(document.location.href);
+        url.searchParams.delete('manifest');
+        url.searchParams.delete('solo');
+        window.history.replaceState({}, "", url.href);
+        // apply
+        this._reloadManifests();
       }
     }
     _onManifestsChange(e) {
       let exclusions = e.currentTarget.exclusions;
       console.log(exclusions);
       localStorage.setItem('exclusions', JSON.stringify(exclusions));
-      this._setState({dotsActive: true});
       this._reloadManifests();
     }
     async _reloadManifests() {
-      this.arc._context = await this._loadManifest(this._config.manifestPath);
+      this._setState({dotsActive: true});
+      this.arc._context = await this._loadManifest();
       this._findSuggestions();
     }
     _setCurrentUser(user) {

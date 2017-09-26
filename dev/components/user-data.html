@@ -1,15 +1,21 @@
 <template>
   <style>
+    user-data {
+      display: block;
+      padding-bottom: 8px;
+    }
     user-data [banner] {
       padding: 6px 4px;
-      background-color: #64c1ff;
+      background-color: whitesmoke;
       margin-bottom: 8px;
+      border-top: 1px dotted silver;
     }
     user-data [banner2] {
       margin-top: 8px;
       padding: 4px 4px;
-      background-color: #69e2ff;
+      background-color: #f1f1f1;
       font-size: 0.7em;
+      border-top: 1px dotted silver;
     }
     user-data [editor] {
       display: flex;
@@ -33,11 +39,12 @@
     }
   </style>
   <div banner>User</div>
+  <!--
   <div editor>
     <span label>name</span>
-    <!--<input value="{{user}}">-->
     <b>{{user}}</b>
   </div>
+-->
   <!--
   <div editor>
     <span label>manifest</span>
@@ -82,7 +89,9 @@
     _update() {
       if (this._users && this._user) {
         this._userData = this._users[this._user];
-        this._render();
+        if (this._userData) {
+          this._render();
+        }
       }
     }
     _render() {
