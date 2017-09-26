@@ -180,7 +180,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <div pages>
       <!-- main page -->
       <div main active$="{{mainActive}}">
-        <div id="particles"></div>
+        <div id="particles">
+          <div slotid="root"></div>
+        </div>
         <x-toast app-footer open="{{toastOpen}}" suggestion-container>
           <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
           <div search>
