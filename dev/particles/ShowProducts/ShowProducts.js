@@ -26,7 +26,7 @@ defineParticle(({DomParticle, resolver}) => {
     font-weight: bold;
   }
   ${host} > x-list [item] {
-    padding: 4px 8px;
+    /*padding: 4px 8px;*/
     background-color: white;
     border-bottom: 1px solid #eeeeee;
   }
