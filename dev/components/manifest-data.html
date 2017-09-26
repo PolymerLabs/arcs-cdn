@@ -60,7 +60,7 @@
         items: {
           template: ManifestData.module.querySelector('[manifest-item]'),
           models: this._manifests.map((m, i) => {
-            let url = new URL(m);
+            let url = new URL(m, location.href);
             let include = this._exclusions.indexOf(m) < 0;
             return {
               include,

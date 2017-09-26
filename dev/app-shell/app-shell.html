@@ -342,6 +342,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async _onPromoteManifest(e) {
       let path = this._config.manifestPath || this._config.soloPath;
       if (path) {
+        path = new URL(path, location.href).href;
         let snapshot = await db.ref('manifests').once('value');
         let remotes = snapshot.val();
         if (remotes.indexOf(path) < 0) {
