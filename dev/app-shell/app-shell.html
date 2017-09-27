@@ -311,7 +311,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO(sjmiles): using the global `db` that is currently leaking out
       // of metadata-storage.html
       let snapshot = await db.ref('manifests').once('value');
-      let remotes = snapshot.val();
+      let remotes = [];
+      snapshot.forEach(m => {remotes.push(m.val())});
       let defaults = [
         //'https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest'
       ];
