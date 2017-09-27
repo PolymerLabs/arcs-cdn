@@ -14,4 +14,4 @@ particle Chooser in 'Chooser.js'
   consume action
   # annotation slot will be provided, as soon as SlotComposer and MapRemoteSlots strategy support it.
   #  provide set of annotation
-  description `Choose from ${choices}`
+  description `choose from ${choices}`
