@@ -64,11 +64,11 @@
         return document.querySelector('template');
       }
       _start(config) {
-        if (!config.soloPath) {
-          config.soloPath = 'arcs.manifest';
-        }
         config.containerKind = 'a-entity';
         super._start(config);
+      }
+      async _fetchManifestList() {
+        return ['arcs.manifest'];
       }
     }
     customElements.define('vr-app-shell', VrAppShell);
