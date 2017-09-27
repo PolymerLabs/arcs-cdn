@@ -53887,6 +53887,7 @@ class AssignViewsByTagAndType extends ViewMapperBase {
   }
 
   getMappableViews(type, tags) {
+    console.log('AssignViewsByTagAndType', this.arc._tags.size);
     if (tags.length > 0) {
       return this.arc.findViewsByType(type, {tag: tags[0]});
     } else {

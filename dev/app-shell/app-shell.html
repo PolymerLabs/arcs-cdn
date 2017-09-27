@@ -223,6 +223,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           this._setState({dotsDisabled: true});
           throw x;
         }
+        window.addEventListener('keydown', e => {
+          if (e.ctrlKey && (e.key == "s")) {
+            e.preventDefault();
+            if (this.arc) {
+              this._findSuggestions();
+            }
+          }
+        });
       }
     }
     _setState(state) {
@@ -506,11 +514,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
     }
     async _findSuggestions() {
+      console.log('Suggestions:', this.arc._tags.size);
       this._setState({dotsActive: true, suggestions: []});
       let max_recursion = 3;
       do {
         let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
-        console.log('plans:', plans);
+        console.log('plans:', plans, ' recursions left:', max_recursion);
         document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
         plans.generations = generations;
         this._plans = plans;
