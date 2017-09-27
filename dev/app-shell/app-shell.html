@@ -385,6 +385,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _setCurrentUser(user) {
       this._currentUser = user;
       localStorage.setItem('currentUser', user);
+
       // TODO: fix this somehow. This is super ugly right now.
       let personSchema = this.arc.context.findSchemaByName('Person');
       if (personSchema) {
@@ -394,17 +395,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           v.set({id: this.arc.generateID(), rawData: p.dataClone()});
         })
       }
+
       this._updateSharedStateIcon();
-      if (this._users) {
-        if (this._currentUser && this._users[this._currentUser]) {
-          this._updateCurrentUsersData(this._users[this._currentUser]);
-        }
+
+      if (this._users && this._currentUser && this._users[this._currentUser]) {
+        this._updateCurrentUsersData(this._users[this._currentUser]);
+
         // Pull in all of the views from all public Arcs and add them to
         // the current context.
-        // TODO: restrict that to a set of users that we care about.
-        Object.keys(this._users).forEach(name => {
+        // TODO: remove unshared / unfriended views
+        Object.keys(this._users[this._currentUser].friends || []).forEach(name => {
           let user = this._users[name];
-          if (name !== this._currentUser && user.shared) {
+          if (user.shared) {
             Object.keys(user.shared).forEach(amkey => {
               if (user.shared[amkey].shared) {
                 console.log('Import view into the context from amkey=', amkey);
@@ -414,6 +416,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
         });
       }
+      
       this._setState({user, users: this._users});
     }
     _updateCurrentUsersData(data) {
