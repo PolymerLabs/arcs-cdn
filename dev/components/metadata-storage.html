@@ -150,7 +150,7 @@
         remoteViewMeta.child('metadata').update(removeUndefined({
           type: localView.type,
           name: localView.name,
-          tags: tags,
+          tags: [...tags],  // removeUndefined doesn't support sets.
         }));
         let remoteView = remoteViewMeta.child('values');
 
