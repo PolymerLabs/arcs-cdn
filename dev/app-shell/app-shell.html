@@ -545,6 +545,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             return desc.indexOf(term) >= 0;
           });
         }
+      } else if (this._plans) {
+        results = this._plans.filter(
+          p => p.plan.slots && p.plan.slots.length &&
+               !p.plan.slots.find(s => s.name == 'root'));
       }
       this._setState({suggestions: results || []});
     }
