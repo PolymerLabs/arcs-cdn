@@ -38,7 +38,7 @@
       margin: 0 4px;
     }
   </style>
-  <div banner>User</div>
+  <div banner>Arcs in Context</div>
   <!--
   <div editor>
     <span label>name</span>
@@ -55,7 +55,9 @@
 -->
   <!--<data-explorer object="{{object}}"></data-explorer>-->
   <!--<textarea spellcheck="false">{{json}}</textarea>-->
-  <div banner2>Friends</div>
+  <div banner2>Yours</div>
+  <div>{{me}}</div>
+  <div banner2>From friends</div>
   <div>{{users}}</div>
 </template>
 
@@ -97,18 +99,23 @@
     _render() {
       let names = Object.keys(this._users);
       let friends = this._userData.friends || [];
+      let makeModel = (name) => {
+        let include = friends.indexOf(name) >= 0;
+        return {
+          key: name,
+          name,
+          include,
+          style: include ? {} : {backgroundColor: 'whitesmoke', color: '#888'},
+        };
+      };
       this._dom.set({
         users: {
           template: UserData.module.querySelector('[user-item]'),
-          models: names.filter(name => name != this._user).map(name => {
-            let include = friends.indexOf(name) >= 0;
-            return {
-              key: name,
-              name,
-              include,
-              style: include ? {} : {backgroundColor: 'whitesmoke', color: '#888'},
-            };
-          })
+          models: names.filter(name => name != this._user).map(name => makeModel(name))
+        },
+        me: {
+          template: UserData.module.querySelector('[user-item]'),
+          models: this._user ? [ makeModel(this._user) ] : []
         }
       });
     }

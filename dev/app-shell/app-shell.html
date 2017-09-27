@@ -280,16 +280,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
       // configure persistence layer
       if (!config.nokey) {
-        // set current user or read it from local storage
-        if (config.user) {
-          this._setCurrentUser(config.user);
-        }
         await this._configureStorage(config);
-        // configure users
-        await this._fetchUsersAndSetupSharing();
         // configure (chrome)-casting
         this._configureCasting();
       }
+      // set current user or read it from local storage
+      if (config.user) {
+        this._setCurrentUser(config.user);
+      }
+      // configure users
+      await this._fetchUsersAndSetupSharing();
       // invoke planner
       this._findSuggestions();
     }
@@ -445,7 +445,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           // In case there are new users
           this._updateUserSelectWidget();
           // Trigger other updates, incl. about shared arcs
-          this._setCurrentUser(this._currentUser);
+          if (this._currentUser) this._setCurrentUser(this._currentUser);
           // On first load, resolve Promise
           if (accept) {
             let f = accept;
