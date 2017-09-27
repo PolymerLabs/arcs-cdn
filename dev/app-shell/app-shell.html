@@ -541,7 +541,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           results = this._plans;
         } else if (term.length > 2) {
           results = this._plans.filter(p => {
-            let desc = p.descriptionGenerator.description.toLowerCase();
+            let desc = p.description.toLowerCase();
             return desc.indexOf(term) >= 0;
           });
         }
@@ -619,29 +619,26 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         if (matching_step) {
           console.log("Auto applying: ", matching_step, suggestion);
           this._appliedSteps[matching_step.hash] = true;
-          this._applySuggestion(suggestion.plan, suggestion.descriptionGenerator);
+          this._applySuggestion(suggestion.plan);
         }
       });
     }
-    _applySuggestion(plan, descriptionGenerator) {
+    _applySuggestion(plan) {
       this.arc.instantiate(plan);
-      descriptionGenerator.setViewDescriptions(this.arc);
+      //descriptionGenerator.setViewDescriptions(this.arc);
       this._syncStorage();
       document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
     }
     _onPlanSelected(e) {
-      let {plan, descriptionGenerator} = e.detail;
-
+      let {plan/*, descriptionGenerator*/} = e.detail;
       this._setState({toastOpen: false});
-
       // Reset search, unless it was '*'
       // This will reduce suggestions to those matching open slots by default
       if (this.search != '*') {
         this.search = '';
         this._setState({searchText: ''});
       }
-
-      this._applySuggestion(plan, descriptionGenerator);
+      this._applySuggestion(plan/*, descriptionGenerator*/);
       this._addAcceptedStep(this._findOriginatingStep(plan));
       this._findSuggestions();
     }
