@@ -43336,7 +43336,7 @@ class DescriptionGenerator {
         let description = particle.spec.description ? particle.spec.description[connection.name] : undefined;
         if (!description) {
           if (view.id) {
-            description = this.relevance.newArc.findViewById(view.id).description
+            description = this.relevance.newArc.findViewById(view.id).description;
           }
         }
         // should verify same particle doesn't push twice?
@@ -43372,8 +43372,20 @@ class DescriptionGenerator {
         }
       }
     });
-
-    return selectedDescriptions.length > 0 ? selectedDescriptions.join(" and ") : this.recipe.name;
+    // Return recipe name by default.
+    let desc = this.recipe.name;
+    // Maybe combine descriptions into a sentence.
+    let count = selectedDescriptions.length;
+    if (count) {
+      // "A."
+      // "A and b."
+      // "A, b, ..., and z." (Oxford comma ftw)
+      let delim = ['', '', ' and ', ', and '][count > 2 ? 3 : count];
+      desc = selectedDescriptions.slice(0,-1).join(", ") + delim + selectedDescriptions.pop();
+      // "Capitalize, punctuate."
+      desc = desc[0].toUpperCase() + desc.slice(1) + '.';
+    }
+    return desc;
   }
   _sortParticles(p1, p2) {
     // Root slot comes first.
@@ -43432,7 +43444,7 @@ class DescriptionGenerator {
                                               selectedParticleViewDescription.recipeParticle);
     } else {
       if (viewDescription && (viewDescription.type.isView || !viewDescription.value)) {
-        resultDescription = viewDescription.type.toString();
+        resultDescription = viewDescription.type.toString().toLowerCase();
         if (viewDescription.create) {
           resultDescription = 'new ' + resultDescription;
         }
