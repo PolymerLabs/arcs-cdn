@@ -43440,7 +43440,7 @@ class DescriptionGenerator {
       // description pattern for the view,
       resultDescription = connection.view.description;
     } else if (selectedParticleViewDescription) {
-      resultDescription = this._resolveTokens(selectedParticleViewDescription.description,
+      resultDescription = this._resolveTokens(selectedParticleViewDescription.description.toLowerCase(),
                                               selectedParticleViewDescription.recipeParticle);
     } else {
       if (viewDescription && (viewDescription.type.isView || !viewDescription.value)) {
@@ -43471,7 +43471,6 @@ class DescriptionGenerator {
         if (localDescription.description)
           return localDescription;
       }
-
       let outDescriptions = viewDescription.descriptions.reduce((prev, curr) => {
         if (curr.direction == "out") {
           prev.push(curr);
