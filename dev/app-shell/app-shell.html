@@ -546,6 +546,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           });
         }
       } else if (this._plans) {
+        // empty string = show suggestions matching current slots, i.e.
+        // suggestions furthering current flow, but not those just appending
+        // TODO(seefeld): Also add suggestions based on in-arc views?
         results = this._plans.filter(
           p => p.plan.slots && p.plan.slots.length &&
                !p.plan.slots.find(s => s.name == 'root'));
@@ -628,7 +631,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onPlanSelected(e) {
       let {plan, descriptionGenerator} = e.detail;
+
       this._setState({toastOpen: false});
+
+      // Reset search, unless it was '*'
+      // This will reduce suggestions to those matching open slots by default
+      if (this.search != '*') {
+        this.search = '';
+        this._setState({searchText: ''});
+      }
+
       this._applySuggestion(plan, descriptionGenerator);
       this._addAcceptedStep(this._findOriginatingStep(plan));
       this._findSuggestions();
