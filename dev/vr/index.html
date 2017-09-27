@@ -44,7 +44,7 @@
   <template>
     <a-scene id="particles" gridhelper="size:8" physics="debug: false">
       <a-entity light="type:directional; castShadow: true;" position="1 1 1"></a-entity>
-      <a-sky color="#DCDCDC" src="assets/tokyo.jpg"></a-sky>
+      <a-sky color="#DCDCDC" src="assets/tokyo (candy bar).jpg"></a-sky>
       <a-camera position="0 0 0"></a-camera>
       <a-entity slotid="root"></a-entity>
     </a-scene>
@@ -64,6 +64,9 @@
         return document.querySelector('template');
       }
       _start(config) {
+        if (!config.soloPath) {
+          config.soloPath = 'arcs.manifest';
+        }
         config.containerKind = 'a-entity';
         super._start(config);
       }
