@@ -308,11 +308,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO(sjmiles): using the global `db` that is currently leaking out
       // of metadata-storage.html
       let snapshot = await db.ref('manifests').once('value');
-      let remotes = [];
-      snapshot.forEach(m => {remotes.push(m.val())});
-      let defaults = [
-        //'https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest'
-      ];
+      let remotes = snapshot.map(m => m.val());
       let locals, exclusions;
       try {
         locals = JSON.parse(localStorage.getItem('manifests') || '[]');
@@ -334,7 +330,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
         return out;
       };
-      let set = dedupe(defaults.concat(locals, remotes)).filter(m => exclusions.indexOf(m) < 0);
+      let set = dedupe(locals.concat(remotes)).filter(m => exclusions.indexOf(m) < 0);
       return set;
     }
     async _onPromoteManifest(e) {
