@@ -380,7 +380,26 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async _reloadManifests() {
       this._setState({dotsActive: true});
       this.arc._context = await this._loadManifest();
+      this._loadSharedArcs();
       this._findSuggestions();
+    }
+    _loadSharedArcs() {
+      if (this._users && this._currentUser && this._users[this._currentUser]) {
+        // Pull in all of the views from all public Arcs and add them to
+        // the current context.
+        // TODO: remove unshared / unfriended views
+        (this._users[this._currentUser].friends || []).forEach(name => {
+          let user = this._users[name];
+          if (user.shared) {
+            Object.keys(user.shared).forEach(amkey => {
+              if (user.shared[amkey].shared) {
+                console.log('Import view into the context from amkey=', amkey);
+                this._syncSharedViews({key: amkey});
+              }
+            });
+          }
+        });
+      }
     }
     _setCurrentUser(user) {
       this._currentUser = user;
@@ -400,23 +419,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
       if (this._users && this._currentUser && this._users[this._currentUser]) {
         this._updateCurrentUsersData(this._users[this._currentUser]);
-
-        // Pull in all of the views from all public Arcs and add them to
-        // the current context.
-        // TODO: remove unshared / unfriended views
-        Object.keys(this._users[this._currentUser].friends || []).forEach(name => {
-          let user = this._users[name];
-          if (user.shared) {
-            Object.keys(user.shared).forEach(amkey => {
-              if (user.shared[amkey].shared) {
-                console.log('Import view into the context from amkey=', amkey);
-                this._syncSharedViews({key: amkey});
-              }
-            });
-          }
-        });
       }
-      
+      this._loadSharedArcs();
       this._setState({user, users: this._users});
     }
     _updateCurrentUsersData(data) {
