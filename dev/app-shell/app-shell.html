@@ -39,15 +39,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <!-- tooling -->
 <link rel="import" href="../components/explorer-hotkey.html">
 
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    /*background-image: url(assets/linen.png);*/
+  }
+</style>
+
 <template>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      /*background-image: url(assets/linen.png);*/
-    }
     app-shell {
-      background-color: white;
       display: flex;
       overflow: hidden;
       padding-top: 32px;
@@ -150,7 +152,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <div arc-panel>
     <!-- header -->
     <app-header>
-      <i class="material-icons" on-click="_onNavClick">menu</i>
+      <i class="material-icons" style="color: gray;" Xon-click="_onNavClick">donut_large</i>
       <span style="flex: 1;"></span>
       <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
         <i class="material-icons">person</i>
