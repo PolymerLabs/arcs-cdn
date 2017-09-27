@@ -431,7 +431,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       // Restoring shared arc or other instance changed sharing state
       // or currentUser changed and has different sharing setting
-      if (this._amkey && data.shared[this._amkey]) {
+      if (this._amkey && data.shared && data.shared[this._amkey]) {
         if (data.shared[this._amkey].shared != this._shared) {
           this._setSharedState(data.shared[this._amkey].shared);
         }
