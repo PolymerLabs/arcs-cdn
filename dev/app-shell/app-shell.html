@@ -373,6 +373,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _setCurrentUser(user) {
       this._currentUser = user;
       localStorage.setItem('currentUser', user);
+      // TODO: fix this somehow. This is super ugly right now.
+      let personSchema = this.arc.context.findSchemaByName('Person');
+      if (personSchema) {
+        this.arc.context.findViewsByType(personSchema.type, {tags: ['#identity']}).forEach(v => {
+          let Person = personSchema.entityClass();
+          let p = new Person({name: this._currentUser});
+          v.set({id: this.arc.generateID(), rawData: p.dataClone()});
+        })
+      }
       this._updateSharedStateIcon();
       if (this._users) {
         if (this._currentUser && this._users[this._currentUser]) {
