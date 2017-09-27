@@ -182,7 +182,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <!-- config panel -->
   <app-tools>
     <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
-    <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest"></local-data>
+    <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
     <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-object-change="_onManifestsChange"></manifest-data>
   </app-tools>
   <!-- sub-templates -->
@@ -347,18 +347,35 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           remotes.push(path);
           db.ref('manifests').set(remotes);
         }
-        // remove path
-        this._config.manifestPath = this._config.soloPath = '';
         // update ui
         this._setState({manifests: remotes, localManifest: ''});
-        // remove url param
-        let url = new URL(document.location.href);
-        url.searchParams.delete('manifest');
-        url.searchParams.delete('solo');
-        window.history.replaceState({}, "", url.href);
+        // remove config paths
+        this._config.manifestPath = this._config.soloPath = '';
+        // update location bar
+        this._manifestConfigToLocation();
         // apply
         this._reloadManifests();
       }
+    }
+    _manifestConfigToLocation() {
+      let url = new URL(document.location.href);
+      let bool_param = (p, n, v) => Boolean(v) ? p.set(n, v) : p.delete(n);
+      bool_param(url.searchParams, 'manifest', this._config.manifestPath);
+      bool_param(url.searchParams, 'solo', this._config.soloPath);
+      window.history.replaceState({}, "", url.href);
+    }
+    _onUpdateManifest(e) {
+      let path = e.detail;
+      let c = this._config;
+      if (c.soloPath) {
+        c.soloPath = path;
+        c.manifestPath = '';
+      } else {
+        c.soloPath = '';
+        c.manifestPath = path;
+      }
+      this._manifestConfigToLocation();
+      this._reloadManifests();
     }
     _onManifestsChange(e) {
       let exclusions = e.currentTarget.exclusions;

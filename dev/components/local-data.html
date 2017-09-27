@@ -37,13 +37,15 @@
   <div editor>
     <!--
     <span label>manifest</span>
-    <input value="{{manifest}}">
     <div>{{manifest}}</div>
     -->
+    <input style="flex: 1;" value="{{manifest}}" on-change="_onManifestChange">
+    <!--
     <div style="flex: 1;">
       <div style="font-size:0.7em; font-style:italic;">{{host}}</div>
       <div style="font-size:0.9em; padding: 4px 0;">{{pathname}}</div>
     </div>
+    -->
     <i class="material-icons" title="Promote" on-click="_onPromoteClick">assignment_returned</i>
     <!--<i class="material-icons" title="Delete">delete</i>-->
   </div>
@@ -56,8 +58,14 @@
       this._dom = Xen.stamp(LocalData.module.querySelector('template')).events(this).appendTo(this);
     }
     set manifest(manifest) {
+      /*
       let {host, pathname} = manifest ? new URL(manifest, location.href) : {host: '', pathname: ''};
-      this._dom.set({host, pathname});
+      this._dom.set({host, pathname, manifest});
+      */
+      this._dom.set({manifest});
+    }
+    _onManifestChange(e) {
+      this.dispatchEvent(new CustomEvent('update-manifest', {detail: e.currentTarget.value}));
     }
     _onPromoteClick(e) {
       this.dispatchEvent(new CustomEvent('promote-manifest'));
