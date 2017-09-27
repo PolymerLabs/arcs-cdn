@@ -39,130 +39,113 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <!-- tooling -->
 <link rel="import" href="../components/explorer-hotkey.html">
 
-<style>
-  body {
-    font-family: sans-serif;
-    margin: 0;
-    /*background-image: url(assets/linen.png);*/
-  }
-  app-shell {
-    background-color: white;
-    display: flex;
-    overflow: hidden;
-    padding-top: 32px;
-    padding-bottom: 64px;
-  }
-  [arc-panel] {
-    flex: 1;
-  }
-  app-tools {
-    display: none;
-  }
-  app-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    padding: 0 8px;
-    box-sizing: border-box;
-    background-color: whitesmoke;
-  }
-  .material-icons {
-    cursor: pointer;
-    vertical-align: middle;
-  }
-  app-header select {
-    border: none;
-    background-color: transparent;
-    outline: none;
-    height: 100%;
-  }
-  x-toast {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    /*
-    transform: translate3d(0, 100%, 0) translateY(-64px);
-    transition: transform 80ms ease-out;
-    */
-    background-color: white;
-  }
-  [pages] {
-    display: flex;
-    flex: 1;
-  }
-  [main], [config] {
-    display: none;
-    flex-direction: column;
-    flex: 1;
-  }
-  /*
-  [config] {
-    position: absolute;
-    top: 32px;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    background-color: gray;
-  }
-  [config] > * {
-    background-color: white;
-  }
-  */
-  [active] {
-    display: flex;
-  }
-  [hidebydefault] {
-    display: none;
-  }
-  [show] {
-    display: initial;
-  }
-  [search] {
-    display: flex;
-    align-items: center;
-    padding: 4px;
-    border-bottom: 1px dotted silver;
-  }
-  [search] input {
-    flex: 1;
-    padding: 7px;
-    border: none;
-    outline: none;
-  }
-  #particles {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    overflow: auto;
-    overflow-x: hidden;
-  }
-  /* wider-than-mobile */
-  @media (min-width: 500px) {
-    app-shell, app-header, [app-footer] {
-      width: 414px;
-      max-width: 414px;
-      box-sizing: border-box;
+<template>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      /*background-image: url(assets/linen.png);*/
+    }
+    app-shell {
+      background-color: white;
+      display: flex;
+      overflow: hidden;
+      padding-top: 32px;
+      padding-bottom: 64px;
+    }
+    [arc-panel] {
+      flex: 1;
     }
     app-tools {
-      display: block;
-      position: fixed;
-      left: 414px;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      overflow: auto;
-      border-left: 1px solid silver;
+      display: none;
     }
-  }
-</style>
+    app-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      box-sizing: border-box;
+      background-color: whitesmoke;
+    }
+    .material-icons {
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    app-header select {
+      border: none;
+      background-color: transparent;
+      outline: none;
+      height: 100%;
+    }
+    x-toast {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: white;
+    }
+    [pages] {
+      display: flex;
+      flex: 1;
+    }
+    [main], [config] {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+    }
+    [active] {
+      display: flex;
+    }
+    [hidebydefault] {
+      display: none;
+    }
+    [show] {
+      display: initial;
+    }
+    [search] {
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-bottom: 1px dotted silver;
+    }
+    [search] input {
+      flex: 1;
+      padding: 7px;
+      border: none;
+      outline: none;
+    }
+    #particles {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      overflow: auto;
+      overflow-x: hidden;
+    }
+    /* wider-than-mobile */
+    @media (min-width: 500px) {
+      app-shell, app-header, [app-footer] {
+        width: 414px;
+        max-width: 414px;
+        box-sizing: border-box;
+      }
+      app-tools {
+        display: block;
+        position: fixed;
+        left: 414px;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        overflow: auto;
+        border-left: 1px solid silver;
+      }
+    }
+  </style>
 
-<template>
   <!-- arc panel -->
   <div arc-panel>
     <!-- header -->
@@ -208,14 +191,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script>
   class AppShell extends HTMLElement {
-    set search(search) {
-      this._search = search;
-      this._searchPlans();
-    }
     connectedCallback() {
       if (!this._mounted) {
         this._mounted = true;
-        this._dom = Xen.stamp(AppShell.module.querySelector('template')).events(this).appendTo(this);
+        this._dom = Xen.stamp(this.template).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
         try {
           this._configure(window);
@@ -232,6 +211,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
         });
       }
+    }
+    get template() {
+      return AppShell.module.querySelector('template');
+    }
+    set search(search) {
+      this._search = search;
+      this._searchPlans();
     }
     _setState(state) {
       if (this._dom) {
@@ -275,7 +261,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let manifest = await this._loadManifest();
       console.log(manifest);
       // renderer
-      let slotComposer = new Arcs.SlotComposer({rootContext: config.container, affordance: config.affordance});
+      let slotComposer = new Arcs.SlotComposer({rootContext: config.container, affordance: config.affordance, containerKind: config.containerKind});
       // Arc!
       this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
       // configure persistence layer
