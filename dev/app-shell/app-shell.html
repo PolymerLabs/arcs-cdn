@@ -191,17 +191,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script>
   class AppShell extends HTMLElement {
-    connectedCallback() {
+    async connectedCallback() {
       if (!this._mounted) {
         this._mounted = true;
         this._dom = Xen.stamp(this.template).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
         try {
-          this._configure(window);
+          await this._configure(window);
         } catch(x) {
           this._setState({dotsDisabled: true});
           throw x;
         }
+        // TODO(sjmiles): collate with other global key commands (see explorer-hotkey)
         window.addEventListener('keydown', e => {
           if (e.ctrlKey && (e.key == "s")) {
             e.preventDefault();
@@ -224,7 +225,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._dom.set(state);
       }
     }
-    _configure({urls, manifest}) {
+    async _configure({urls, manifest}) {
       let appShellPath = AppShell.module.URL.split('/').slice(0, -2).join('/');
       let params = (new URL(document.location)).searchParams;
       let config = {
@@ -243,7 +244,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       document.dispatchEvent(new CustomEvent('configure', {detail: config}));
       console.log(config);
       // start application
-      this._start(config);
+      await this._start(config);
     }
     async _start(config) {
       this._config = config;
