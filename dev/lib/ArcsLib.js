@@ -43508,7 +43508,7 @@ class DescriptionGenerator {
       let viewList = view.toList();
       if (viewList) {
         if (viewList.length > 2) {
-          return `<b>${viewList[0].rawData.name}</b> and <b>${viewList.length-1}</b> other items`;
+          return `<b>${viewList[0].rawData.name}</b> plus <b>${viewList.length-1}</b> other items`;
         }
         return viewList.map(v => v.rawData.name).join(", ");
       }
