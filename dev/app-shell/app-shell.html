@@ -308,7 +308,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO(sjmiles): using the global `db` that is currently leaking out
       // of metadata-storage.html
       let snapshot = await db.ref('manifests').once('value');
-      let remotes = snapshot.map(m => m.val());
+      let remotes = [];
+      // TODO(sjmiles): convert sparse array (snapshot.val()) to dense array, return false to iterate all `s`
+      snapshot.forEach(s => {remotes.push(s.val())});
       let locals, exclusions;
       try {
         locals = JSON.parse(localStorage.getItem('manifests') || '[]');
@@ -406,7 +408,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _setCurrentUser(user) {
       this._currentUser = user;
       localStorage.setItem('currentUser', user);
-
       // TODO: fix this somehow. This is super ugly right now.
       let personSchema = this.arc.context.findSchemaByName('Person');
       if (personSchema) {
@@ -416,9 +417,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           v.set({id: this.arc.generateID(), rawData: p.dataClone()});
         })
       }
-
       this._updateSharedStateIcon();
-
       if (this._users && this._currentUser && this._users[this._currentUser]) {
         this._updateCurrentUsersData(this._users[this._currentUser]);
       }
@@ -448,7 +447,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
         // out of metadata-storage.html
         db.ref('users').on('value', snapshot => {
-          console.log('server: users data updated');
           let users = snapshot.val() || {};
           this._users = users;
           // In case there are new users
