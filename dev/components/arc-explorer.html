@@ -5,11 +5,11 @@
     <x-list items="{{particles}}">
       <template>
         <div particle>
-          <div name title="{{name}}"><a href="{{file}}">{{name}}</a></div>
+          <div name title="{{name}}"><a href="{{file}}" target="_blank">{{name}}</a></div>
           <x-list items="{{slots}}">
-              <template>
-                  <div slot>consumes: <span>{{name}}</span></div>
-              </template>
+            <template>
+              <div slot>consumes: <span>{{name}}</span></div>
+            </template>
           </x-list>
         </div>
       </template>
