@@ -46,6 +46,10 @@
       <a-entity light="type:directional; castShadow: true;" position="1 1 1"></a-entity>
       <a-sky color="#DCDCDC" src="assets/tokyo (candy bar).jpg"></a-sky>
       <a-camera position="0 0 0"></a-camera>
+      <a-assets timeout="60000" slotid="assets">
+          <!-- Slot that can be used to add assets to the scene. Note <a-assets> needs
+            to be a child of the scene. -->
+      </a-assets>
       <a-entity slotid="root"></a-entity>
     </a-scene>
     <x-toast app-footer open="{{toastOpen}}" suggestion-container>
