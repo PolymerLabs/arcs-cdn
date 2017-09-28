@@ -55,6 +55,11 @@
       this._dom.set({applyDisabled: !dirty});
     }
     _updateData() {
+      if (this._manifests && this._exclusions) {
+        this._render();
+      }
+    }
+    _render() {
       this._dom.set({
         items: {
           template: ManifestData.module.querySelector('[manifest-item]'),

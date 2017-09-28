@@ -193,6 +193,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script>
   class AppShell extends HTMLElement {
+    get template() {
+      return AppShell.module.querySelector('template');
+    }
     async connectedCallback() {
       if (!this._mounted) {
         this._mounted = true;
@@ -214,9 +217,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
         });
       }
-    }
-    get template() {
-      return AppShell.module.querySelector('template');
     }
     set search(search) {
       this._search = search;
@@ -510,7 +510,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._syncStorage = () => storage.sync({key: amkey});
       }
       this._syncStorage();  // Initial sync for the current Arc.
-
       // Store the manifest file path for the Arc to test out metadata storage.
       // TODO: this should be the absolute URL.
       storage.store('manifest', {url: config.manifestPath});
@@ -521,7 +520,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
     }
     async _findSuggestions() {
-      console.log('Suggestions:', this.arc._tags.size);
+      //console.log('Suggestions:', this.arc._tags.size);
       this._setState({dotsActive: true, suggestions: []});
       let max_recursion = 3;
       do {
@@ -620,6 +619,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           console.log("Auto applying: ", matching_step, suggestion);
           this._appliedSteps[matching_step.hash] = true;
           this._applySuggestion(suggestion.plan);
+        } else {
+          console.warn("applyAcceptedSteps: failed to match plan hash", this._steps);
         }
       });
     }
