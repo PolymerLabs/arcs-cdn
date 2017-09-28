@@ -35,6 +35,7 @@ let template = Object.assign(document.createElement('template'), {innerHTML: `
     color: black;
   }
 </style>
+
 <div></div>
 
 `.trim()});
@@ -49,18 +50,24 @@ class SuggestionsElement extends HTMLElement {
     }
   }
 
-  addSuggestion({plan, descriptionGenerator, rank, hash}, index) {
+  addSuggestion({plan, description, rank, hash}, index) {
     let model = {
       index,
-      innerHTML: descriptionGenerator.description,
+      innerHTML: description,
       onclick: () => {
         //this.toast.open = false;
         // TODO(sjmiles): wait for toast animation to avoid jank
-        setTimeout(()=>this._choose(plan, descriptionGenerator), 80);
+        setTimeout(()=>this._choose(plan), 80);
       }
     };
     let suggest = Object.assign(document.createElement("suggest"), model);
     suggest.setAttribute("hash", hash);
+    suggest.onmouseover = () => {
+      document.dispatchEvent(new CustomEvent("plan-hover", {detail: {hash, selected: true}}));
+    }
+    suggest.onmouseout = () => {
+      document.dispatchEvent(new CustomEvent("plan-hover", {detail: {hash, selected: false}}));
+    }
     this.container.insertBefore(suggest, this.container.firstElementChild);
   }
 
@@ -73,10 +80,10 @@ class SuggestionsElement extends HTMLElement {
     this.add(suggestions);
   }
 
-  _choose(plan, descriptionGenerator) {
+  _choose(plan) {
     this.container.textContent = "";
     this.dispatchEvent(new CustomEvent("plan-selected", {
-      detail: { plan, descriptionGenerator }
+      detail: { plan }
     }));
   }
 
