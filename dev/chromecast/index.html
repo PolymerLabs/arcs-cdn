@@ -2,21 +2,24 @@
 <html lang="en">
 <head>
 
-  <title>Arcs</title>
+  <title>Arcs: Chromecast</title>
+  <link rel="shortcut icon" href="favicon.ico">
 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
   <style>
-    app-shell {
-      max-width: none !important;
-      max-height: none !important;
+    body app-shell {
+      width: auto;
+      max-width: none;
+      max-height: none;
+      padding: 0;
     }
-    app-shell [header], app-shell x-toast {
+    body app-shell app-header, body app-shell x-toast, body app-shell app-tools {
       display: none;
     }
-    app-shell #particles {
-      margin-bottom: 0 !important;
+    body app-shell #particles {
+      margin-bottom: 0;
     }
   </style>
 
@@ -27,7 +30,7 @@
 
   <script>
     document.addEventListener('configure', e => {
-      e.detail.manifestPath = 'arcs.manifest';
+      e.detail.soloPath = 'arcs.manifest';
     });
   </script>
 
