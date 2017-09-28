@@ -9,28 +9,22 @@ http://polymer.github.io/PATENTS.txt
 -->
 
 <script>
-
-class VideoControllerElement extends HTMLElement {
- connectedCallback() {
-   //if (!this._mounted) {
-     //this._mounted = true;
-     //this.root = this.attachShadow({mode: "open"});
-     this.video = document.querySelector("#" + this.getAttribute("video"));
-     //this._config = undefined;
-   //}
- }
- set config(config) {
-   if (config.mode == "play") {
-     this.video.currentTime = (config.position + (Date.now() - config.ts)) / 1000.0;
-     this.video.play();
-   } else {
-     console.assert(config.mode == "pause");
-     this.video.pause();
-   }
-   this.video.volume = parseInt(config.volume) / 100.0;
-   console.log(this.video.currentTime * 1000.0);
- }
-}
-customElements.define("video-controller", VideoControllerElement);
+  class VideoControllerElement extends HTMLElement {
+    connectedCallback() {
+      this.video = document.querySelector("#" + this.getAttribute("video"));
+    }
+    set config(config) {
+      if (config.mode == "play") {
+        this.video.currentTime = (config.position + (Date.now() - config.ts)) / 1000.0;
+        this.video.play();
+      } else {
+        console.assert(config.mode == "pause");
+        this.video.pause();
+      }
+      this.video.volume = parseInt(config.volume) / 100.0;
+      console.log(this.video.currentTime * 1000.0);
+    }
+  }
+  customElements.define("video-controller", VideoControllerElement);
 
 </script>

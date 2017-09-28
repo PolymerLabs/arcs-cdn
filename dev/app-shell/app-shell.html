@@ -193,6 +193,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script>
   class AppShell extends HTMLElement {
+    get template() {
+      return AppShell.module.querySelector('template');
+    }
     async connectedCallback() {
       if (!this._mounted) {
         this._mounted = true;
@@ -214,9 +217,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
         });
       }
-    }
-    get template() {
-      return AppShell.module.querySelector('template');
     }
     set search(search) {
       this._search = search;
@@ -309,10 +309,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // of metadata-storage.html
       let snapshot = await db.ref('manifests').once('value');
       let remotes = [];
-      snapshot.forEach(m => {remotes.push(m.val())});
-      let defaults = [
-        //'https://sjmiles.github.io/arc-stories/artifacts/Chat/recipes.manifest'
-      ];
+      // TODO(sjmiles): convert sparse array (snapshot.val()) to dense array, return false to iterate all `s`
+      snapshot.forEach(s => {remotes.push(s.val())});
       let locals, exclusions;
       try {
         locals = JSON.parse(localStorage.getItem('manifests') || '[]');
@@ -334,7 +332,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
         return out;
       };
-      let set = dedupe(defaults.concat(locals, remotes)).filter(m => exclusions.indexOf(m) < 0);
+      let set = dedupe(locals.concat(remotes)).filter(m => exclusions.indexOf(m) < 0);
       return set;
     }
     async _onPromoteManifest(e) {
@@ -410,7 +408,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _setCurrentUser(user) {
       this._currentUser = user;
       localStorage.setItem('currentUser', user);
-
       // TODO: fix this somehow. This is super ugly right now.
       let personSchema = this.arc.context.findSchemaByName('Person');
       if (personSchema) {
@@ -420,9 +417,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           v.set({id: this.arc.generateID(), rawData: p.dataClone()});
         })
       }
-
       this._updateSharedStateIcon();
-
       if (this._users && this._currentUser && this._users[this._currentUser]) {
         this._updateCurrentUsersData(this._users[this._currentUser]);
       }
@@ -452,7 +447,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
         // out of metadata-storage.html
         db.ref('users').on('value', snapshot => {
-          console.log('server: users data updated');
           let users = snapshot.val() || {};
           this._users = users;
           // In case there are new users
@@ -516,7 +510,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._syncStorage = () => storage.sync({key: amkey});
       }
       this._syncStorage();  // Initial sync for the current Arc.
-
       // Store the manifest file path for the Arc to test out metadata storage.
       // TODO: this should be the absolute URL.
       storage.store('manifest', {url: config.manifestPath});
@@ -527,7 +520,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
     }
     async _findSuggestions() {
-      console.log('Suggestions:', this.arc._tags.size);
+      //console.log('Suggestions:', this.arc._tags.size);
       this._setState({dotsActive: true, suggestions: []});
       let max_recursion = 3;
       do {
@@ -547,7 +540,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           results = this._plans;
         } else if (term.length > 2) {
           results = this._plans.filter(p => {
-            let desc = p.descriptionGenerator.description.toLowerCase();
+            let desc = p.description.toLowerCase();
             return desc.indexOf(term) >= 0;
           });
         }
@@ -625,29 +618,28 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         if (matching_step) {
           console.log("Auto applying: ", matching_step, suggestion);
           this._appliedSteps[matching_step.hash] = true;
-          this._applySuggestion(suggestion.plan, suggestion.descriptionGenerator);
+          this._applySuggestion(suggestion.plan);
+        } else {
+          console.warn("applyAcceptedSteps: failed to match plan hash", this._steps);
         }
       });
     }
-    _applySuggestion(plan, descriptionGenerator) {
+    _applySuggestion(plan) {
       this.arc.instantiate(plan);
-      descriptionGenerator.setViewDescriptions(this.arc);
+      //descriptionGenerator.setViewDescriptions(this.arc);
       this._syncStorage();
       document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
     }
     _onPlanSelected(e) {
-      let {plan, descriptionGenerator} = e.detail;
-
+      let {plan/*, descriptionGenerator*/} = e.detail;
       this._setState({toastOpen: false});
-
       // Reset search, unless it was '*'
       // This will reduce suggestions to those matching open slots by default
       if (this.search != '*') {
         this.search = '';
         this._setState({searchText: ''});
       }
-
-      this._applySuggestion(plan, descriptionGenerator);
+      this._applySuggestion(plan/*, descriptionGenerator*/);
       this._addAcceptedStep(this._findOriginatingStep(plan));
       this._findSuggestions();
     }
