@@ -193,6 +193,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script>
   class AppShell extends HTMLElement {
+    get template() {
+      return AppShell.module.querySelector('template');
+    }
     async connectedCallback() {
       if (!this._mounted) {
         this._mounted = true;
@@ -214,9 +217,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
         });
       }
-    }
-    get template() {
-      return AppShell.module.querySelector('template');
     }
     set search(search) {
       this._search = search;
@@ -619,6 +619,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           console.log("Auto applying: ", matching_step, suggestion);
           this._appliedSteps[matching_step.hash] = true;
           this._applySuggestion(suggestion.plan);
+        } else {
+          console.warn("applyAcceptedSteps: failed to match plan hash", this._steps);
         }
       });
     }
