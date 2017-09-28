@@ -236,9 +236,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         manifestPath: params.get('manifest'),
         soloPath: params.get('solo'),
         user: params.get('user') || localStorage.getItem('currentUser'),
+        search: params.get('search'),
         nokey: params.has('nokey'),
-        nosync: params.has('nosync'),
-        shared: params.getAll('shared'),
         container: this._dom.$('#particles'),
         urls
       };
@@ -250,6 +249,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     async _start(config) {
       this._config = config;
+      // set initial search string (early, so we don't override what user starts typing)
+      if (config.search) {
+        this._setState({ searchText: config.search });
+      }
       // create default URL map
       let urlMap = Arcs.utils.createUrlMap(config.root);
       // create a system loader
@@ -281,6 +284,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       await this._fetchUsersAndSetupSharing();
       // invoke planner
       this._findSuggestions();
+      if (config.search) {
+        // trigger search
+        this.search = config.search;
+      }
     }
     _configureCasting() {
       UrlCaster.set(window.location.href.replace('app', 'chromecast'));
@@ -350,16 +357,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // remove config paths
         this._config.manifestPath = this._config.soloPath = '';
         // update location bar
-        this._manifestConfigToLocation();
+        this._configToLocation();
         // apply
         this._reloadManifests();
       }
     }
-    _manifestConfigToLocation() {
+    _configToLocation() {
       let url = new URL(document.location.href);
       let bool_param = (p, n, v) => Boolean(v) ? p.set(n, v) : p.delete(n);
       bool_param(url.searchParams, 'manifest', this._config.manifestPath);
       bool_param(url.searchParams, 'solo', this._config.soloPath);
+      bool_param(url.searchParams, 'search', this._search);
       window.history.replaceState({}, "", url.href);
     }
     _onUpdateManifest(e) {
@@ -372,7 +380,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         c.soloPath = '';
         c.manifestPath = path;
       }
-      this._manifestConfigToLocation();
+      this._configToLocation();
       this._reloadManifests();
     }
     _onManifestsChange(e) {
@@ -505,10 +513,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           window.history.replaceState({}, "", url.href);
         });
       }
-      if (!config.nosync) {
-        // If sync is enabled, sync views after a new plan was incorporated to the Arc.
-        this._syncStorage = () => storage.sync({key: amkey});
-      }
+      // If sync is enabled, sync views after a new plan was incorporated to the Arc.
+      this._syncStorage = () => storage.sync({key: amkey});
       this._syncStorage();  // Initial sync for the current Arc.
       // Store the manifest file path for the Arc to test out metadata storage.
       // TODO: this should be the absolute URL.
@@ -635,8 +641,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({toastOpen: false});
       // Reset search, unless it was '*'
       // This will reduce suggestions to those matching open slots by default
-      if (this.search != '*') {
+      if (this._search != '*') {
         this.search = '';
+        this._configToLocation();
         this._setState({searchText: ''});
       }
       this._applySuggestion(plan/*, descriptionGenerator*/);
@@ -691,6 +698,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onSearch(e) {
       this.search = e.target.value.toLowerCase();
+      this._configToLocation();
     }
     _onSearchClick(e) {
       this._setState({searchText: '*'});
