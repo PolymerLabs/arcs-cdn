@@ -510,7 +510,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._syncStorage = () => storage.sync({key: amkey});
       }
       this._syncStorage();  // Initial sync for the current Arc.
-
       // Store the manifest file path for the Arc to test out metadata storage.
       // TODO: this should be the absolute URL.
       storage.store('manifest', {url: config.manifestPath});
@@ -521,7 +520,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
     }
     async _findSuggestions() {
-      console.log('Suggestions:', this.arc._tags.size);
+      //console.log('Suggestions:', this.arc._tags.size);
       this._setState({dotsActive: true, suggestions: []});
       let max_recursion = 3;
       do {
