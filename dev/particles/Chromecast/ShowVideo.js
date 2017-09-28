@@ -23,15 +23,17 @@ defineParticle(({DomParticle}) => {
     get template() {
       return template;
     }
-    _render(props, state) {
+    _render(props) {
       if (props.controls && props.controls.length) {
         let c = props.controls[props.controls.length - 1];
-        return { config: {
-          mode: c.mode,
-          position: c.position,
-          ts: c.ts,
-          volume: c.volume,
-        }};
+        return {
+          config: {
+            mode: c.mode,
+            position: c.position,
+            ts: c.ts,
+            volume: c.volume
+          }
+        };
       }
     }
   };

@@ -6,9 +6,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import 'https://arcs-firebase-playground.glitch.me/entities/VideoPlayback.manifest'
+import 'https://noelutz.github.io/arcs-stories/artifacts/VideoPlayer/entities/VideoPlayback.manifest'
 
 particle ShowVideo in 'ShowVideo.js'
   ShowVideo(in [VideoPlayback] controls)
   consume root
-  description `Show Video`
+  description `show video`
