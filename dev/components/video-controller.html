@@ -12,19 +12,6 @@ http://polymer.github.io/PATENTS.txt
   class VideoControllerElement extends HTMLElement {
     connectedCallback() {
       this.video = document.querySelector("#" + this.getAttribute("video"));
-      
-      let p = this.video.play();
-      if (p !== undefined) {
-        p.then(() => {
-          this.video.pause();
-        }).error(() => {
-          // This means we're on a mobile device. I.e., play() is only allowed
-          // if the video is muted.
-          this.video.muted = true;
-        });
-      } else {
-        this.video.pause();
-      }
     }
     set config(config) {
       if (config.mode == "play") {
