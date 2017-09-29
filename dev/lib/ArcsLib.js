@@ -20164,11 +20164,6 @@ const {
 
 const XenStateMixin = __webpack_require__(110);
 
-//let log = !global.document || (global.logging === false) ? () => {} : console.log.bind(console, `---------- DomParticle::`);
-//console.log(!!global.document, global.logging, log);
-
-let log = false ? console.log.bind(console) : () => {};
-
 /** @class DomParticle
  * Particle that does stuff with DOM.
  */
@@ -38582,6 +38577,7 @@ function extend() {
  */
 
 let Arcs = {
+  version: '0.2',
   Arc: __webpack_require__(122),
   Manifest: __webpack_require__(46),
   BrowserLoader: __webpack_require__(121),

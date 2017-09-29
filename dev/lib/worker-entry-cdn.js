@@ -9020,11 +9020,6 @@ const {
 
 const XenStateMixin = __webpack_require__(87);
 
-//let log = !global.document || (global.logging === false) ? () => {} : console.log.bind(console, `---------- DomParticle::`);
-//console.log(!!global.document, global.logging, log);
-
-let log = false ? console.log.bind(console) : () => {};
-
 /** @class DomParticle
  * Particle that does stuff with DOM.
  */
@@ -18407,11 +18402,12 @@ function extend() {
 
 const InnerPec = __webpack_require__(48);
 const Loader = __webpack_require__(47);
+const workerLog = `background: #12005e; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`;
 
 self.onmessage = function(e) {
   self.onmessage = null;
   let {id, base} = e.data;
-  console.log('starting worker', id);
+  console.log('%cstarting worker', workerLog, id);
   new InnerPec(e.ports[0], id, new Loader(base));
 };
 
