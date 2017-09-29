@@ -1,0 +1,688 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!-- icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Arcs engine -->
+<script src="../lib/ArcsLib.js"></script>
+<!-- Arcs helpers -->
+<script src="../lib/utils.js"></script>
+
+<!-- component dependencies -->
+<script src="../components/xen/xen-template.js"></script>
+<script src="../components/xen/xen-element.js"></script>
+<script src="../components/xen/xen-state.js"></script>
+
+<!-- whitelist components (reusable) -->
+<link rel="import" href="../components/video-controller.html">
+<!-- components (reusable) -->
+<script src="../components/x-toast.js"></script>
+<script src="../components/suggestions-element.js"></script>
+<link rel="import" href="../components/dancing-dots.html">
+<link rel="import" href="../components/user-data.html">
+<link rel="import" href="../components/local-data.html">
+<link rel="import" href="../components/manifest-data.html">
+
+<!-- view-persistence via front-end -->
+<link rel="import" href="../components/metadata-storage.html">
+<!-- chrome-cast integration -->
+<script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js"></script>
+<script src="../components/url-caster.js"></script>
+<!-- tooling -->
+<link rel="import" href="../components/explorer-hotkey.html">
+
+<script src="lib/manifest-tools.js"></script>
+<script src="lib/storage-tools.js"></script>
+<script src="lib/user-tools.js"></script>
+<script src="lib/sharing-tools.js"></script>
+<script src="lib/cast-tools.js"></script>
+
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    background-image: url(assets/linen.png);
+    overflow-x: hidden;
+    overflow-y: scroll;
+  }
+</style>
+
+<template>
+  <style>
+    app-shell {
+      display: block;
+      overflow: hidden;
+      padding-top: 32px;
+      padding-bottom: 64px;
+      background-color: white;
+    }
+    [arc-panel] {
+      min-height: calc(100vh - 96px);
+      background-color: inherit;
+    }
+    app-tools {
+      display: none;
+      background-color: white;
+    }
+    app-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      box-sizing: border-box;
+      background-color: whitesmoke;
+    }
+    .material-icons {
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    app-header select {
+      border: none;
+      background-color: transparent;
+      outline: none;
+      height: 100%;
+    }
+    x-toast {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: white;
+    }
+    [pages] {
+      display: flex;
+    }
+    [main], [config] {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+    }
+    [active] {
+      display: flex;
+    }
+    [hidebydefault] {
+      display: none;
+    }
+    [show] {
+      display: initial;
+    }
+    [search] {
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-bottom: 1px dotted silver;
+    }
+    [search] input {
+      flex: 1;
+      padding: 7px;
+      border: none;
+      outline: none;
+    }
+    #particles {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      overflow: auto;
+      overflow-x: hidden;
+    }
+    /**/
+    app-shell, app-header, [app-footer] {
+      min-width: 320px;
+    }
+    /* wider-than-mobile */
+    @media (min-width: 500px) {
+      app-shell, app-header, [app-footer] {
+        box-sizing: border-box;
+        margin: 0 auto;
+        max-width: 700px;
+      }
+      app-shell[expanded], [expanded] app-header, [expanded] [app-footer] {
+        margin: 0;
+        width: 414px;
+        max-width: 414px;
+      }
+      [expanded] app-tools {
+        display: block;
+        position: fixed;
+        left: 414px;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        overflow: auto;
+        border-left: 1px solid silver;
+      }
+    }
+  </style>
+
+  <!-- arc panel -->
+  <div arc-panel>
+    <!-- header -->
+    <app-header>
+      <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large</i>
+      <span style="flex: 1;"></span>
+      <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
+        <i class="material-icons">person</i>
+        <select on-change="_onUserSelected">{{usersOptions}}</select>
+        <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
+      </span>
+      <i class="material-icons" style="padding-left: 4px;" on-click="_onCastClick">{{castIcon}}</i>
+    </app-header>
+    <!-- particles -->
+    <div id="particles">
+      <div slotid="toproot"></div>
+      <div slotid="root"></div>
+    </div>
+    <!-- footer -->
+    <x-toast app-footer open="{{toastOpen}}" suggestion-container>
+      <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
+      <div search>
+        <input value="{{searchText}}" on-input="_onSearch">
+        <i class="material-icons" on-click="_onSearchClick">search</i>
+      </div>
+      <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
+    </x-toast>
+  </div>
+  <!-- config panel -->
+  <app-tools>
+    <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
+    <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
+    <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-object-change="_onManifestsChange"></manifest-data>
+  </app-tools>
+  <!-- sub-templates -->
+  <template users-options>
+    <option value="{{value}}" selected="{{selected}}">{{user}}</option>
+  </template>
+</template>
+
+<script>
+  const appLog = `background: #007ac1; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`;
+
+  class AppShell extends HTMLElement {
+    constructor() {
+      super();
+      this._initHotKeys();
+    }
+    _initHotKeys() {
+      addEventListener('keydown', e => {
+        if (e.ctrlKey) {
+          if (this.arc && !{input:1, textArea:1}[e.target.localName] && this.hotkey(e.key, e)) {
+            e.preventDefault();
+          }
+        }
+      });
+    }
+    get template() {
+      return AppShell.module.querySelector('template');
+    }
+    async connectedCallback() {
+      if (!this._mounted) {
+        this._mounted = true;
+        this._dom = Xen.stamp(this.template).events(this).appendTo(this);
+        this._setState({dotsActive: true, toastOpen: true, mainActive: true});
+        try {
+          // get configuration
+          let config = this._configure(window);
+          // hook for outer scope modification of `config`
+          document.dispatchEvent(new CustomEvent('configure', {detail: config}));
+          // reflect config to UI
+          console.log(`%cconfiguration`, appLog, config);
+          this._setState({localManifest: config.manifestPath || config.soloPath});
+          // start application
+          await this._start(config);
+        } catch(x) {
+          this._setState({dotsDisabled: true});
+          throw x;
+        }
+      }
+    }
+    get search() {
+      return this._search;
+    }
+    set search(search) {
+      this._search = search;
+      this._setState({searchText: search});
+      if (this._plans) {
+        this.searchPlans(this._plans, search);
+      }
+    }
+    hotkey(key, e) {
+      switch(key) {
+        case 's':
+          this._findSuggestions();
+          break;
+        default:
+          return false;
+      }
+      return true;
+    }
+    _setState(state) {
+      if (this._dom) {
+        this._dom.set(state);
+      }
+    }
+    _configure({urls, manifest}) {
+      let appShellPath = AppShell.module.URL.split('/').slice(0, -2).join('/');
+      let params = (new URL(document.location)).searchParams;
+      return {
+        affordance: 'dom',
+        root: params.get('root') || appShellPath,
+        manifestPath: params.get('manifest'),
+        soloPath: params.get('solo'),
+        user: params.get('user') || localStorage.getItem('currentUser'),
+        nokey: params.has('nokey'),
+        nosync: params.has('nosync'),
+        shared: params.getAll('shared'),
+        search: params.get('search'),
+        container: this._dom.$('#particles'),
+        urls
+      };
+    }
+    async _start(config) {
+      this._config = config;
+      // create default URL map
+      let urlMap = Arcs.utils.createUrlMap(config.root);
+      // create a system loader
+      // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
+      // but we have to create one by hand for manifest loading
+      let loader = this._loader = new Arcs.BrowserLoader(urlMap);
+      // add `urls` to `urlMap` after a resolve pass
+      if (config.urls) {
+        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
+      }
+      // load manifest
+      let {manifest, manifests, remotes, exclusions} = await ManifestTools.loadManifest(config, loader);
+      this._setState({remotes, exclusions});
+      // composer
+      let slotComposer = new Arcs.SlotComposer({
+        rootContext: config.container,
+        affordance: config.affordance,
+        containerKind: config.containerKind
+      });
+      // Arc!
+      let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
+      window.arc = arc;
+      // configure storage
+      if (!config.nokey) {
+        StorageTools.init(arc, config);
+        // configure (chrome)-casting
+        CastTools.init();
+        this._setState({castIcon: 'cast'});
+      }
+      // configure users
+      /*let users =*/ await UserTools.init(arc, loader);
+      console.log(`%cusers`, appLog, UserTools.users);
+      // configure current user
+      if (config.user) {
+        UserTools.currentUser = config.user;
+      }
+      this._updateUserSelectWidget();
+      // configure sharing
+      this.configureArcSharing(config);
+      // configure search
+      this.search = config.search;
+      // invoke planner
+      this._findSuggestions();
+    }
+    configureArcSharing(config) {
+      SharingTools.loadSharedArcs(config.user, UserTools);
+    }
+    /*
+    _onUpdateManifest(e) {
+      let path = e.detail;
+      let c = this._config;
+      if (c.soloPath) {
+        c.soloPath = path;
+        c.manifestPath = '';
+      } else {
+        c.soloPath = '';
+        c.manifestPath = path;
+      }
+      this._manifestConfigToLocation();
+      this._reloadManifests();
+    }
+    _onManifestsChange(e) {
+      let exclusions = e.currentTarget.exclusions;
+      console.log(exclusions);
+      localStorage.setItem('exclusions', JSON.stringify(exclusions));
+      this._reloadManifests();
+    }
+    async _reloadManifests() {
+      this._setState({dotsActive: true});
+      this.arc._context = await this._loadManifest();
+      this._loadSharedArcs();
+      this._findSuggestions();
+    }
+    _loadSharedArcs() {
+      if (this._users && this._currentUser && this._users[this._currentUser]) {
+        // Pull in all of the views from all public Arcs and add them to
+        // the current context.
+        // TODO: remove unshared / unfriended views
+        (this._users[this._currentUser].friends || []).forEach(name => {
+          let user = this._users[name];
+          if (user.shared) {
+            Object.keys(user.shared).forEach(amkey => {
+              if (user.shared[amkey].shared) {
+                console.log('Import view into the context from amkey=', amkey);
+                this._syncSharedViews({key: amkey});
+              }
+            });
+          }
+        });
+      }
+    }
+    _setCurrentUser(user) {
+      this._currentUser = user;
+      localStorage.setItem('currentUser', user);
+      // TODO: fix this somehow. This is super ugly right now.
+      let personSchema = this.arc.context.findSchemaByName('Person');
+      if (personSchema) {
+        this.arc.context.findViewsByType(personSchema.type, {tags: ['#identity']}).forEach(v => {
+          let Person = personSchema.entityClass();
+          let p = new Person({name: this._currentUser});
+          v.set({id: this.arc.generateID(), rawData: p.dataClone()});
+        })
+      }
+      this._updateSharedStateIcon();
+      if (this._users && this._currentUser && this._users[this._currentUser]) {
+        this._updateCurrentUsersData(this._users[this._currentUser]);
+      }
+      this._loadSharedArcs();
+      this._setState({user, users: this._users});
+    }
+    _updateCurrentUsersData(data) {
+      if (data.manifest != this._currentUsersManifest) {
+        this._currentUsersManifest = data.manifest;
+        console.log("new user manifest", data.manifest);
+        // TODO: Update context
+      }
+      // Restoring shared arc or other instance changed sharing state
+      // or currentUser changed and has different sharing setting
+      if (this._amkey && data.shared && data.shared[this._amkey]) {
+        if (data.shared[this._amkey].shared != this._shared) {
+          this._setSharedState(data.shared[this._amkey].shared);
+        }
+      } else { // nothing yet in Firebase about this arc
+        if (this._shared) {
+          this._setSharedState(false);
+        }
+      }
+    }
+    async _fetchUsersAndSetupSharing() {
+      return new Promise(accept => {
+        // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
+        // out of metadata-storage.html
+        db.ref('users').on('value', snapshot => {
+          let users = snapshot.val() || {};
+          this._users = users;
+          // In case there are new users
+          this._updateUserSelectWidget();
+          // Trigger other updates, incl. about shared arcs
+          if (this._currentUser) this._setCurrentUser(this._currentUser);
+          // On first load, resolve Promise
+          if (accept) {
+            let f = accept;
+            accept = null;
+            f();
+          }
+        });
+      });
+    }
+    _onUserDataChanged() {
+      if (this._users) {
+        db.ref('users').set(this._users);
+      }
+    }
+    _saveSharedState() {
+      if (!this._currentUser || !this._amkey) {
+        console.warn("attempt to save shared state without selected user failed");
+        return;
+      }
+      // TODO(sjmiles,seefeld): using the global `db` that is currently leaking
+      // out of metadata-storage.html
+      db.ref('users').child(this._currentUser).child('shared').child(this._amkey).set({
+          shared: this._shared,
+          when: Date.now()
+      });
+    }
+    _syncStorage() {
+      // dummy, replaced in _configureStorage
+    }
+    _syncAcceptedSteps() {
+      // dummy, replaced in _configureStorage
+    }
+    _syncSharedViews() {
+      // If storage is enabled and sharing is enabled we will pull in all shared
+      // Arcs.
+    }
+    async _configureStorage(config) {
+      let storage = new ArcMetadataStorage(this);
+      // Create an amkey=id if it doesn't already exist.
+      // TODO: support multiple arcs.
+      // TODO: we should probably associate the manifest path with the stored ID.
+      let amkey = new URL(document.location.href).searchParams.get('amkey');
+      if (!amkey) {
+        // Initialize storage and wait for the new remote Arc metadata entry
+        // to be created.
+        await storage.init().then(k => {
+          amkey = k;
+          let url = new URL(document.location.href);
+          url.searchParams.set('amkey', amkey);
+          window.history.replaceState({}, "", url.href);
+        });
+      }
+      if (!config.nosync) {
+        // If sync is enabled, sync views after a new plan was incorporated to the Arc.
+        this._syncStorage = () => storage.sync({key: amkey});
+      }
+      this._syncStorage();  // Initial sync for the current Arc.
+      // Store the manifest file path for the Arc to test out metadata storage.
+      // TODO: this should be the absolute URL.
+      storage.store('manifest', {url: config.manifestPath});
+      this._amkey = amkey;
+      this._syncSharedViews = ({key}) => storage.syncSharedViews({key});
+      // Storing and reloading steps (keeping too storage specific stuff local)
+      this._syncAcceptedSteps = () => storage.store("accepted_steps", this._steps);
+      storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));
+    }
+    */
+    async _findSuggestions() {
+      console.groupCollapsed('%cplanning', appLog);
+      try {
+        //console.log('Suggestions:', this.arc._tags.size);
+        this._setState({dotsActive: true, suggestions: []});
+        //let max_recursion = 3;
+        //do {
+          let {plans, generations} = await Arcs.utils.makePlans(this.arc, 5000);
+          console.log(`%cplans`, appLog, plans); //, 'recursions left:', max_recursion);
+          //console.log('plans:', plans, ' recursions left:', max_recursion);
+          //plans.generations = generations;
+        //} while (this._applyAcceptedSteps() && --max_recursion > 0);
+        document.dispatchEvent(new CustomEvent('generations', {detail: generations}));
+        this._setState({dotsActive: false, dotsDisabled: plans && plans.length === 0});
+        this._plans = plans;
+        this.searchPlans();
+      } finally {
+        console.groupEnd();
+      }
+    }
+    searchPlans() {
+      let suggestions = this._searchPlans(this._plans, this._search) || [];
+      this._setState({suggestions});
+    }
+    _searchPlans(plans, term) {
+      let results;
+      if (plans && term) {
+        if (term === '*') {
+          results = plans;
+        } else if (term.length > 2) {
+          results = plans.filter(p => {
+            let desc = p.description.toLowerCase();
+            return desc.indexOf(term) >= 0;
+          });
+        }
+      } else if (plans) {
+        // empty string = show suggestions matching current slots, i.e.
+        // suggestions furthering current flow, but not those just appending
+        // TODO(seefeld): Also add suggestions based on in-arc views?
+        results = plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
+      }
+      return results || [];
+    }
+    /*
+    _findFirstGeneration(plan) {
+      let last_generation = undefined;
+      // Search generations in reverse order for the accepted plan
+      [...this._plans.generations].reverse().find(
+        generation => {
+          return last_generation =
+            generation.find(member => member.result == plan);
+        });
+      if (!last_generation) {
+        console.log("no originating generation found for", plan);
+        return null;
+      }
+      // Walk derivation tree up to root. All paths will lead to the same root,
+      // hence we can always take the first branch.
+      let first_generation = last_generation;
+      while (first_generation.derivation[0].parent) {
+        first_generation = first_generation.derivation[0].parent;
+      }
+      return first_generation;
+    }
+    _findOriginatingStep(plan) {
+      let first_generation = this._findFirstGeneration(plan);
+      if (!first_generation) return null;
+      // Really, we should only store the string and upon loading normalize it
+      // again and create a new hash. But really, really we should probably
+      // do something smarter than literal matching anyway...
+      return {
+        recipe: first_generation.result.toString(),
+        hash: first_generation.hash
+      };
+    }
+    _addAcceptedStep(step) {
+      console.log("accepting step", step);
+      if (!this._steps) this._steps = [];
+      if (!this._appliedSteps) this._appliedSteps = {};
+      this._steps.push(step);
+      this._appliedSteps[step.hash] = true;
+      this._syncAcceptedSteps();
+    }
+    async _newAcceptedSteps(steps) {
+      // Assume same length means we just get our own latest state
+      if (this._steps && steps.length == this._steps.length) return;
+      console.log("new accepted suggestions from database", steps);
+      this._steps = steps;
+      this._applyAcceptedSteps();
+      this._findSuggestions();
+    }
+    _applyAcceptedSteps() {
+      if (!this._steps || !this._plans) return;
+      if (!this._appliedSteps) this._appliedSteps = {};
+      this._plans.forEach(suggestion => {
+        let first_generation = this._findFirstGeneration(suggestion.plan);
+        if (!first_generation) {
+          console.warn("can't find first generation of", plan, "in", this._plans.generations);
+          return;
+        }
+        // TODO: Allow re-applying same step unless its on the root slot.
+        // Will make sense once verbs, etc. work and different slots, etc.
+        // resolve differently.
+        if (this._appliedSteps[first_generation.hash]) return;
+        let matching_step = this._steps.find(step => step.hash == first_generation.hash);
+        if (matching_step) {
+          console.log("Auto applying: ", matching_step, suggestion);
+          this._appliedSteps[matching_step.hash] = true;
+          this._applySuggestion(suggestion.plan);
+        } else {
+          console.warn("applyAcceptedSteps: failed to match plan hash", this._steps);
+        }
+      });
+    }
+    */
+    _applySuggestion(plan) {
+      this.arc.instantiate(plan);
+      //descriptionGenerator.setViewDescriptions(this.arc);
+      //this._syncStorage();
+      document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
+    }
+    _onPlanSelected(e) {
+      let {plan} = e.detail;
+      this._setState({toastOpen: false});
+      // Reset search, unless it was '*'
+      // This will reduce suggestions to those matching open slots by default
+      if (this.search != '*') {
+        this.search = '';
+        this._setState({searchText: ''});
+      }
+      this._applySuggestion(plan);
+      //this._addAcceptedStep(this._findOriginatingStep(plan));
+      this._findSuggestions();
+    }
+    _onNavClick() {
+      Xen.setBoolAttribute(this, 'expanded');
+    }
+    /*
+    _onCastClick() {
+      UrlCaster.cast();
+    }
+    _updateSharedStateIcon() {
+      let icon = "";
+      if (this._currentUser) {
+        icon = this._shared ? "supervisor_account" : "lock_outline";
+      }
+      this._setState({sharedStateIcon: icon});
+    }
+    _setSharedState(shared) {
+      this._shared = shared;
+      this._updateSharedStateIcon();
+    }
+    _onShareClick() {
+      this._setSharedState(!this._shared);
+      this._saveSharedState();
+    }
+    */
+    _updateUserSelectWidget() {
+      let users = UserTools.users || [];
+      let userName = UserTools.currentUser;
+      //let usernames = UserTools.users.Object.keys(this._users || {});
+      this._setState({
+        usersShown: users.length > 0,
+        usersOptions: {
+          $template: 'users-options',
+          models: [0, ...users].map(user => {
+            return {
+              user: user.name || "(none)",
+              //value: user,
+              selected: user.name == userName
+            }
+          })
+        }
+      })
+    }
+    _onUserSelected(e) {
+      UserTools.currentUser = e.target.value;
+    }
+    _onSearch(e) {
+      this.search = e.target.value.toLowerCase();
+    }
+    _onSearchClick(e) {
+      this.search = '*';
+    }
+  }
+  AppShell.module = document.currentScript.ownerDocument;
+  customElements.define('app-shell', AppShell);
+</script>
