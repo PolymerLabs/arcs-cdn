@@ -12,3 +12,4 @@ schema Person extends Thing
   optional
     Text friends
     Text foods
+    Text avatar
