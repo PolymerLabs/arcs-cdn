@@ -9,6 +9,7 @@
  */
 
 let Arcs = {
+  version: '0.2',
   Arc: require(`../../arcs/runtime/arc.js`),
   Manifest: require("../../arcs/runtime/manifest.js"),
   BrowserLoader: require(`./browser-cdn-loader.js`),
