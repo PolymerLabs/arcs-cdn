@@ -23,6 +23,71 @@
     return JSON.parse(JSON.stringify(o));
   }
 
+  // Class that pulls in shared Arcs into the current Arc context.
+  class SharedArcs {
+    constructor({ arc }) {
+      this._arc = arc;
+      this._syncedViews = new Set();
+    }
+
+    // Creates or returns a context view for the given params.
+    _getContextView(type, name, viewId, tags) {
+      let views = this._arc.context.findViewById(viewId);
+      console.assert(!views || views.length == 1 || views.length == 0);
+      if (views && views.length) {
+        return views[0];
+      }
+      return this._arc.context.newView(type, name, viewId, tags);
+    }
+
+    // Returns the context view id for the given params.
+    _getContextViewId(type, tags, amkey, isProfile) {
+      let viewid = 'sharedview:' + type.toString().replace(' ', '-');
+      if (tags && [...tags].length) {
+        viewid += '-' + [...tags].join('-').replace(/#/g, '');
+      }
+      if (isProfile) {
+        viewid += '-PROFILE';
+      } else if (amkey) {
+        viewid += amkey;
+      }
+      return viewid;
+    }
+
+    // Syncs all of the views in the given shared Arc amkey to the local context.
+    sync({ key, isProfile }) {
+      let arc = db.ref('arcs/' + key);
+
+      arc.child('views').on('value', remoteViews => {
+        remoteViews.forEach(remoteViewMeta => {
+          let metadata = remoteViewMeta.child('metadata').val();
+          let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
+          let viewId = this._getContextViewId(type, metadata.tags, key, isProfile);
+          if (this._syncedViews.has(viewId)) {
+            console.warn(`View id already synced in Arc: ${viewId}`);
+            return;
+          }
+          this._syncedViews.add(viewId);
+          let localView = this._getContextView(type, metadata.name, viewId, metadata.tags);
+          let remoteView = remoteViewMeta.child('values').ref;
+          if (localView.type.isView) {
+            // One-way syncing. Whenever a new entity is added / removed in the remote
+            // view it should get reflected in the context.
+            remoteView.on('child_added', function (data) {
+              localView.store(data.val());
+            });
+            remoteView.on('child_removed', function (data) {
+              localView.remove(data.val().id);
+            });
+          } else if (localView.type.isVariable) {
+            console.warn('Shared Variable syncing not implemented');
+          }
+        });
+      });
+    }
+  }
+  window.SharedArcs = SharedArcs;
+
   // Class that knows how to synchronize all of the views + metadata in an Arc.
   class ArcMetadataStorage {
     // Creates a new storage instance for the given arc. The arc is required.
@@ -161,88 +226,12 @@
           this._syncVariable(localView, remoteView);
         }
       });
-
-      // ... second, we synchronize remote views with their local representations.
-      // This needs fixing.
-      /*
-      this._remoteRef.child('views').on('value', remoteViews => {
-        remoteViews.forEach(remoteViewMeta => {
-          let metadata = remoteViewMeta.child('metadata').val();
-          let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
-          let viewId = this._getViewId({ type });
-          if (this._syncedViews.has(viewId)) {
-            console.log(viewId);
-            
-            return;
-          }
-          console.log(viewId);
-          this._syncedViews.add(viewId);
-          return;
-          console.log('Unsynced remove view: ', remoteViewMeta.key);
-          // Use or create; if a view of this type exists then we edit it. Otherwise,
-          // we create a new view of the given type.
-          let localView = ((
-            this._arc.findViewsByType(type) && this._arc.findViewsByType(type)[0]) ||
-            this._arc.createView(type, metadata.name));
-          let remoteView = remoteViewMeta.child('values').ref;
-          if (localView.type.isView) {
-            this._syncView(localView, remoteView);
-          }
-          if (localView.type.isVariable) {
-            this._syncVariable(localView, remoteView);
-          }
-        });
-      });*/
     }
 
     // Returns the storage key.
     // PRE: sync() was called and returned a key.
     get key() {
       return this._remoteRef.key;
-    }
-
-    _getContextView(type, metadata) {
-      let existingViews = this._arc.context.findViewsByType(type, {tags: metadata.tags});
-      if (existingViews.length) {
-        return existingViews[0];
-      }
-      // No local context view exists for that type + tags => create a new one.
-      return this._arc.context.newView(type, metadata.name, /* id */ null, metadata.tags);
-    }
-
-    // Adds all of the views in the given Arc to the local context.
-    syncSharedViews({ key }) {
-      if (this._remoteRef && key == this.key) return;
-      // TODO: there is a lot of code duplication here with sync() above.
-      //
-      let arc = db.ref('arcs/' + key);
-      arc.child('views').on('value', remoteViews => {
-        remoteViews.forEach(remoteViewMeta => {
-          let metadata = remoteViewMeta.child('metadata').val();
-          let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
-          let sharedViewId = 'Shared:' + key + '-' + this._getViewId({ type }, metadata.tags);
-          if (this._syncedViews.has(sharedViewId)) {
-            console.warn(`View id already synced in Arc: ${sharedViewId}`);
-            return;
-          }
-          this._syncedViews.add(sharedViewId);
-          let localView = this._getContextView(type, metadata);
-          let remoteView = remoteViewMeta.child('values').ref;
-          if (localView.type.isView) {
-            // One-way syncing. Whenever a new entity is added / removed in the remote
-            // view it should get reflected in the context.
-            remoteView.on('child_added', function (data) {
-              localView.store(data.val());
-            });
-            remoteView.on('child_removed', function (data) {
-              localView.remove(data.val().id);
-            });
-          }
-          if (localView.type.isVariable) {
-            console.warn('Shared Variable syncing not implemented');
-          }
-        })
-      });
     }
 
     // Stores arbitrary metadata associated with that arc. The key here
