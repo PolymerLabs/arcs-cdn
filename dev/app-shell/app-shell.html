@@ -527,7 +527,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async _configureStorage(config) {
       let storage = new ArcMetadataStorage(this);
       let shared = new SharedArcs(this);
-  
+
       // Create an amkey=id if it doesn't already exist.
       // TODO: support multiple arcs.
       // TODO: we should probably associate the manifest path with the stored ID.
@@ -609,15 +609,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return first_generation;
     }
-    _findOriginatingStep(plan) {
-      let first_generation = this._findFirstGeneration(plan);
-      if (!first_generation) return null;
+    _createOriginatingStep(plan) {
+      let firstGeneration = this._findFirstGeneration(plan);
+      if (!firstGeneration) return null;
+
       // Really, we should only store the string and upon loading normalize it
       // again and create a new hash. But really, really we should probably
       // do something smarter than literal matching anyway...
+
+      // Find all mapped views to be remembered.
+      // Store as string, as we'll only use it to find exact matches later. (String is easier to compare)
+      let mappedViews =
+        plan.views.filter(v => v.fate == "map" && v.id.substr(0, 7) == "shared:").map(v => v.id).sort().toString();
+
       return {
-        recipe: first_generation.result.toString(),
-        hash: first_generation.hash
+        recipe: firstGeneration.result.toString(),
+        hash: firstGeneration.hash,
+        mappedViews
       };
     }
     _addAcceptedStep(step) {
@@ -640,22 +648,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!this._steps || !this._plans) return;
       if (!this._appliedSteps) this._appliedSteps = {};
       this._plans.forEach(suggestion => {
-        let first_generation = this._findFirstGeneration(suggestion.plan);
-        if (!first_generation) {
+        let step = this._createOriginatingStep(suggestion.plan);
+        if (!step) {
           console.warn("can't find first generation of", plan, "in", this._plans.generations);
           return;
         }
         // TODO: Allow re-applying same step unless its on the root slot.
         // Will make sense once verbs, etc. work and different slots, etc.
         // resolve differently.
-        if (this._appliedSteps[first_generation.hash]) return;
-        let matching_step = this._steps.find(step => step.hash == first_generation.hash);
-        if (matching_step) {
-          console.log("Auto applying: ", matching_step, suggestion);
-          this._appliedSteps[matching_step.hash] = true;
+        if (this._appliedSteps[step.hash]) return;
+        let matchingStep = this._steps.find(s => s.hash == step.hash && s.mappedViews == step.mappedViews);
+        if (matchingStep) {
+          console.log("Auto applying: ", matchingStep, suggestion);
+          this._appliedSteps[matchingStep.hash] = true;
           this._applySuggestion(suggestion.plan);
         } else {
-          console.warn("applyAcceptedSteps: failed to match plan hash", this._steps);
+          let nearMiss = this._steps.find(s => s.hash == step.hash);
+          if (nearMiss) console.log("Almost auto-applied: ", nearMiss, suggestion);
         }
       });
     }
@@ -676,7 +685,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._setState({searchText: ''});
       }
       this._applySuggestion(plan/*, descriptionGenerator*/);
-      this._addAcceptedStep(this._findOriginatingStep(plan));
+      this._addAcceptedStep(this._createOriginatingStep(plan));
       this._findSuggestions();
     }
     _onNavClick() {
