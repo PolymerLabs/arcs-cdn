@@ -5,7 +5,7 @@
 <script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-messaging.js"></script>
 -->
 <script>
-  let version = typeof Arcs === 'undefined' ? '_' : Arcs.version.replace(/\./g, '_');
+  let version = typeof Arcs === 'undefined' || !Arcs.version ? '' : Arcs.version.replace(/\./g, '_');
 
   let firebaseConfig = {
     apiKey: "AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8",
@@ -16,7 +16,10 @@
     messagingSenderId: "779656349412"
   };
 
-  let db = firebase.initializeApp(firebaseConfig, 'arcs-storage').database().ref(version);
+  let db = firebase.initializeApp(firebaseConfig, 'arcs-storage').database();
+  if (version) {
+    db = db.ref(version);
+  }
 
   const storeLog = `background: #c43e00; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`;
 
