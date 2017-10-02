@@ -42,14 +42,15 @@
 
     // Returns the context view id for the given params.
     _getContextViewId(type, tags, amkey, isProfile) {
-      let viewid = 'sharedview:' + type.toString().replace(' ', '-');
-      if (tags && [...tags].length) {
-        viewid += '-' + [...tags].sort().join('-').replace(/#/g, '');
-      }
+      let viewid = 'shared:';
       if (isProfile) {
-        viewid += '-PROFILE';
-      } else if (amkey) {
-        viewid += amkey;
+        viewid += 'PROFILE/';
+      } else {
+        viewid += `AMKEY${amkey}/`;
+      }
+      viewid += type.toString().replace(' ', '-') + '/';
+      if (tags && [...tags].length) {
+        viewid += [...tags].sort().join('-').replace(/#/g, '') + '/';
       }
       return viewid;
     }
