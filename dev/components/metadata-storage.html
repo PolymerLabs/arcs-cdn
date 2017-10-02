@@ -44,7 +44,7 @@
     _getContextViewId(type, tags, amkey, isProfile) {
       let viewid = 'sharedview:' + type.toString().replace(' ', '-');
       if (tags && [...tags].length) {
-        viewid += '-' + [...tags].join('-').replace(/#/g, '');
+        viewid += '-' + [...tags].sort().join('-').replace(/#/g, '');
       }
       if (isProfile) {
         viewid += '-PROFILE';
@@ -55,7 +55,7 @@
     }
 
     // Syncs all of the views in the given shared Arc amkey to the local context.
-    sync({ key, isProfile }) {
+    sync({ key, isProfile, inFriendProfile }) {
       let arc = db.ref('arcs/' + key);
 
       arc.child('views').on('value', remoteViews => {

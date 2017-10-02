@@ -405,11 +405,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           if (user.shared) {
             Object.keys(user.shared).forEach(amkey => {
               if (user.shared[amkey].shared) {
-                console.log('Import view into the context from amkey=', amkey);
-                this._syncSharedViews({key: amkey, isProfile: this._isProfile});
+                this._syncSharedViews({
+                  key: amkey,
+                  isProfile: false,
+                  inFriendProfile: Boolean((user.profile || {})[amkey])});
               }
             });
           }
+        });
+
+        // Also sync the user's profile views.
+        Object.keys(this._users[this._currentUser].profile || {}).forEach(key => {
+          this._syncSharedViews({key, isProfile: true, inFriendProfile: false});
         });
       }
     }
