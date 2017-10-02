@@ -4,8 +4,9 @@
 <script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-messaging.js"></script>
 -->
-
 <script>
+  let version = typeof Arcs === 'undefined' ? '_' : Arcs.version.replace(/\./g, '_');
+
   let firebaseConfig = {
     apiKey: "AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8",
     authDomain: "arcs-storage.firebaseapp.com",
@@ -15,7 +16,9 @@
     messagingSenderId: "779656349412"
   };
 
-  let db = firebase.initializeApp(firebaseConfig, 'arcs-storage').database();
+  let db = firebase.initializeApp(firebaseConfig, 'arcs-storage').database().ref(version);
+
+  const storeLog = `background: #c43e00; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`;
 
   // Firebase doesn't like undefined attributes in objects. Converting
   // to JSON will filter out undefined attributes.
@@ -96,7 +99,7 @@
       this._arc = arc;
       this._remoteRef = undefined;
       this._syncedViews = new Set();
-      console.log("Storing arc:", this._arc);
+      console.log("%cstoring arc", storeLog, this._arc);
     }
 
     _getViewId(view, tags) {
@@ -179,7 +182,7 @@
     init() {
       // This is the first time we see this Arc. Create the basic Arc metadata
       // in Firebase.
-      let ref = db.ref('arcs').push();
+      let ref = db.child('arcs').push();
       return ref.set(this._arc.serialize()).then(value => {
         return ref.key;
       });
@@ -196,7 +199,7 @@
     // TODO: change arc.js to fire an event when a new view is added to an Arc.
     sync({key}) {
       console.assert(key);
-      this._remoteRef = db.ref('arcs/' + key);
+      this._remoteRef = db.child('arcs/' + key);
 
       // Arc is loading or recently changed. We need to synchronize the views.
       // First we synchronize all of the local views with their remote copies.
