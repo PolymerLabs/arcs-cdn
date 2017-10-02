@@ -155,8 +155,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <i class="material-icons" style="color: gray;" Xon-click="_onNavClick">donut_large</i>
       <span style="flex: 1;"></span>
       <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
-        <i class="material-icons">person</i>
         <select on-change="_onUserSelected">{{usersOptions}}</select>
+        <i class="material-icons" on-click="_onProfileClick">{{profileStateIcon}}</i>
         <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
       </span>
       <i class="material-icons" style="padding-left: 4px;" on-click="_onCastClick">{{castIcon}}</i>
@@ -406,7 +406,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             Object.keys(user.shared).forEach(amkey => {
               if (user.shared[amkey].shared) {
                 console.log('Import view into the context from amkey=', amkey);
-                this._syncSharedViews({key: amkey, isProfile: name == this._currentUser});
+                this._syncSharedViews({key: amkey, isProfile: this._isProfile});
               }
             });
           }
@@ -426,6 +426,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         })
       }
       this._updateSharedStateIcon();
+      this._updateProfileStateIcon();
       if (this._users && this._currentUser && this._users[this._currentUser]) {
         this._updateCurrentUsersData(this._users[this._currentUser]);
       }
@@ -448,6 +449,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         if (this._shared) {
           this._setSharedState(false);
         }
+      }
+      // Restore the profile state for this amkey.
+      if (this._amkey && data.profile) {
+        this._setProfileState(Boolean(data.profile[this._amkey]));
+      } else {
+        this._setProfileState(false);
       }
     }
     async _fetchUsersAndSetupSharing() {
@@ -486,6 +493,19 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           shared: this._shared,
           when: Date.now()
       });
+    }
+    _saveProfileState() {
+      if (!this._currentUser || !this._amkey) {
+        console.warn("attempt to save shared state without selected user failed");
+        return;
+      }
+      if (this._isProfile) {
+        db.ref('users').child(this._currentUser).child('profile').child(this._amkey).set({
+            when: Date.now()
+        });
+      } else {
+        db.ref('users').child(this._currentUser).child('profile').child(this._amkey).remove();
+      }
     }
     _syncStorage() {
       // dummy, replaced in _configureStorage
@@ -678,6 +698,24 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onShareClick() {
       this._setSharedState(!this._shared);
       this._saveSharedState();
+    }
+    // TODO: remove code duplication between shared state and profile state handling.
+    _updateProfileStateIcon() {
+      let icon = "";
+      if (this._currentUser) {
+        icon = this._isProfile ? "person" : "person_outline";
+      }
+      this._setState({profileStateIcon: icon});
+    }
+    _setProfileState(isProfile) {
+      if (isProfile != this._isProfile) {
+        this._isProfile = isProfile;
+        this._updateProfileStateIcon();
+      }
+    }
+    _onProfileClick() {
+      this._setProfileState(!this._isProfile);
+      this._saveProfileState();
     }
     _updateUserSelectWidget() {
       let usernames = Object.keys(this._users || {});
