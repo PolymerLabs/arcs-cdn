@@ -1,0 +1,88 @@
+(function(scope) {
+
+const userLog = `background: #20AA20; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
+const log = console.log.bind(console, '%cUserTools', userLog);
+
+/*
+let users = [
+  {
+    name: "Melchior",
+    friends: "Caspar",
+    foods: "Frankincense",
+    avatar: "user (1).jpg"
+  },
+  {
+    name: "Caspar",
+    friends: "Melchior,Balthazar",
+    foods: "Myrrh,Frankincense",
+    avatar: "user (2).jpg"
+  },
+  {
+    name: "Balthazar",
+    friends: "Melchior",
+    foods: "Gold",
+    avatar: "user (3).jpg"
+  }
+];
+*/
+
+UserTools = {
+  async init(config, arc, loader) {
+    this.usersDb = db.child('users');
+    let users = await this.usersDb.once('value').then(snap => snap.val());
+    log(`users`, users);
+    //
+    this.id = () => arc.generateID();
+    //
+    let manifest = await Arcs.Manifest.load(`${config.root}/app-shell/types.manifest`, loader);
+    let personSchema = manifest.findSchemaByName('Person');
+    //
+    // view in arc suitable for `use`, `?`
+    //
+    //let identities = arc.createView(personSchema.type.viewOf(), 'Identities', arc.generateID(), ['#identities']);
+    //
+    // view in arc manifest for `map`, `copy`, `?`
+    //
+    let identities = manifest.newView(personSchema.type.viewOf(), 'Identities', arc.generateID(), ['#identities']);
+    users.forEach(u => {
+      identities.store({id: this.id(), rawData: u});
+    });
+    //
+    let identity = manifest.newView(personSchema.type, 'Identity', arc.generateID(), ['#identity']);
+    //identity.set({id: arc.generateID(), rawData: users[0]});
+    //
+    arc.context.imports.push(manifest);
+    //
+    this.userName = localStorage.getItem('currentUser') || '';
+    this.users = users;
+    this.identities = identities;
+    this.identity = identity;
+    //
+    return users;
+  },
+  findUser(name) {
+   return this.users.find(u => u.name == name);
+  },
+  userDb(name) {
+    let key = this.users.findIndex(u => u.name === name);
+    if (key > -1) {
+      return this.usersDb.child(key);
+    }
+  },
+  get currentUser() {
+    return this.userName;
+  },
+  set currentUser(name) {
+    this.userName = name;
+    localStorage.setItem('currentUser', name);
+    let user = this.findUser(name);
+    if (!user) {
+      user = this.users[0];
+    }
+    this.identity.set({id: this.id(), rawData: user});
+  }
+};
+
+scope.UserTools = UserTools;
+
+})(this);

@@ -1,0 +1,94 @@
+<template>
+  <style>
+    manifest-data [banner] {
+      padding: 6px 4px;
+      background-color: whitesmoke;
+      margin-bottom: 8px;
+      border-top: 1px dotted silver;
+    }
+  </style>
+  <div banner>System Manifests and Local Exclusions</div>
+  <div style="padding: 4px;">
+    <button on-click="_onApply" disabled="{{applyDisabled}}">Apply Changes</button>
+  </div>
+  <div>{{items}}</div>
+</template>
+
+<template manifest-item>
+  <div style="padding: 8px 0; border-top: 1px dotted silver;" style%="{{style}}">
+    <label title="{{url}}" style="display: flex; align-items: center;">
+      <input style="vertical-align: middle; margin: 0 8px; flex-shrink: 0;" type="checkbox" checked="{{include}}" key="{{key}}" on-click="_onCheckInput">
+      <div>
+        <div style="font-size:0.7em; font-style:italic;">{{origin}}</div>
+        <div style="font-size:0.9em; padding: 4px 0;">{{path}}</div>
+      </div>
+    </label>
+  </div>
+</template>
+
+<script>
+  class ManifestData extends HTMLElement {
+    constructor() {
+      super();
+      this._manifests = [];
+      this._exclusions = [];
+      this._data = [];
+    }
+    connectedCallback() {
+      this.text = '';
+      this._dom = Xen.stamp(ManifestData.module.querySelector("template")).events(this).appendTo(this);
+      this.dirty = false;
+    }
+    set manifests(manifests) {
+      this._manifests = manifests;
+      this._updateData();
+    }
+    set exclusions(exclusions) {
+      this._exclusions = exclusions;
+      this._updateData();
+      this.dirty = false;
+    }
+    get exclusions() {
+      return this._exclusions;
+    }
+    set dirty(dirty) {
+      this._dom.set({applyDisabled: !dirty});
+    }
+    _updateData() {
+      if (this._manifests && this._exclusions) {
+        this._render();
+      }
+    }
+    _render() {
+      this._dom.set({
+        items: {
+          template: ManifestData.module.querySelector('[manifest-item]'),
+          models: this._manifests.map((m, i) => {
+            let url = new URL(m, location.href);
+            let include = this._exclusions.indexOf(m) < 0;
+            return {
+              include,
+              url: m,
+              origin: url.origin,
+              path: url.pathname,
+              style: include ? {} : {backgroundColor: 'whitesmoke', color: '#888'},
+              key: i
+            };
+          })
+        }
+      });
+    }
+    _onCheckInput(e) {
+      let {key, checked} = e.currentTarget;
+      let m = this._manifests[key], x = this._exclusions;
+      this.exclusions = checked ? x.filter(e => e != m) : x.concat([m]);
+      this.dirty = true;
+    }
+    _onApply(e) {
+      this.dispatchEvent(new CustomEvent('object-change'));
+      this.dirty = false;
+    }
+  }
+  ManifestData.module = document.currentScript.ownerDocument;
+  customElements.define("manifest-data", ManifestData);
+</script>

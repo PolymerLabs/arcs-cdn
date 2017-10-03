@@ -1,0 +1,465 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!-- icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+<!-- Arcs engine -->
+<script src="../lib/ArcsLib.js"></script>
+<!-- Arcs helpers -->
+<script src="lib/utils.js"></script>
+
+<!-- component dependencies -->
+<script src="../components/xen/xen-template.js"></script>
+<script src="../components/xen/xen-element.js"></script>
+<script src="../components/xen/xen-state.js"></script>
+
+<!-- whitelist components (reusable) -->
+<link rel="import" href="../components/video-controller.html">
+<!-- components (reusable) -->
+<script src="../components/x-toast.js"></script>
+<script src="../components/suggestions-element.js"></script>
+<link rel="import" href="../components/dancing-dots.html">
+<link rel="import" href="../components/user-data.html">
+<link rel="import" href="../components/local-data.html">
+<link rel="import" href="../components/manifest-data.html">
+
+<!-- chrome-cast integration -->
+<script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js"></script>
+<script src="../components/url-caster.js"></script>
+<!-- tooling -->
+<link rel="import" href="../components/explorer-hotkey.html">
+
+<link rel="import" href="lib/metadata-storage.html">
+<script src="lib/manifest-tools.js"></script>
+<script src="lib/storage-tools.js"></script>
+<script src="lib/user-tools.js"></script>
+<script src="lib/sharing-tools.js"></script>
+<script src="lib/cast-tools.js"></script>
+
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    background-image: url(assets/linen.png);
+    overflow-x: hidden;
+    overflow-y: scroll;
+  }
+</style>
+
+<template>
+  <style>
+    app-shell {
+      display: block;
+      overflow: hidden;
+      padding-top: 32px;
+      padding-bottom: 64px;
+      background-color: white;
+    }
+    [arc-panel] {
+      min-height: calc(100vh - 96px);
+      background-color: inherit;
+    }
+    app-tools {
+      display: none;
+      background-color: white;
+    }
+    app-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      box-sizing: border-box;
+      background-color: whitesmoke;
+    }
+    .material-icons {
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    app-header select {
+      border: none;
+      background-color: transparent;
+      outline: none;
+      height: 100%;
+    }
+    x-toast {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: white;
+    }
+    [pages] {
+      display: flex;
+    }
+    [main], [config] {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+    }
+    [active] {
+      display: flex;
+    }
+    [hidebydefault] {
+      display: none;
+    }
+    [show] {
+      display: initial;
+    }
+    [search] {
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-bottom: 1px dotted silver;
+    }
+    [search] input {
+      flex: 1;
+      padding: 7px;
+      border: none;
+      outline: none;
+    }
+    #particles {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      overflow: auto;
+      overflow-x: hidden;
+    }
+    /**/
+    app-shell, app-header, [app-footer] {
+      min-width: 320px;
+    }
+    /* wider-than-mobile */
+    @media (min-width: 500px) {
+      app-shell, app-header, [app-footer] {
+        box-sizing: border-box;
+        margin: 0 auto;
+        max-width: 700px;
+      }
+      app-shell[expanded], [expanded] app-header, [expanded] [app-footer] {
+        margin: 0;
+        width: 414px;
+        max-width: 414px;
+      }
+      [expanded] app-tools {
+        display: block;
+        position: fixed;
+        left: 414px;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        overflow: auto;
+        border-left: 1px solid silver;
+      }
+    }
+  </style>
+
+  <!-- arc panel -->
+  <div arc-panel>
+    <!-- header -->
+    <app-header>
+      <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large</i>
+      <span style="flex: 1;"></span>
+      <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
+        <i class="material-icons">person</i>
+        <select on-change="_onUserSelected">{{usersOptions}}</select>
+        <i class="material-icons" on-click="_onProfileClick">{{profileStateIcon}}</i>
+        <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
+      </span>
+      <i class="material-icons" style="padding-left: 4px;" on-click="_onCastClick">{{castIcon}}</i>
+    </app-header>
+    <!-- particles -->
+    <div id="particles">
+      <div slotid="toproot"></div>
+      <div slotid="root"></div>
+    </div>
+    <!-- footer -->
+    <x-toast app-footer open="{{toastOpen}}" suggestion-container>
+      <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
+      <div search>
+        <input value="{{searchText}}" on-input="_onSearch">
+        <i class="material-icons" on-click="_onSearchClick">search</i>
+      </div>
+      <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
+    </x-toast>
+  </div>
+  <!-- config panel -->
+  <app-tools>
+    <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
+    <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
+    <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-object-change="_onManifestsChange"></manifest-data>
+  </app-tools>
+  <!-- sub-templates -->
+  <template users-options>
+    <option value="{{value}}" selected="{{selected}}">{{user}}</option>
+  </template>
+</template>
+
+<script>
+  const logPre = [`%cAppShell`, `background: #007ac1; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`];
+  const log = console.log.bind(console, ...logPre);
+
+  class AppShell extends HTMLElement {
+    constructor() {
+      super();
+      this._initHotKeys();
+    }
+    _initHotKeys() {
+      addEventListener('keydown', e => {
+        if (e.ctrlKey && this.arc && !{input:1, textArea:1}[e.target.localName] && this.hotkey(e.key, e)) {
+          e.preventDefault();
+        }
+      });
+    }
+    hotkey(key, e) {
+      switch(key) {
+        case 's':
+          this.findSuggestions();
+          break;
+        default:
+          return false;
+      }
+      return true;
+    }
+    get template() {
+      return AppShell.module.querySelector('template');
+    }
+    async connectedCallback() {
+      if (!this._mounted) {
+        this._mounted = true;
+        this._dom = Xen.stamp(this.template).events(this).appendTo(this);
+        this._setState({dotsActive: true, toastOpen: true, mainActive: true});
+        try {
+          // get configuration
+          let config = this._configure(window);
+          // hook for outer scope modification of `config`
+          document.dispatchEvent(new CustomEvent('configure', {detail: config}));
+          log(`configuration`, config);
+          // reflect config to UI
+          this._setState({localManifest: config.manifestPath || config.soloPath});
+          // start application
+          await this._start(config);
+        } catch(x) {
+          this._setState({dotsDisabled: true});
+          throw x;
+        }
+      }
+    }
+    get search() {
+      return this._search;
+    }
+    set search(search) {
+      this._search = search;
+      this._setState({searchText: search});
+      if (this._plans) {
+        this.searchPlans(this._plans, search);
+      }
+    }
+    _setState(state) {
+      if (this._dom) {
+        this._dom.set(state);
+      }
+    }
+    _configure({urls, manifest}) {
+      let appShellPath = AppShell.module.URL.split('/').slice(0, -2).join('/');
+      let params = (new URL(document.location)).searchParams;
+      return {
+        affordance: 'dom',
+        root: params.get('root') || appShellPath,
+        manifestPath: params.get('manifest'),
+        soloPath: params.get('solo'),
+        user: params.get('user') || localStorage.getItem('currentUser'),
+        nokey: params.has('nokey'),
+        nosync: params.has('nosync'),
+        shared: params.getAll('shared'),
+        search: params.get('search'),
+        container: this._dom.$('#particles'),
+        urls
+      };
+    }
+    async _start(config) {
+      this._config = config;
+      // create default URL map
+      let urlMap = Arcs.utils.createUrlMap(config.root);
+      // create a system loader
+      // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
+      // but we have to create one by hand for manifest loading
+      let loader = this._loader = new Arcs.BrowserLoader(urlMap);
+      // add `urls` to `urlMap` after a resolve pass
+      if (config.urls) {
+        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
+      }
+      // load manifest
+      let {manifest, manifests, remotes, exclusions} = await ManifestTools.loadManifest(config, loader);
+      this._setState({remotes, exclusions});
+      // composer
+      let slotComposer = new Arcs.SlotComposer({
+        rootContext: config.container,
+        affordance: config.affordance,
+        containerKind: config.containerKind
+      });
+      // Arc!
+      let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
+      window.arc = arc;
+      // configure sharing
+      SharingTools.init(this);
+      // configure storage
+      if (!config.nokey) {
+        await StorageTools.init(arc, config);
+        // configure (chrome)-casting
+        CastTools.init();
+        this._setState({castIcon: 'cast'});
+      }
+      // configure users
+      await UserTools.init(config, arc, loader);
+      // configure current user
+      if (config.user) {
+        this._setCurrentUser(config.user);
+      }
+      this._updateUserSelectWidget();
+      // configure search
+      this.search = config.search;
+      // invoke planner
+      //await this.findSuggestions();
+      // done for now, syncSteps() will trigger planner
+      this._setState({dotsDisabled: true});
+      // watch for steps, until turned off
+      StorageTools.syncSteps();
+    }
+    _setCurrentUser(user) {
+      UserTools.currentUser = user;
+      StorageTools.setUrlParam('user', user);
+      // update ui
+      this._updateUserSelectWidget();
+      this._updateSharedStateIcon();
+      this._updateProfileStateIcon();
+      // configure sharing
+      this.loadSharedArcs();
+    }
+    loadSharedArcs() {
+      SharingTools.loadSharedArcs(UserTools.currentUser, UserTools);
+    }
+    async findSuggestions() {
+      console.groupCollapsed(...logPre, 'planning');
+      try {
+        this._setState({dotsActive: true, suggestions: []});
+        let plans, max_iterations = 3;
+        do {
+          plans = await Arcs.utils.makePlans(this.arc, 5000);
+          log(`plans`, plans, 'iterations left:', max_iterations);
+        } while (SharingTools.applyAcceptedSteps(plans) && --max_iterations > 0);
+        document.dispatchEvent(new CustomEvent('generations', {detail: plans.generations}));
+        this._setState({dotsDisabled: plans && plans.length === 0});
+        this._plans = plans;
+        this.searchPlans();
+      } finally {
+        this._setState({dotsActive: false});
+        console.groupEnd();
+      }
+    }
+    searchPlans() {
+      let suggestions = this._searchPlans(this._plans, this._search) || [];
+      this._setState({suggestions});
+    }
+    _searchPlans(plans, term) {
+      let results;
+      if (plans && term) {
+        if (term === '*') {
+          results = plans;
+        } else if (term.length > 2) {
+          results = plans.filter(p => {
+            let desc = p.description.toLowerCase();
+            return desc.indexOf(term) >= 0;
+          });
+        }
+      } else if (plans) {
+        // empty string = show suggestions matching current slots, i.e.
+        // suggestions furthering current flow, but not those just appending
+        // TODO(seefeld): Also add suggestions based on in-arc views?
+        results = plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
+      }
+      return results || [];
+    }
+    applySuggestion(plan) {
+      this.arc.instantiate(plan);
+      StorageTools.syncStorage();
+      document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
+    }
+    _onPlanSelected(e) {
+      let {plan} = e.detail;
+      this._setState({toastOpen: false});
+      // Reset search, unless it was '*'
+      // This will reduce suggestions to those matching open slots by default
+      if (this.search != '*') {
+        this.search = '';
+        this._setState({searchText: ''});
+      }
+      this.applySuggestion(plan);
+      SharingTools.addAcceptedStep(plan, this._plans.generations);
+      this.findSuggestions();
+    }
+    _updateSharedStateIcon() {
+      let icon = !UserTools.currentUser ? '' : this._shared ? "supervisor_account" : "lock_outline";
+      this._setState({sharedStateIcon: icon});
+    }
+    _updateProfileStateIcon() {
+      let icon = !UserTools.currentUser ? '' : this._isProfile ? "person" : "person_outline"
+      this._setState({profileStateIcon: icon});
+    }
+    _updateUserSelectWidget() {
+      let users = UserTools.users || [];
+      let userName = UserTools.currentUser;
+      this._setState({
+        usersShown: users.length > 0,
+        usersOptions: {
+          $template: 'users-options',
+          models: [0, ...users].map(user => {
+            return {
+              user: user.name || "(none)",
+              selected: user.name == userName
+            }
+          })
+        }
+      })
+    }
+    _onUserSelected(e) {
+      this._setCurrentUser(e.target.value);
+    }
+    _onProfileClick() {
+      this._isProfile = !this._isProfile;
+      this._updateProfileStateIcon();
+      StorageTools.saveProfileState(this._isProfile);
+    }
+    _onShareClick() {
+      this._shared = !this._shared;
+      this._updateSharedStateIcon();
+      StorageTools.saveSharedState(this._shared);
+    }
+    _onSearch(e) {
+      this.search = e.target.value.toLowerCase();
+    }
+    _onSearchClick(e) {
+      this.search = '*';
+    }
+    _onNavClick() {
+      Xen.setBoolAttribute(this, 'expanded');
+    }
+    _onCastClick() {
+      CastTools.cast();
+    }
+  }
+  AppShell.module = document.currentScript.ownerDocument;
+  customElements.define('app-shell', AppShell);
+</script>
