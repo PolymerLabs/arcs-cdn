@@ -6312,6 +6312,11 @@ class Recipe {
     this._views = views;
     this._slots = slots;
     this._connectionConstraints.sort(util.compareComparables);
+
+    Object.freeze(this._particles);
+    Object.freeze(this._views);
+    Object.freeze(this._slots);
+    Object.freeze(this._connectionConstraints);
     Object.freeze(this);
 
     return true;
@@ -6479,6 +6484,7 @@ class Strategizer {
     this._internalPopulation = [];
     this._population = [];
     this._generated = [];
+    this._terminal = [];
     this._options = {
       maxPopulation,
       generationSize,
@@ -6502,6 +6508,12 @@ class Strategizer {
   get discarded() {
     return this._discarded;
     // TODO: Do we need this?
+  }
+  // Individuals from the previous generation that were not decended from in the
+  // current generation.
+  get terminal() {
+    assert(this._terminal);
+    return this._terminal;
   }
   async generate() {
     // Generate
@@ -6566,6 +6578,19 @@ class Strategizer {
       return true;
     });
 
+    let terminal = new Map();
+    for (let candidate of this.generated) {
+      terminal.set(candidate.result, candidate);
+    }
+    for (let result of generated) {
+      for (let {parent} of result.derivation) {
+        if (parent && terminal.has(parent.result)) {
+          terminal.delete(parent.result);
+        }
+      }
+    }
+    terminal = [...terminal.values()];
+
     record.totalGenerated = generated.length;
 
     generated.sort((a,b) => {
@@ -6620,6 +6645,7 @@ class Strategizer {
     }
 
     // Publish
+    this._terminal = terminal;
     this._generation = generation;
     this._generated = generated;
     this._population = this._internalPopulation.map(x => x.individual);
@@ -11676,6 +11702,33 @@ ${e.message}
         items.byName.set(item.name, {item: item, particle: particle});
       }
       items.byParticle.set(particle, item);
+
+      for (let slotConnectionItem of item.slotConnections) {
+        let slotConn = particle.consumedSlotConnections[slotConnectionItem.param];
+        if (!slotConn) {
+          slotConn = particle.addSlotConnection(slotConnectionItem.param);
+        }
+        if (slotConnectionItem.name) {
+          slotConnectionItem.providedSlots.forEach(ps => {
+            let providedSlot = slotConn.providedSlots[ps.param];
+            if (providedSlot) {
+              items.byName.set(ps.name, providedSlot);
+              items.bySlot.set(providedSlot, ps);
+            } else
+              providedSlot = items.byName.get(ps.name);
+            if (!providedSlot) {
+              providedSlot = recipe.newSlot(ps.param);
+              providedSlot.localName = ps.name;
+              assert(!items.byName.has(ps.name));
+              items.byName.set(ps.name, providedSlot);
+              items.bySlot.set(providedSlot, ps);
+            }
+            if (!slotConn.providedSlots[ps.param]) {
+              slotConn.providedSlots[ps.param] = providedSlot;
+            }
+          });
+        }
+      }
     }
 
     for (let [particle, item] of items.byParticle) {
@@ -11737,32 +11790,6 @@ ${e.message}
 
         if (targetView) {
           connection.connectToView(targetView);
-        }
-      }
-      for (let slotConnectionItem of item.slotConnections) {
-        let slotConn = particle.consumedSlotConnections[slotConnectionItem.param];
-        if (!slotConn) {
-          slotConn = particle.addSlotConnection(slotConnectionItem.param);
-        }
-        if (slotConnectionItem.name) {
-          slotConnectionItem.providedSlots.forEach(ps => {
-            let providedSlot = slotConn.providedSlots[ps.param];
-            if (providedSlot) {
-              items.byName.set(ps.name, providedSlot);
-              items.bySlot.set(providedSlot, ps);
-            } else
-              providedSlot = items.byName.get(ps.name);
-            if (!providedSlot) {
-              providedSlot = recipe.newSlot(ps.param);
-              providedSlot.localName = ps.name;
-              assert(!items.byName.has(ps.name));
-              items.byName.set(ps.name, providedSlot);
-              items.bySlot.set(providedSlot, ps);
-            }
-            if (!slotConn.providedSlots[ps.param]) {
-              slotConn.providedSlots[ps.param] = providedSlot;
-            }
-          });
         }
       }
 
@@ -20164,6 +20191,11 @@ const {
 
 const XenStateMixin = __webpack_require__(110);
 
+//let log = !global.document || (global.logging === false) ? () => {} : console.log.bind(console, `---------- DomParticle::`);
+//console.log(!!global.document, global.logging, log);
+
+let log = false ? console.log.bind(console) : () => {};
+
 /** @class DomParticle
  * Particle that does stuff with DOM.
  */
@@ -21462,23 +21494,20 @@ class Planner {
     // TODO: Run some reasonable number of speculations in parallel.
     let results = [];
     for (let plan of plans) {
-      if (this._matchesActiveRecipe(plan))
+      let hash = ((hash) => { return hash.substring(hash.length - 4)}) (await plan.digest());
+
+      if (this._matchesActiveRecipe(plan)) {
+        this._updateGeneration(generations, hash, (g) => g.active = true);
         continue;
+      }
+
       let relevance = await trace.wait(() => speculator.speculate(this._arc, plan));
       trace.resume();
       let rank = relevance.calcRelevanceScore();
       let description = Description.getSuggestion(plan, this._arc, relevance);
 
-      let hash = ((hash) => { return hash.substring(hash.length - 4)}) (await plan.digest());
-      if (generations) {
-        generations.forEach(g => {
-          g.forEach(gg => {
-            if (gg.hash.endsWith(hash)) {
-              gg.description = description;
-            }
-          });
-        });
-      }
+      this._updateGeneration(generations, hash, (g) => g.description = description);
+
       // TODO: Move this logic inside speculate, so that it can stop the arc
       // before returning.
       relevance.newArc.stop();
@@ -21491,6 +21520,17 @@ class Planner {
     }
     trace.end();
     return results;
+  }
+  _updateGeneration(generations, hash, handler) {
+    if (generations) {
+      generations.forEach(g => {
+        g.forEach(gg => {
+          if (gg.hash.endsWith(hash)) {
+            handler(gg);
+          }
+        });
+      });
+    }
   }
 }
 
@@ -38577,7 +38617,7 @@ function extend() {
  */
 
 let Arcs = {
-  version: '0.2',
+  //version: '0.2',
   Arc: __webpack_require__(122),
   Manifest: __webpack_require__(46),
   BrowserLoader: __webpack_require__(121),
@@ -49824,6 +49864,7 @@ class InitPopulation extends Strategy {
       score: 1 - recipe.particles.filter(particle => particle.spec && this._loadedParticles.has(particle.spec.implFile)).length,
       derivation: [{strategy: this, parent: undefined}],
       hash: recipe.digest(),
+      valid: Object.isFrozen(recipe),
     }));
 
     return {
@@ -49868,6 +49909,7 @@ module.exports = class InitSearch extends Strategy {
     let recipe = new Recipe();
     recipe.setSearchPhrase(this._search);
     assert(recipe.normalize());
+    assert(!recipe.isResolved())
 
     return {
       results: [{
@@ -50012,7 +50054,12 @@ class MapRemoteSlots extends Strategy {
 
         return (recipe, slotConnection) => {
           if (!slotConnection.targetSlot) {
-            let slot = recipe.newSlot(slotConnection.name);
+            let slot = recipe.slots.find(slot => {
+              return (slot.id == remoteSlotId) || (!slot.id && (slot.name == slotConnection.name));
+            });
+            if (!slot) {
+              slot = recipe.newSlot(slotConnection.name);
+            }
             slotConnection.connectToSlot(slot);
           }
           slotConnection.targetSlot.id = remoteSlotId;
@@ -50160,11 +50207,11 @@ module.exports = class SearchTokensToParticles extends Strategy {
   }
   async generate(strategizer) {
     let findParticles = token => this._byToken[token] || [];
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    let generated = strategizer.generated.filter(result => !result.result.isResolved());
+    let terminal = strategizer.terminal;
+    var results = Recipe.over([...generated, ...terminal], new class extends RecipeWalker {
       onRecipe(recipe) {
-        // TODO: according to design, the search strategy activates when the recipe is resolved
-        // OR when the recipe is a terminal case (did not generate descendants from any other strategies).
-        if (/*!recipe.isResolved() ||*/ !recipe.search || !recipe.search.unresolvedTokens.length) {
+        if (!recipe.search || !recipe.search.unresolvedTokens.length) {
           return;
         }
 
