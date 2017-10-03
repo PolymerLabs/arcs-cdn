@@ -1,0 +1,97 @@
+<template>
+  <style>
+    dancing-dots bullet {
+      display: inline-block;
+      transition: all 200ms cubic-bezier(0.445, 0.05, 0.55, 0.95);
+      font-size: 2em;
+    }
+    dancing-dots bullet::after {
+      content: '•'
+    }
+    dancing-dots[animate] bullet {
+      transform: translate3d(0, 8px, 0);
+    }
+    dancing-dots[up] bullet {
+      transform: translate3d(0, -8px, 0);
+    }
+    body dancing-dots[off] bullet {
+      color: silver;
+    }
+    dancing-dots bullet:nth-of-type(1) {
+      color: blue;
+    }
+    dancing-dots bullet:nth-of-type(2) {
+      color: red;
+      transition-delay: calc(1*40ms);
+    }
+    dancing-dots bullet:nth-of-type(3) {
+      color: orange;
+      transition-delay: calc(2*40ms);
+    }
+    dancing-dots bullet:nth-of-type(4) {
+      color: green;
+      transition-delay: calc(3*40ms);
+    }
+  </style>
+  <div bullets>
+    <bullet one></bullet>
+    <bullet two></bullet>
+    <bullet three></bullet>
+    <bullet four></bullet>
+  </div>
+</template>
+
+<script>
+  class DancingDots extends HTMLElement {
+    connectedCallback() {
+      if (!this.childElementCount) {
+        this.appendChild(this.constructor.module.querySelector('template').content.cloneNode(true));
+      }
+    }
+    get disabled() {
+      return this._disabled;
+    }
+    set disabled(disabled) {
+      this._disabled = disabled;
+      if (this._disabled) {
+        this.active = false;
+        this.setAttribute('off', '');
+      } else {
+        this.removeAttribute('off');
+      }
+    }
+    get active() {
+      return this._active;
+    }
+    set active(active) {
+      this._active = active;
+      this._active ? this._start() : this._stop();
+    }
+    _start() {
+      if (!this._interval) {
+        this.disabled = false;
+        this.setAttribute('animate', '');
+        let animate = () => {
+          this.setAttribute('up', '');
+          setTimeout(() => this.removeAttribute('up'), 280);
+        };
+        this._interval = setInterval(animate, 560);
+      }
+    }
+    _stop() {
+      this.removeAttribute('animate');
+      if (this._interval) {
+        clearInterval(this._interval);
+        this._interval = null;
+      }
+    }
+    startStop() {
+      this.active = !this.active;
+    }
+    disEnable() {
+      this.disabled = !this.disabled;
+    }
+  }
+  DancingDots.module = document.currentScript.ownerDocument;
+  customElements.define('dancing-dots', DancingDots);
+</script>

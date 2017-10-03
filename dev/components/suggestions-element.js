@@ -12,7 +12,7 @@ let template = Object.assign(document.createElement('template'), {innerHTML: `
 <style>
   :host {
     display: block;
-    max-height: 500px;
+    max-height: 40%;
     overflow-y: auto;
     background-color: white;
     padding: 0 6px;

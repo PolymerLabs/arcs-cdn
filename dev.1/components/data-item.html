@@ -1,0 +1,74 @@
+<style>
+  data-item {
+    display: flex;
+  }
+  data-item > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px dotted silver;
+    /*
+    border-bottom: none;
+    border-right: none;
+    */
+  }
+  data-item > left {
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    justify-content: flex-end;
+    /*
+    flex: 1;
+    min-width: 40px;
+    border-right: 1px solid gray;
+    */
+    width: 64px;
+    background-color: whitesmoke;
+  }
+  data-item > right {
+    flex: 3;
+  }
+  data-item > right > div {
+    padding: 4px;
+  }
+</style>
+
+<template>
+  <left>{{name}}</left>
+  <right>
+    <div hidden="{{notbool}}" title="{{name}}"><input type="checkbox" checked="{{value}}" on-click="_onCheckInput"></div>
+    <div hidden="{{notstring}}" title="{{title}}">{{value}}</div>
+    <data-explorer hidden="{{notobject}}" object="{{object}}"></data-explorer>
+  </right>
+</template>
+
+<script>
+  class DataItem extends XenState(XenElement) {
+    static get observedAttributes() { return ['name','value']; }
+    _onCheckInput(e) {
+      e.stopPropagation();
+      this.dispatchEvent(new CustomEvent('item-change', {detail: e.target.checked}));
+    }
+    _doMount() {
+      this._dom = Xen.stamp(DataItem.module.querySelector('template')).events(this).appendTo(this);
+    }
+    _update(props, state) {
+      this._dom.set(this._render(props, state));
+    }
+    _render(props, state) {
+      let type = typeof props.value;
+      let isobject = (type === 'object'), isstring = (type === 'string'), isbool = (type==='boolean');
+      return {
+        name: props.name,
+        notstring: !isstring,
+        notobject: !isobject,
+        notbool: !isbool,
+        object: isobject ? props.value : null,
+        value: /*isstring ? props.value.slice(-54) :*/ props.value,
+        title: isstring ? props.value : props.name
+      };
+    }
+  }
+  DataItem.module = document.currentScript.ownerDocument;
+  window.customElements.define('data-item', DataItem);
+</script>
