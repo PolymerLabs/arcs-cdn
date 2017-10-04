@@ -19,7 +19,7 @@
       this._watchedViews = new Set();
       this._watchedRefs = [];
     }
-    // [{key, isProfile, inFriendProfile}], notifier
+    // [{key, owner, isProfile, inFriendProfile}], notifier
     // `notifier` is called everytime a `watch` executes
     watchAll(arcSpecs, notifier) {
       arcSpecs.forEach(vs => this._watchArc(vs, notifier));
@@ -30,18 +30,18 @@
       this._watchedViews = new Set();
     }
     // Syncs all of the views in the given shared Arc amkey to the local context.
-    _watchArc({key, isProfile, isFriendProfile}, notifier) {
+    _watchArc({key, user, owner, isProfile, inFriendProfile}, notifier) {
       log(`watching enabled for arcs/${key}/views`);
       let node = db.child(`arcs/${key}/views`);
       this._watchedRefs.push(node);
       node.on('value', viewSnaps => {
         log(`watch triggered for arcs/${key}/views`);
-        viewSnaps.forEach(snap => this._watchView(snap, key, isProfile));
+        viewSnaps.forEach(snap => this._watchView(snap, key, user, owner, isProfile, inFriendProfile));
         // TODO(sjmiles): might need debouncing (if the strobing is noticable)
         notifier && notifier();
       });
     }
-    _watchView(snapshot, key, isProfile) {
+    _watchView(snapshot, key, user, owner, isProfile, inFriendProfile) {
       // get view `metadata`
       let metadata = snapshot.child('metadata').val();
       // construct type object
@@ -54,8 +54,10 @@
         return;
       }
       this._watchedViews.add(viewId);
+      // calculate description
+      let viewDescription = this._getViewDescription(metadata.name, metadata.tags, user, owner);
       // find or create a view in the arc context
-      let localView = this._getContextView(type, metadata.name, viewId, metadata.tags);
+      let localView = this._getContextView(type, metadata.name, viewId, metadata.tags, viewDescription);
       // get view `values`
       let remoteView = snapshot.child('values').ref;
       if (localView.type.isView) {
@@ -75,28 +77,36 @@
       }
     }
     // Creates or returns a context view for the given params.
-    _getContextView(type, name, viewId, tags) {
+    _getContextView(type, name, viewId, tags, description) {
       let views = this._arc.context.findViewById(viewId);
       console.assert(!views || views.length == 1 || views.length == 0, 'views.length is faulty', views);
       if (views && views.length) {
         return views[0];
       }
-      return this._arc.context.newView(type, name, viewId, tags);
+      let view = this._arc.context.newView(type, name, viewId, tags);
+      if (!view.description && description) {
+        view.description = description;
+      }
+      return view;
     }
     // Returns the context view id for the given params.
     _getContextViewId(type, tags, amkey, isProfile) {
-      let viewid =
-        `shared:${isProfile ? `PROFILE/` : `AMKEY${amkey}/`}`
-        + type.toString().replace(' ', '-') + '/'
-      ;
-      if (tags && [...tags].length) {
-        viewid += [...tags].sort().join('-').replace(/#/g, '') + '/';
-      }
-      return viewid;
+      return ''
+        + `shared:${isProfile ? `PROFILE/` : `AMKEY${amkey}/`}`
+        + `${type.toString().replace(' ', '-')}/`
+        + (tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : ''
+        ;
     }
-
+    _getViewDescription(name, tags, user, owner) {
+      let noun = (user == owner) ? 'my' : `<b>${owner}'s</b>`;
+      if (tags && tags.length) {
+        return `${noun} ${tags[0].substring(1)}`;
+      }
+      if (name) {
+        return `${noun} ${name}`;
+      }
+    }
   }
-  window.SharedArcs = SharedArcs;
 
   // Class that knows how to synchronize all of the views + metadata in an Arc.
   class ArcMetadataStorage {
@@ -275,7 +285,7 @@
     }
   }
 
-  scope.db = db;
+  scope.SharedArcs = SharedArcs;
   scope.ArcMetadataStorage = ArcMetadataStorage;
 
 })(this);

@@ -41,8 +41,10 @@ SharingTools = {
         log('_watchFriendsArc: adding view to watch from amkey=', amkey);
         watches.push({
           key: amkey,
-          isProfile: false,
-          isFriendProfile: Boolean((friend.profile || {})[amkey])
+          user: UserTools.currentUser,
+          owner: name,
+          isProfile: name === UserTools.currentUser,
+          inFriendProfile: Boolean((friend.profile || {})[amkey])
         });
       }
     });
@@ -50,31 +52,24 @@ SharingTools = {
   _watchProfileArcs(user, watches) {
     if (user.profile) {
       Object.keys(user.profile).forEach(key => {
-          log(`_watchProfileArcs: adding view to watch for ${user.name}:`, key);
-          watches.push({key, isProfile: true, isFriendProfile: false});
-        }
-      );
+        log(`_watchProfileArcs: adding view to watch for ${user.name}:`, key);
+        watches.push({
+          key,
+          user: UserTools.currentUser,
+          owner: UserTools.currentUser,
+          isProfile: true,
+          inFriendProfile: false
+        });
+      });
     }
   },
   addAcceptedStep(plan, generations) {
-    let step = this._findOriginatingStep(plan, generations);
+    let step = this._createOriginatingStep(plan, generations);
     log("addAcceptedStep", step);
     this._steps = this._steps || [];
     this._steps.push(step);
     this._appliedSteps[step.hash] = true;
     StorageTools.syncAcceptedSteps(this._steps);
-  },
-  _findOriginatingStep(plan, generations) {
-    let first_generation = this._findFirstGeneration(plan, generations);
-    if (first_generation) {
-      // Really, we should only store the string and upon loading normalize it
-      // again and create a new hash. But really, really we should probably
-      // do something smarter than literal matching anyway...
-      return {
-        recipe: first_generation.result.toString(),
-        hash: first_generation.hash
-      };
-    }
   },
   async newAcceptedSteps(steps) {
     // Assume same length means we just get our own latest state
@@ -89,25 +84,45 @@ SharingTools = {
     if (!this._steps || !plans) return;
     if (!this._appliedSteps) this._appliedSteps = {};
     plans.forEach(suggestion => {
-      let first_generation = this._findFirstGeneration(suggestion.plan, plans.generations);
-      if (!first_generation) {
+      let step = this._createOriginatingStep(suggestion.plan, plans.generations);
+      if (!step) {
         console.warn(...pre, "can't find first generation of", plan, "in", plans.generations);
         return;
       }
       // TODO: Allow re-applying same step unless its on the root slot.
       // Will make sense once verbs, etc. work and different slots, etc.
       // resolve differently.
-      if (!this._appliedSteps[first_generation.hash]) {
-        let matching_step = this._steps.find(step => step.hash == first_generation.hash);
-        if (matching_step) {
-          log("Auto applying: ", matching_step, suggestion);
-          this._appliedSteps[matching_step.hash] = true;
+      if (!this._appliedSteps[step.hash]) {
+        let matchingStep = this._steps.find(s => s.hash == step.hash && s.mappedViews == step.mappedViews);
+        if (matchingStep) {
+          log("Auto applying step: ", matchingStep, suggestion);
+          this._appliedSteps[matchingStep.hash] = true;
           this._shell.applySuggestion(suggestion.plan);
         } else {
-          console.warn(...pre, "applyAcceptedSteps: failed to match plan hash", this._steps);
+          let nearMiss = this._steps.find(s => s.hash == step.hash);
+          if (nearMiss) log("Almost auto-applied step: ", nearMiss, suggestion);
         }
       }
     });
+  },
+  _createOriginatingStep(plan, generations) {
+    let firstGeneration = this._findFirstGeneration(plan, generations);
+    if (firstGeneration) {
+      // Really, we should only store the string and upon loading normalize it
+      // again and create a new hash. But really, really we should probably
+      // do something smarter than literal matching anyway...
+
+      // Find all mapped views to be remembered.
+      // Store as string, as we'll only use it to find exact matches later. (String is easier to compare)
+      let mappedViews =
+        plan.views.filter(v => v.fate == "map" && v.id.substr(0, 7) == "shared:").map(v => v.id).sort().toString();
+
+      return {
+        recipe: firstGeneration.result.toString(),
+        hash: firstGeneration.hash,
+        mappedViews
+      };
+    }
   },
   _findFirstGeneration(plan, generations) {
     let last_generation;
