@@ -407,7 +407,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
               if (user.shared[amkey].shared) {
                 this._syncSharedViews({
                   key: amkey,
-                  isProfile: false,
+                  owner: name,
+                  isProfile: name == this._currentUser,
                   inFriendProfile: Boolean((user.profile || {})[amkey])});
               }
             });
@@ -416,7 +417,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
         // Also sync the user's profile views.
         Object.keys(this._users[this._currentUser].profile || {}).forEach(key => {
-          this._syncSharedViews({key, isProfile: true, inFriendProfile: false});
+          this._syncSharedViews({
+            key,
+            owner: this._currentUser,
+            isProfile: true,
+            inFriendProfile: false});
         });
       }
     }
@@ -549,7 +554,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // TODO: this should be the absolute URL.
       storage.store('manifest', {url: config.manifestPath});
       this._amkey = amkey;
-      this._syncSharedViews = ({key, isProfile}) => shared.sync({key, isProfile});
+      this._syncSharedViews = (data) => shared.sync(data);
       // Storing and reloading steps (keeping too storage specific stuff local)
       this._syncAcceptedSteps = () => storage.store("accepted_steps", this._steps);
       storage.on((key, value) => key === "accepted_steps" && this._newAcceptedSteps(value));

@@ -30,14 +30,28 @@
       this._syncedViews = new Set();
     }
 
+    _getViewDescription(name, tags, isProfile, owner) {
+      let pronoun = isProfile ? 'My' : `${owner}'s`;
+      if (tags && tags.length) {
+        return `${pronoun} ${tags[0].substring(1)}`;
+      } 
+      if (name) {
+        return `${pronoun} ${name}`;
+      }
+    }
+
     // Creates or returns a context view for the given params.
-    _getContextView(type, name, viewId, tags) {
+    _getContextView(type, name, viewId, tags, description) {
       let views = this._arc.context.findViewById(viewId);
       console.assert(!views || views.length == 1 || views.length == 0);
       if (views && views.length) {
         return views[0];
       }
-      return this._arc.context.newView(type, name, viewId, tags);
+      let view = this._arc.context.newView(type, name, viewId, tags);
+      if (!view.description && description) {
+        view.description = description;
+      }
+      return view;
     }
 
     // Returns the context view id for the given params.
@@ -56,7 +70,7 @@
     }
 
     // Syncs all of the views in the given shared Arc amkey to the local context.
-    sync({ key, isProfile, inFriendProfile }) {
+    sync({ key, owner, isProfile, inFriendProfile }) {
       let arc = db.ref('arcs/' + key);
 
       arc.child('views').on('value', remoteViews => {
@@ -69,7 +83,8 @@
             return;
           }
           this._syncedViews.add(viewId);
-          let localView = this._getContextView(type, metadata.name, viewId, metadata.tags);
+          let viewDescription = this._getViewDescription(metadata.name, metadata.tags, isProfile, owner);
+          let localView = this._getContextView(type, metadata.name, viewId, metadata.tags, viewDescription);
           let remoteView = remoteViewMeta.child('values').ref;
           if (localView.type.isView) {
             // One-way syncing. Whenever a new entity is added / removed in the remote
