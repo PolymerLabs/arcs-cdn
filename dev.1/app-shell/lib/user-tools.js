@@ -73,8 +73,8 @@ UserTools = {
         console.log(user);
         let shared = snap.ref.child('shared');
         promises.push(shared.remove());
-        //let profile = snap.ref.child('profile');
-        //promises.push(profile.remove());
+        let profile = snap.ref.child('profile');
+        promises.push(profile.remove());
       });
       /*
       usersSnap.forEach(snap => promises.push(snap.ref.child('shared').remove()));
