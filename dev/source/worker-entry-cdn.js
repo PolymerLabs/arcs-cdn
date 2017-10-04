@@ -8,7 +8,7 @@
 
 'use strict';
 
-const InnerPec = require('../../arcs/runtime/inner-PEC.js');
+const InnerPec = require('../../../arcs/runtime/inner-PEC.js');
 const Loader = require('./browser-cdn-loader.js');
 
 //const workerLog = `background: #ba000d; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`;

@@ -8,6 +8,6 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
-let Tracing = require(`../../arcs/tracelib`);
+let Tracing = require(`../../../arcs/tracelib`);
 
 window.Tracing = Tracing;
