@@ -3,34 +3,17 @@
 const userLog = `background: #20AA20; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
 const log = console.log.bind(console, '%cUserTools', userLog);
 
-/*
-let users = [
-  {
-    name: "Melchior",
-    friends: "Caspar",
-    foods: "Frankincense",
-    avatar: "user (1).jpg"
-  },
-  {
-    name: "Caspar",
-    friends: "Melchior,Balthazar",
-    foods: "Myrrh,Frankincense",
-    avatar: "user (2).jpg"
-  },
-  {
-    name: "Balthazar",
-    friends: "Melchior",
-    foods: "Gold",
-    avatar: "user (3).jpg"
-  }
-];
-*/
-
 UserTools = {
   async init(config, arc, loader) {
     this.usersDb = db.child('users');
-    let users = await this.usersDb.once('value').then(snap => snap.val());
+    let users = this.users = await this.usersDb.once('value').then(snap => snap.val());
     log(`users`, users);
+    //
+    if (config.user && !this.findUser(config.user)) {
+      if (!this.createUser(config.user)) {
+        config.user = '';
+      }
+    }
     //
     this.id = () => arc.generateID();
     //
@@ -51,12 +34,11 @@ UserTools = {
     let identity = manifest.newView(personSchema.type, 'Identity', arc.generateID(), ['#identity']);
     //identity.set({id: arc.generateID(), rawData: users[0]});
     //
-    arc.context.imports.push(manifest);
+    //arc.context.imports.push(manifest);
     //
-    this.userName = localStorage.getItem('currentUser') || '';
-    this.users = users;
     this.identities = identities;
     this.identity = identity;
+    this.identityManifest = manifest;
     //
     return users;
   },
@@ -80,6 +62,44 @@ UserTools = {
       user = this.users[0];
     }
     this.identity.set({id: this.id(), rawData: user});
+  },
+  async privatize() {
+    if (confirm("Privatize removes sharing information that cannot be retrieved. Privatize anyway?")) {
+      log('privatizing...');
+      let usersSnap = await this.usersDb.once('value');
+      let promises = [];
+      usersSnap.forEach(snap => {
+        let user = snap.val();
+        console.log(user);
+        let shared = snap.ref.child('shared');
+        promises.push(shared.remove());
+        //let profile = snap.ref.child('profile');
+        //promises.push(profile.remove());
+      });
+      /*
+      usersSnap.forEach(snap => promises.push(snap.ref.child('shared').remove()));
+      usersSnap.forEach(snap => promises.push(snap.ref.child('profile').remove()));
+      */
+      await Promise.all(promises);
+      this.users = (await this.usersDb.once('value')).val();
+      log(`privatize: users`, this.users);
+    }
+  },
+  async createUser(name) {
+    if (confirm(`Create new user "${name}"?`)) {
+      if (this.findUser(name)) {
+        log(`createUser: user ${name} already exists`);
+      } else {
+        this.users.push({
+          name: name,
+          friends: ''
+        });
+        await this.usersDb.set(this.users);
+        this.users = (await this.usersDb.once('value')).val();
+        log(`createUser: users`, this.users);
+      }
+      return true;
+    }
   }
 };
 

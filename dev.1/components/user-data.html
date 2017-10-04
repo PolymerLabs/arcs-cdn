@@ -39,22 +39,7 @@
     }
   </style>
   <div banner>Other Arcs</div>
-  <!--
-  <div editor>
-    <span label>name</span>
-    <b>{{user}}</b>
-  </div>
--->
-  <!--
-  <div editor>
-    <span label>manifest</span>
-    <input value="{{manifest}}">
-    <i class="material-icons" title="Promote">assignment_returned</i>
-    <i class="material-icons" title="Delete">delete</i>
-  </div>
--->
-  <!--<data-explorer object="{{object}}"></data-explorer>-->
-  <!--<textarea spellcheck="false">{{json}}</textarea>-->
+  <div style="padding:8px;"><button on-click="_onPrivatize">Privatize</button></div>
   <div banner2>Yours</div>
   <div>{{me}}</div>
   <div banner2>From friends</div>
@@ -84,21 +69,20 @@
     set users(users) {
       this._users = users;
       if (users) {
-        console.log(users);
         this._update();
       }
     }
     _update() {
       if (this._users && this._user) {
-        this._userData = this._users[this._user];
+        this._userData = UserTools.findUser(this._user);
         if (this._userData) {
           this._render();
         }
       }
     }
     _render() {
-      let names = Object.keys(this._users);
-      let friends = this._userData.friends || [];
+      let names = this._users.map(u => u.name);
+      let friends = (this._userData.friends || '').split(',');
       let makeModel = (name) => {
         let include = friends.indexOf(name) >= 0;
         return {
@@ -108,25 +92,30 @@
           style: include ? {} : {backgroundColor: 'whitesmoke', color: '#888'},
         };
       };
+      let item_template = UserData.module.querySelector('[user-item]');
       this._dom.set({
         users: {
-          template: UserData.module.querySelector('[user-item]'),
+          template: item_template,
           models: names.filter(name => name != this._user).map(name => makeModel(name))
         },
         me: {
-          template: UserData.module.querySelector('[user-item]'),
+          template: item_template,
           models: this._user ? [ makeModel(this._user) ] : []
         }
       });
     }
     _onCheckInput(e) {
       if (this._userData) {
-        let friends = this._userData.friends || [];
         let {key, checked} = e.currentTarget;
-        this._userData.friends = checked ? friends.concat([key]) : friends.filter(f => f != key);
+        let friends = (this._userData.friends || '').split(',');
+        friends = checked ? friends.concat([key]) : friends.filter(f => f != key);
+        this._userData.friends = friends.join(',');
         this._render();
         this.dispatchEvent(new CustomEvent('data-changed'));
       }
+    }
+    _onPrivatize(e) {
+      UserTools.privatize();
     }
   }
   UserData.module = document.currentScript.ownerDocument;

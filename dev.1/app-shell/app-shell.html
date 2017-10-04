@@ -8,41 +8,7 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 
-<!-- icons -->
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-
-<!-- Arcs engine -->
-<script src="../lib/ArcsLib.js"></script>
-<!-- Arcs helpers -->
-<script src="lib/utils.js"></script>
-
-<!-- component dependencies -->
-<script src="../components/xen/xen-template.js"></script>
-<script src="../components/xen/xen-element.js"></script>
-<script src="../components/xen/xen-state.js"></script>
-
-<!-- whitelist components (reusable) -->
-<link rel="import" href="../components/video-controller.html">
-<!-- components (reusable) -->
-<script src="../components/x-toast.js"></script>
-<script src="../components/suggestions-element.js"></script>
-<link rel="import" href="../components/dancing-dots.html">
-<link rel="import" href="../components/user-data.html">
-<link rel="import" href="../components/local-data.html">
-<link rel="import" href="../components/manifest-data.html">
-
-<!-- chrome-cast integration -->
-<script src="//www.gstatic.com/cv/js/sender/v1/cast_sender.js"></script>
-<script src="../components/url-caster.js"></script>
-<!-- tooling -->
-<link rel="import" href="../components/explorer-hotkey.html">
-
-<link rel="import" href="lib/metadata-storage.html">
-<script src="lib/manifest-tools.js"></script>
-<script src="lib/storage-tools.js"></script>
-<script src="lib/user-tools.js"></script>
-<script src="lib/sharing-tools.js"></script>
-<script src="lib/cast-tools.js"></script>
+<link rel="import" href="imports.html">
 
 <style>
   body {
@@ -173,7 +139,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large</i>
       <span style="flex: 1;"></span>
       <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
-        <i class="material-icons">person</i>
+        <!--<i class="material-icons">person</i>-->
         <select on-change="_onUserSelected">{{usersOptions}}</select>
         <i class="material-icons" on-click="_onProfileClick">{{profileStateIcon}}</i>
         <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
@@ -199,7 +165,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <app-tools>
     <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
     <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
-    <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-object-change="_onManifestsChange"></manifest-data>
+    <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-manifests-change="_onManifestsChange"></manifest-data>
   </app-tools>
   <!-- sub-templates -->
   <template users-options>
@@ -291,19 +257,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     async _start(config) {
       this._config = config;
-      // create default URL map
-      let urlMap = Arcs.utils.createUrlMap(config.root);
       // create a system loader
-      // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
-      // but we have to create one by hand for manifest loading
-      let loader = this._loader = new Arcs.BrowserLoader(urlMap);
-      // add `urls` to `urlMap` after a resolve pass
-      if (config.urls) {
-        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
-      }
+      this._loader = this._marshalLoader(config);
       // load manifest
-      let {manifest, manifests, remotes, exclusions} = await ManifestTools.loadManifest(config, loader);
-      this._setState({remotes, exclusions});
+      let manifest = await this.loadManifest();
       // composer
       let slotComposer = new Arcs.SlotComposer({
         rootContext: config.container,
@@ -311,49 +268,72 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         containerKind: config.containerKind
       });
       // Arc!
-      let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap, slotComposer, context: manifest});
+      let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap: config.urlMap, slotComposer, context: manifest});
+      // for debugging only
       window.arc = arc;
-      // configure sharing
-      SharingTools.init(this);
-      // configure storage
       if (!config.nokey) {
+        // configure sharing
+        SharingTools.init(this);
+        // configure storage
         await StorageTools.init(arc, config);
         // configure (chrome)-casting
         CastTools.init();
         this._setState({castIcon: 'cast'});
       }
       // configure users
-      await UserTools.init(config, arc, loader);
+      await UserTools.init(config, arc, this._loader);
+      manifest.imports.push(UserTools.identityManifest);
       // configure current user
-      if (config.user) {
-        this._setCurrentUser(config.user);
-      }
-      this._updateUserSelectWidget();
-      // configure search
-      this.search = config.search;
-      // invoke planner
-      //await this.findSuggestions();
+      this._setCurrentUser(config.user);
       // done for now, syncSteps() will trigger planner
       this._setState({dotsDisabled: true});
+      // configure search
+      this.search = config.search;
       // watch for steps, until turned off
       StorageTools.syncSteps();
+      //this.findSuggestions();
+    }
+    _marshalLoader(config) {
+      // create default URL map
+      let urlMap = Arcs.utils.createUrlMap(config.root);
+      // create a system loader
+      // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
+      // but we have to create one by hand for manifest loading
+      let loader = new Arcs.BrowserLoader(urlMap);
+      // add `urls` to `urlMap` after a resolve pass
+      if (config.urls) {
+        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
+      }
+      config.urlMap = urlMap;
+      return loader;
     }
     _setCurrentUser(user) {
       UserTools.currentUser = user;
-      StorageTools.setUrlParam('user', user);
+      if (user) {
+        //Arcs.utils.setUrlParam('user', user);
+      }
       // update ui
       this._updateUserSelectWidget();
       this._updateSharedStateIcon();
       this._updateProfileStateIcon();
-      // configure sharing
-      this.loadSharedArcs();
+      this._setState({user: UserTools.currentUser, users: UserTools.users});
+      // update sharing
+      this.watchSharedArcs();
     }
-    loadSharedArcs() {
-      SharingTools.loadSharedArcs(UserTools.currentUser, UserTools);
+    async loadManifest() {
+      let {manifest, manifests, remotes, exclusions} = await ManifestTools.loadManifest(this._config, this._loader);
+      this._setState({remotes, exclusions});
+      return manifest;
+    }
+    watchSharedArcs() {
+      if (!this._config.nokey) {
+        SharingTools.watchSharedArcs();
+      }
     }
     async findSuggestions() {
       console.groupCollapsed(...logPre, 'planning');
       try {
+        this.planning = true;
         this._setState({dotsActive: true, suggestions: []});
         let plans, max_iterations = 3;
         do {
@@ -365,6 +345,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._plans = plans;
         this.searchPlans();
       } finally {
+        this.planning = false;
         this._setState({dotsActive: false});
         console.groupEnd();
       }
@@ -397,6 +378,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       StorageTools.syncStorage();
       document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
     }
+    addAcceptedStep(plan) {
+      SharingTools.addAcceptedStep(plan, this._plans.generations);
+    }
     _onPlanSelected(e) {
       let {plan} = e.detail;
       this._setState({toastOpen: false});
@@ -407,7 +391,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._setState({searchText: ''});
       }
       this.applySuggestion(plan);
-      SharingTools.addAcceptedStep(plan, this._plans.generations);
+      this.addAcceptedStep(plan);
       this.findSuggestions();
     }
     _updateSharedStateIcon() {
@@ -434,6 +418,43 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
       })
     }
+    viewsChanged() {
+      log('viewsChanged');
+      this._invalidatePlanning();
+    }
+    stepsChanged() {
+      log('stepsChanged');
+      this._invalidatePlanning();
+    }
+    _invalidatePlanning() {
+      if (!this.planning) {
+        clearTimeout(this.validator);
+        this.validator = setTimeout(() => this.findSuggestions(), 100);
+      }
+    }
+    async reloadManifests() {
+      this._setState({dotsActive: true});
+      this.arc._context = await this.loadManifest();
+      this.arc._context.imports.push(UserTools.identityManifest);
+      this.watchSharedArcs();
+      this.findSuggestions();
+    }
+    async _onPromoteManifest() {
+      let remotes = await ManifestTools.publishManifest(this._config);
+      this._setState({manifests: remotes, localManifest: ''});
+      this.reloadManifests();
+    }
+    _onUpdateManifest(e) {
+      let path = e.detail;
+      ManifestTools.updateManifestConfig(this._config, path);
+      this.reloadManifests();
+    }
+    _onManifestsChange(e) {
+      let exclusions = e.currentTarget.exclusions;
+      log(exclusions);
+      localStorage.setItem('exclusions', JSON.stringify(exclusions));
+      this.reloadManifests();
+    }
     _onUserSelected(e) {
       this._setCurrentUser(e.target.value);
     }
@@ -454,6 +475,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.search = '*';
     }
     _onNavClick() {
+      // toggles boolean attribute `expanded` on `this`
       Xen.setBoolAttribute(this, 'expanded');
     }
     _onCastClick() {

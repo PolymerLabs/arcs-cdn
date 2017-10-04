@@ -1,4 +1,4 @@
-(function() {
+(function(scope) {
 
 const pre = [`%cSharingTools`, `background: #005b4f; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
 const log = console.log.bind(console, ...pre);
@@ -6,94 +6,123 @@ const log = console.log.bind(console, ...pre);
 SharingTools = {
   init(shell) {
     this._shell = shell;
-    this._steps = [];
     this._appliedSteps = {};
   },
-  loadSharedArcs(userName, tools) {
-    let user = tools.findUser(userName);
+  watchSharedArcs() {
+    StorageTools.shared.unwatchAll();
+    let user = UserTools.findUser(UserTools.currentUser);
     if (user) {
+      let watches = [];
       // Pull in all of the views from all public Arcs and add them to
       // the current context.
       // TODO: remove unshared / unfriended views
-      let names = user.friends.split(',');
-      //console.log(`%cusers's friends are`, shareLog, names);
-      //console.log(...fmt(`users's friends are`, names));
-      log(`${userName}'s friends: `, names);
-      names.forEach(name => {
-        let user = tools.findUser(name);
-        if (user && user.shared) {
-          Object.keys(user.shared).forEach(amkey => {
-            // TODO(sjmiles): why can `user.shared[amkey].shared` be false?
-            if (user.shared[amkey].shared) {
-              log('import view into the context from amkey=', amkey);
-              //this.syncSharedViews(amkey);
-              StorageTools.syncSharedViews({
-                key: amkey,
-                isProfile: false,
-                inFriendProfile: Boolean((user.profile || {})[amkey])
-              });
-            }
-          });
-        }
-      });
+      this._watchFriendsArcs(user, watches);
       // Also sync the user's profile views.
-      if (user.profile) {
-        Object.keys(user.profile).forEach(key => {
-          StorageTools.syncSharedViews({key, isProfile: true, inFriendProfile: false});
+      this._watchProfileArcs(user, watches);
+      // Setup the watches
+      log(`watchSharedArcs `, watches);
+      StorageTools.shared.watchAll(watches, () => this._shell.viewsChanged());
+    }
+  },
+  _watchFriendsArcs(user, watches) {
+    let names = (user.friends || '').split(',');
+    log(`_watchFriendsArcs: ${user.name}'s friends: `, names);
+    names.forEach(name => {
+      let friend = UserTools.findUser(name);
+      if (friend && friend.shared) {
+        this._watchFriendsArc(friend, watches);
+      }
+    });
+  },
+  _watchFriendsArc(friend, watches) {
+    Object.keys(friend.shared).forEach(amkey => {
+      // TODO(sjmiles): why can `user.shared[amkey].shared` be false?
+      if (friend.shared[amkey].shared) {
+        log('_watchFriendsArc: adding view to watch from amkey=', amkey);
+        watches.push({
+          key: amkey,
+          user: UserTools.currentUser,
+          owner: name,
+          isProfile: name === UserTools.currentUser,
+          inFriendProfile: Boolean((friend.profile || {})[amkey])
         });
       }
+    });
+  },
+  _watchProfileArcs(user, watches) {
+    if (user.profile) {
+      Object.keys(user.profile).forEach(key => {
+        log(`_watchProfileArcs: adding view to watch for ${user.name}:`, key);
+        watches.push({
+          key,
+          user: UserTools.currentUser,
+          owner: UserTools.currentUser,
+          isProfile: true,
+          inFriendProfile: false
+        });
+      });
     }
   },
   addAcceptedStep(plan, generations) {
-    let step = this._findOriginatingStep(plan, generations);
-    log("accepting step", step);
+    let step = this._createOriginatingStep(plan, generations);
+    log("addAcceptedStep", step);
+    this._steps = this._steps || [];
     this._steps.push(step);
     this._appliedSteps[step.hash] = true;
     StorageTools.syncAcceptedSteps(this._steps);
   },
-  _findOriginatingStep(plan, generations) {
-    let first_generation = this._findFirstGeneration(plan, generations);
-    if (first_generation) {
-      // Really, we should only store the string and upon loading normalize it
-      // again and create a new hash. But really, really we should probably
-      // do something smarter than literal matching anyway...
-      return {
-        recipe: first_generation.result.toString(),
-        hash: first_generation.hash
-      };
-    }
-  },
   async newAcceptedSteps(steps) {
     // Assume same length means we just get our own latest state
     if (steps && (!this._steps || steps.length !== this._steps.length)) {
+      log('newAcceptedSteps', steps);
       this._steps = steps;
       this.applyAcceptedSteps();
     }
-    await this._shell.findSuggestions();
+    this._shell.stepsChanged();
   },
   applyAcceptedSteps(plans) {
     if (!this._steps || !plans) return;
     if (!this._appliedSteps) this._appliedSteps = {};
     plans.forEach(suggestion => {
-      let first_generation = this._findFirstGeneration(suggestion.plan, plans.generations);
-      if (!first_generation) {
+      let step = this._createOriginatingStep(suggestion.plan, plans.generations);
+      if (!step) {
         console.warn(...pre, "can't find first generation of", plan, "in", plans.generations);
         return;
       }
       // TODO: Allow re-applying same step unless its on the root slot.
       // Will make sense once verbs, etc. work and different slots, etc.
       // resolve differently.
-      if (!this._appliedSteps[first_generation.hash]) {
-        let matching_step = this._steps.find(step => step.hash == first_generation.hash);
-        if (matching_step) {
-          log("Auto applying: ", matching_step, suggestion);
-          this._appliedSteps[matching_step.hash] = true;
+      if (!this._appliedSteps[step.hash]) {
+        let matchingStep = this._steps.find(s => s.hash == step.hash && s.mappedViews == step.mappedViews);
+        if (matchingStep) {
+          log("Auto applying step: ", matchingStep, suggestion);
+          this._appliedSteps[matchingStep.hash] = true;
           this._shell.applySuggestion(suggestion.plan);
         } else {
-          console.warn(...pre, "applyAcceptedSteps: failed to match plan hash", this._steps);
+          let nearMiss = this._steps.find(s => s.hash == step.hash);
+          if (nearMiss) log("Almost auto-applied step: ", nearMiss, suggestion);
         }
       }
     });
+  },
+  _createOriginatingStep(plan, generations) {
+    let firstGeneration = this._findFirstGeneration(plan, generations);
+    if (firstGeneration) {
+      // Really, we should only store the string and upon loading normalize it
+      // again and create a new hash. But really, really we should probably
+      // do something smarter than literal matching anyway...
+
+      // Find all mapped views to be remembered.
+      // Store as string, as we'll only use it to find exact matches later. (String is easier to compare)
+      let mappedViews =
+        plan.views.filter(v => v.fate == "map" && v.id.substr(0, 7) == "shared:").map(v => v.id).sort().toString();
+
+      return {
+        recipe: firstGeneration.result.toString(),
+        hash: firstGeneration.hash,
+        mappedViews
+      };
+    }
   },
   _findFirstGeneration(plan, generations) {
     let last_generation;
@@ -115,6 +144,6 @@ SharingTools = {
   }
 };
 
-window.SharingTools = SharingTools;
+scope.SharingTools = SharingTools;
 
-})();
+})(this);
