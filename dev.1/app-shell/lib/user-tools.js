@@ -86,7 +86,7 @@ UserTools = {
     }
   },
   async createUser(name) {
-    if (confirm(`Create new user "${name}"?`)) {
+    if (name && confirm(`Create new user "${name}"?`)) {
       if (this.findUser(name)) {
         log(`createUser: user ${name} already exists`);
       } else {
@@ -94,12 +94,15 @@ UserTools = {
           name: name,
           friends: ''
         });
-        await this.usersDb.set(this.users);
+        await this.userDataChanged();
         this.users = (await this.usersDb.once('value')).val();
         log(`createUser: users`, this.users);
       }
       return true;
     }
+  },
+  async userDataChanged() {
+    await this.usersDb.set(this.users);
   }
 };
 
