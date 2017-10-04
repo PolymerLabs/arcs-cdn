@@ -3,6 +3,21 @@
 const pre = [`%cSharingTools`, `background: #005b4f; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
 const log = console.log.bind(console, ...pre);
 
+/*
+  Sharing Strategy
+
+  `watchSharedArcs` creates a series of `on` watchers on friend's shared arcs, owned profile arcs, and view
+  meta-data. `on` watchers are persistent and asynchronous. There is always at least one reply to
+  an `on` call (to guarantee no data changes are lost), and then subsequent replies can happen at any time.
+  All references that recieve `on` calls are tracked, and are turned `off` at the next invocation
+  of `watchSharedArcs` (called when context changes).
+
+  When `watchSharedArcs` change events occur, app shell planning is invalidated. Similarly, if arc `steps`
+  are changed, app shell planning is invalidated.
+
+  App shell invalidation is cleared by re-planning after a debouncing interval.
+*/
+
 SharingTools = {
   init(shell) {
     this._shell = shell;

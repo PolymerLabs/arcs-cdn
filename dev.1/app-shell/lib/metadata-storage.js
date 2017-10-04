@@ -20,7 +20,7 @@
       this._watchedRefs = [];
     }
     // [{key, owner, isProfile, inFriendProfile}], notifier
-    // `notifier` is called everytime a `watch` executes
+    // `notifier` is called every time a `watch` executes
     watchAll(arcSpecs, notifier) {
       arcSpecs.forEach(vs => this._watchArc(vs, notifier));
     }
@@ -37,7 +37,6 @@
       node.on('value', viewSnaps => {
         log(`watch triggered for arcs/${key}/views`);
         viewSnaps.forEach(snap => this._watchView(snap, key, user, owner, isProfile, inFriendProfile));
-        // TODO(sjmiles): might need debouncing (if the strobing is noticable)
         notifier && notifier();
       });
     }
@@ -79,7 +78,7 @@
     // Creates or returns a context view for the given params.
     _getContextView(type, name, viewId, tags, description) {
       let views = this._arc.context.findViewById(viewId);
-      console.assert(!views || views.length == 1 || views.length == 0, 'views.length is faulty', views);
+      console.assert(!views || views.length == 1 || views.length == 0, `views.length (${views && views.length}) is faulty`, views);
       if (views && views.length) {
         return views[0];
       }
@@ -163,7 +162,7 @@
             change.remove.forEach((r) => {
               remoteView.orderByChild('id').equalTo(r.id).on("value", function (snapshot) {
                 snapshot.forEach(function (data) {
-                  removeView.child(data.key()).remove();
+                  remoteView.child(data.key()).remove();
                 });
               });
             });
