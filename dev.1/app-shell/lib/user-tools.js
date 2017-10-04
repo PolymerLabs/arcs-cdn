@@ -58,6 +58,26 @@ UserTools = {
       user = this.users[0];
     }
     this.identity.set({id: this.id(), rawData: user});
+  },
+  async privatize() {
+    log('privatizing...');
+    let usersSnap = await this.usersDb.once('value');
+    let promises = [];
+    usersSnap.forEach(snap => {
+      let user = snap.val();
+      console.log(user);
+      let shared = snap.ref.child('shared');
+      promises.push(shared.remove());
+      let profile = snap.ref.child('profile');
+      promises.push(profile.remove());
+    });
+    /*
+    usersSnap.forEach(snap => promises.push(snap.ref.child('shared').remove()));
+    usersSnap.forEach(snap => promises.push(snap.ref.child('profile').remove()));
+    */
+    await Promise.all(promises);
+    this.users = (await this.usersDb.once('value')).val();
+    log(`users`, this.users);
   }
 };
 

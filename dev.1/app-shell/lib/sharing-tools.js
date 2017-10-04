@@ -1,4 +1,4 @@
-(function() {
+(function(scope) {
 
 const pre = [`%cSharingTools`, `background: #005b4f; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
 const log = console.log.bind(console, ...pre);
@@ -6,7 +6,6 @@ const log = console.log.bind(console, ...pre);
 SharingTools = {
   init(shell) {
     this._shell = shell;
-    this._steps = [];
     this._appliedSteps = {};
   },
   watchSharedArcs() {
@@ -17,29 +16,29 @@ SharingTools = {
       // Pull in all of the views from all public Arcs and add them to
       // the current context.
       // TODO: remove unshared / unfriended views
-      this._watchFriends(user, watches);
+      this._watchFriendsArcs(user, watches);
       // Also sync the user's profile views.
-      this._watchProfile(user, watches);
+      this._watchProfileArcs(user, watches);
       // Setup the watches
-      log(`watching `, watches);
-      StorageTools.shared.watchAll(watches);
+      log(`watchSharedArcs `, watches);
+      StorageTools.shared.watchAll(watches, () => this._shell.viewsChanged());
     }
   },
-  _watchFriends(user, watches) {
-    let names = user.friends.split(',');
-    log(`_watchFriends for ${user.name}'s friends: `, names);
+  _watchFriendsArcs(user, watches) {
+    let names = (user.friends || '').split(',');
+    log(`_watchFriendsArcs: ${user.name}'s friends: `, names);
     names.forEach(name => {
       let friend = UserTools.findUser(name);
       if (friend && friend.shared) {
-        this._watchFriend(friend, watches);
+        this._watchFriendsArc(friend, watches);
       }
     });
   },
-  _watchFriend(friend, watches) {
+  _watchFriendsArc(friend, watches) {
     Object.keys(friend.shared).forEach(amkey => {
       // TODO(sjmiles): why can `user.shared[amkey].shared` be false?
       if (friend.shared[amkey].shared) {
-        log('_watchFriend: import view into the context from amkey=', amkey);
+        log('_watchFriendsArc: adding view to watch from amkey=', amkey);
         watches.push({
           key: amkey,
           isProfile: false,
@@ -48,16 +47,19 @@ SharingTools = {
       }
     });
   },
-  _watchProfile(user, watches) {
+  _watchProfileArcs(user, watches) {
     if (user.profile) {
-      Object.keys(user.profile).forEach(key =>
-        watches.push({key, isProfile: true, isFriendProfile: false})
+      Object.keys(user.profile).forEach(key => {
+          log(`_watchProfileArcs: adding view to watch for ${user.name}:`, key);
+          watches.push({key, isProfile: true, isFriendProfile: false});
+        }
       );
     }
   },
   addAcceptedStep(plan, generations) {
     let step = this._findOriginatingStep(plan, generations);
-    log("accepting step", step);
+    log("addAcceptedStep", step);
+    this._steps = this._steps || [];
     this._steps.push(step);
     this._appliedSteps[step.hash] = true;
     StorageTools.syncAcceptedSteps(this._steps);
@@ -81,7 +83,7 @@ SharingTools = {
       this._steps = steps;
       this.applyAcceptedSteps();
     }
-    await this._shell.findSuggestions();
+    this._shell.stepsChanged();
   },
   applyAcceptedSteps(plans) {
     if (!this._steps || !plans) return;
@@ -127,6 +129,6 @@ SharingTools = {
   }
 };
 
-window.SharingTools = SharingTools;
+scope.SharingTools = SharingTools;
 
-})();
+})(this);

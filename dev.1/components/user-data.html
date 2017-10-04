@@ -39,22 +39,7 @@
     }
   </style>
   <div banner>Other Arcs</div>
-  <!--
-  <div editor>
-    <span label>name</span>
-    <b>{{user}}</b>
-  </div>
--->
-  <!--
-  <div editor>
-    <span label>manifest</span>
-    <input value="{{manifest}}">
-    <i class="material-icons" title="Promote">assignment_returned</i>
-    <i class="material-icons" title="Delete">delete</i>
-  </div>
--->
-  <!--<data-explorer object="{{object}}"></data-explorer>-->
-  <!--<textarea spellcheck="false">{{json}}</textarea>-->
+  <div style="padding:8px;"><button on-click="_onPrivatize">Privatize</button></div>
   <div banner2>Yours</div>
   <div>{{me}}</div>
   <div banner2>From friends</div>
@@ -97,7 +82,7 @@
     }
     _render() {
       let names = this._users.map(u => u.name);
-      let friends = this._userData.friends || [];
+      let friends = (this._userData.friends || '').split(',');
       let makeModel = (name) => {
         let include = friends.indexOf(name) >= 0;
         return {
@@ -121,12 +106,16 @@
     }
     _onCheckInput(e) {
       if (this._userData) {
-        let friends = this._userData.friends || [];
         let {key, checked} = e.currentTarget;
-        this._userData.friends = checked ? friends.concat([key]) : friends.filter(f => f != key);
+        let friends = (this._userData.friends || '').split(',');
+        friends = checked ? friends.concat([key]) : friends.filter(f => f != key);
+        this._userData.friends = friends.join(',');
         this._render();
         this.dispatchEvent(new CustomEvent('data-changed'));
       }
+    }
+    _onPrivatize(e) {
+      UserTools.privatize();
     }
   }
   UserData.module = document.currentScript.ownerDocument;

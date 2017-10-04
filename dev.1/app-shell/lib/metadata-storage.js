@@ -17,27 +17,27 @@
     constructor({arc}) {
       this._arc = arc;
       this._watchedViews = new Set();
-      this._watchOffs = [];
+      this._watchedRefs = [];
     }
-    _on(thing, event, cb) {
-      thing.on(event, cb);
-      this._watchOffs.push(() => thing.off(event, cb));
+    // [{key, isProfile, inFriendProfile}], notifier
+    // `notifier` is called everytime a `watch` executes
+    watchAll(arcSpecs, notifier) {
+      arcSpecs.forEach(vs => this._watchArc(vs, notifier));
     }
     unwatchAll() {
-      this._watchOffs.forEach(w => w());
-      this._watchOffs = [];
-    }
-    // [{key, isProfile, inFriendProfile, notifier}]
-    watchAll(viewSpecs) {
-      viewSpecs.forEach(vs => this.watch(vs));
+      this._watchedRefs.forEach(r => r.off());
+      this._watchedRefs = [];
+      this._watchedViews = new Set();
     }
     // Syncs all of the views in the given shared Arc amkey to the local context.
-    watch({key, isProfile, inFriendProfile, notifier}) {
+    _watchArc({key, isProfile, isFriendProfile}, notifier) {
       log(`watching enabled for arcs/${key}/views`);
       let node = db.child(`arcs/${key}/views`);
-      this._on(node, 'value', viewSnaps => {
+      this._watchedRefs.push(node);
+      node.on('value', viewSnaps => {
         log(`watch triggered for arcs/${key}/views`);
         viewSnaps.forEach(snap => this._watchView(snap, key, isProfile));
+        // TODO(sjmiles): might need debouncing (if the strobing is noticable)
         notifier && notifier();
       });
     }
@@ -59,6 +59,9 @@
       // get view `values`
       let remoteView = snapshot.child('values').ref;
       if (localView.type.isView) {
+        // TODO(sjmiles): remoteView watchers originally never went away, now they
+        // go away when `unwatchAll` is called.
+        this._watchedRefs.push(remoteView);
         // One-way syncing. Whenever a new entity is added / removed in the remote
         // view it should get reflected in the context.
         remoteView.on('child_added', function (data) {
@@ -71,17 +74,15 @@
         console.warn(...pre, 'Shared Variable syncing not implemented');
       }
     }
-
     // Creates or returns a context view for the given params.
     _getContextView(type, name, viewId, tags) {
       let views = this._arc.context.findViewById(viewId);
-      console.assert(!views || views.length == 1 || views.length == 0);
+      console.assert(!views || views.length == 1 || views.length == 0, 'views.length is faulty', views);
       if (views && views.length) {
         return views[0];
       }
       return this._arc.context.newView(type, name, viewId, tags);
     }
-
     // Returns the context view id for the given params.
     _getContextViewId(type, tags, amkey, isProfile) {
       let viewid =

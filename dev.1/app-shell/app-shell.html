@@ -271,10 +271,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap: config.urlMap, slotComposer, context: manifest});
       // for debugging only
       window.arc = arc;
-      // configure sharing
-      SharingTools.init(this);
-      // configure storage
       if (!config.nokey) {
+        // configure sharing
+        SharingTools.init(this);
+        // configure storage
         await StorageTools.init(arc, config);
         // configure (chrome)-casting
         CastTools.init();
@@ -290,8 +290,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // configure search
       this.search = config.search;
       // watch for steps, until turned off
-      //StorageTools.syncSteps();
-      this.findSuggestions();
+      StorageTools.syncSteps();
+      //this.findSuggestions();
     }
     _marshalLoader(config) {
       // create default URL map
@@ -317,7 +317,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._updateSharedStateIcon();
       this._updateProfileStateIcon();
       this._setState({user: UserTools.currentUser, users: UserTools.users});
-      // configure sharing
+      // update sharing
       this.watchSharedArcs();
     }
     async loadManifest() {
@@ -326,11 +326,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return manifest;
     }
     watchSharedArcs() {
-      SharingTools.watchSharedArcs();
+      if (!this._config.nokey) {
+        SharingTools.watchSharedArcs();
+      }
     }
     async findSuggestions() {
       console.groupCollapsed(...logPre, 'planning');
       try {
+        this.planning = true;
         this._setState({dotsActive: true, suggestions: []});
         let plans, max_iterations = 3;
         do {
@@ -342,6 +345,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._plans = plans;
         this.searchPlans();
       } finally {
+        this.planning = false;
         this._setState({dotsActive: false});
         console.groupEnd();
       }
@@ -375,7 +379,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
     }
     addAcceptedStep(plan) {
-      //SharingTools.addAcceptedStep(plan, this._plans.generations);
+      SharingTools.addAcceptedStep(plan, this._plans.generations);
     }
     _onPlanSelected(e) {
       let {plan} = e.detail;
@@ -413,6 +417,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           })
         }
       })
+    }
+    viewsChanged() {
+      log('viewsChanged');
+      this._invalidatePlanning();
+    }
+    stepsChanged() {
+      log('stepsChanged');
+      this._invalidatePlanning();
+    }
+    _invalidatePlanning() {
+      if (!this.planning) {
+        clearTimeout(this.validator);
+        this.validator = setTimeout(() => this.findSuggestions(), 100);
+      }
     }
     async reloadManifests() {
       this._setState({dotsActive: true});
