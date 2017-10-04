@@ -109,6 +109,7 @@
         let {key, checked} = e.currentTarget;
         let friends = (this._userData.friends || '').split(',');
         friends = checked ? friends.concat([key]) : friends.filter(f => f != key);
+        friends = friends.filter(name => name != '');
         this._userData.friends = friends.join(',');
         this._render();
         this.dispatchEvent(new CustomEvent('data-changed'));
