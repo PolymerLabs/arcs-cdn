@@ -394,6 +394,27 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.addAcceptedStep(plan);
       this.findSuggestions();
     }
+    viewsChanged() {
+      log('viewsChanged');
+      this._invalidatePlanning();
+    }
+    stepsChanged() {
+      log('stepsChanged');
+      this._invalidatePlanning();
+    }
+    _invalidatePlanning() {
+      if (!this.planning) {
+        clearTimeout(this.validator);
+        this.validator = setTimeout(() => this.findSuggestions(), 100);
+      }
+    }
+    async reloadManifests() {
+      this._setState({dotsActive: true});
+      this.arc._context = await this.loadManifest();
+      this.arc._context.imports.push(UserTools.identityManifest);
+      this.watchSharedArcs();
+      this.findSuggestions();
+    }
     _updateSharedStateIcon() {
       let icon = !UserTools.currentUser ? '' : this._shared ? "supervisor_account" : "lock_outline";
       this._setState({sharedStateIcon: icon});
@@ -417,27 +438,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           })
         }
       })
-    }
-    viewsChanged() {
-      log('viewsChanged');
-      this._invalidatePlanning();
-    }
-    stepsChanged() {
-      log('stepsChanged');
-      this._invalidatePlanning();
-    }
-    _invalidatePlanning() {
-      if (!this.planning) {
-        clearTimeout(this.validator);
-        this.validator = setTimeout(() => this.findSuggestions(), 100);
-      }
-    }
-    async reloadManifests() {
-      this._setState({dotsActive: true});
-      this.arc._context = await this.loadManifest();
-      this.arc._context.imports.push(UserTools.identityManifest);
-      this.watchSharedArcs();
-      this.findSuggestions();
     }
     async _onPromoteManifest() {
       let remotes = await ManifestTools.publishManifest(this._config);
@@ -480,6 +480,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onCastClick() {
       CastTools.cast();
+    }
+    _onUserDataChanged() {
+      UserTools.userDataChanged();
+      // update sharing
+      this.watchSharedArcs();
     }
   }
   AppShell.module = document.currentScript.ownerDocument;
