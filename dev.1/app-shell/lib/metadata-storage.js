@@ -77,12 +77,11 @@
     }
     // Creates or returns a context view for the given params.
     _getContextView(type, name, viewId, tags, description) {
-      let views = this._arc.context.findViewById(viewId);
-      console.assert(!views || views.length == 1 || views.length == 0, `views.length (${views && views.length}) is faulty`, views);
-      if (views && views.length) {
-        return views[0];
+      let view = this._arc.context.findViewById(viewId);
+      if (view) {
+        return view;
       }
-      let view = this._arc.context.newView(type, name, viewId, tags);
+      view = this._arc.context.newView(type, name, viewId, tags);
       if (!view.description && description) {
         view.description = description;
       }
@@ -93,7 +92,7 @@
       return ''
         + `shared:${isProfile ? `PROFILE/` : `AMKEY${amkey}/`}`
         + `${type.toString().replace(' ', '-')}/`
-        + (tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : ''
+        + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : '')
         ;
     }
     _getViewDescription(name, tags, user, owner) {
