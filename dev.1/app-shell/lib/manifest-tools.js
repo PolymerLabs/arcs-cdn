@@ -1,4 +1,6 @@
-ManifestTools = {
+(() => {
+
+this.ManifestTools = {
   async loadManifest(config, loader) {
     let {manifestPath, soloPath} = config;
     let path, content;
@@ -20,7 +22,7 @@ ManifestTools = {
   async _fetchManifestList() {
     // TODO(sjmiles): using the global `db` that is currently leaking out
     // of metadata-storage.html
-    let snapshot = await db.ref('manifests').once('value');
+    let snapshot = await db.child('manifests').once('value');
     let remotes = [];
     // TODO(sjmiles): convert sparse array (snapshot.val()) to dense array, return false to iterate all `s`
     snapshot.forEach(s => {remotes.push(s.val())});
@@ -53,14 +55,17 @@ ManifestTools = {
     let path = config.manifestPath || config.soloPath;
     if (path) {
       path = new URL(path, location.href).href;
-      let snapshot = await db.ref('manifests').once('value');
+      let node = db.child('manifests');
+      let snapshot = await node.once('value');
       let remotes = snapshot.val();
-      if (remotes.indexOf(path) < 0) {
-        remotes.push(path);
-        db.ref('manifests').set(remotes);
+      if (!remotes || remotes.indexOf(path) < 0) {
+        if (!remotes) {
+          remotes = [path];
+        } else {
+          remotes.push(path);
+        }
+        node.set(remotes);
       }
-      // update ui
-      //this._setState({manifests: remotes, localManifest: ''});
       // remove config paths
       config.manifestPath = config.soloPath = '';
       // update location bar
@@ -74,6 +79,8 @@ ManifestTools = {
     let bool_param = (p, n, v) => Boolean(v) ? p.set(n, v) : p.delete(n);
     bool_param(url.searchParams, 'manifest', config.manifestPath);
     bool_param(url.searchParams, 'solo', config.soloPath);
-    window.history.replaceState({}, "", url.href);
+    window.history.replaceState({}, "", decodeURIComponent(url.href));
   }
 };
+
+})();

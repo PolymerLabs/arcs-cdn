@@ -84,20 +84,19 @@
     set users(users) {
       this._users = users;
       if (users) {
-        console.log(users);
         this._update();
       }
     }
     _update() {
       if (this._users && this._user) {
-        this._userData = this._users[this._user];
+        this._userData = UserTools.findUser(this._user);
         if (this._userData) {
           this._render();
         }
       }
     }
     _render() {
-      let names = Object.keys(this._users);
+      let names = this._users.map(u => u.name);
       let friends = this._userData.friends || [];
       let makeModel = (name) => {
         let include = friends.indexOf(name) >= 0;
@@ -108,13 +107,14 @@
           style: include ? {} : {backgroundColor: 'whitesmoke', color: '#888'},
         };
       };
+      let item_template = UserData.module.querySelector('[user-item]');
       this._dom.set({
         users: {
-          template: UserData.module.querySelector('[user-item]'),
+          template: item_template,
           models: names.filter(name => name != this._user).map(name => makeModel(name))
         },
         me: {
-          template: UserData.module.querySelector('[user-item]'),
+          template: item_template,
           models: this._user ? [ makeModel(this._user) ] : []
         }
       });

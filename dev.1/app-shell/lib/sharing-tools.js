@@ -9,39 +9,50 @@ SharingTools = {
     this._steps = [];
     this._appliedSteps = {};
   },
-  loadSharedArcs(userName, tools) {
-    let user = tools.findUser(userName);
+  watchSharedArcs() {
+    StorageTools.shared.unwatchAll();
+    let user = UserTools.findUser(UserTools.currentUser);
     if (user) {
+      let watches = [];
       // Pull in all of the views from all public Arcs and add them to
       // the current context.
       // TODO: remove unshared / unfriended views
-      let names = user.friends.split(',');
-      //console.log(`%cusers's friends are`, shareLog, names);
-      //console.log(...fmt(`users's friends are`, names));
-      log(`${userName}'s friends: `, names);
-      names.forEach(name => {
-        let user = tools.findUser(name);
-        if (user && user.shared) {
-          Object.keys(user.shared).forEach(amkey => {
-            // TODO(sjmiles): why can `user.shared[amkey].shared` be false?
-            if (user.shared[amkey].shared) {
-              log('import view into the context from amkey=', amkey);
-              //this.syncSharedViews(amkey);
-              StorageTools.syncSharedViews({
-                key: amkey,
-                isProfile: false,
-                inFriendProfile: Boolean((user.profile || {})[amkey])
-              });
-            }
-          });
-        }
-      });
+      this._watchFriends(user, watches);
       // Also sync the user's profile views.
-      if (user.profile) {
-        Object.keys(user.profile).forEach(key => {
-          StorageTools.syncSharedViews({key, isProfile: true, inFriendProfile: false});
+      this._watchProfile(user, watches);
+      // Setup the watches
+      log(`watching `, watches);
+      StorageTools.shared.watchAll(watches);
+    }
+  },
+  _watchFriends(user, watches) {
+    let names = user.friends.split(',');
+    log(`_watchFriends for ${user.name}'s friends: `, names);
+    names.forEach(name => {
+      let friend = UserTools.findUser(name);
+      if (friend && friend.shared) {
+        this._watchFriend(friend, watches);
+      }
+    });
+  },
+  _watchFriend(friend, watches) {
+    Object.keys(friend.shared).forEach(amkey => {
+      // TODO(sjmiles): why can `user.shared[amkey].shared` be false?
+      if (friend.shared[amkey].shared) {
+        log('_watchFriend: import view into the context from amkey=', amkey);
+        watches.push({
+          key: amkey,
+          isProfile: false,
+          isFriendProfile: Boolean((friend.profile || {})[amkey])
         });
       }
+    });
+  },
+  _watchProfile(user, watches) {
+    if (user.profile) {
+      Object.keys(user.profile).forEach(key =>
+        watches.push({key, isProfile: true, isFriendProfile: false})
+      );
     }
   },
   addAcceptedStep(plan, generations) {
@@ -66,6 +77,7 @@ SharingTools = {
   async newAcceptedSteps(steps) {
     // Assume same length means we just get our own latest state
     if (steps && (!this._steps || steps.length !== this._steps.length)) {
+      log('newAcceptedSteps', steps);
       this._steps = steps;
       this.applyAcceptedSteps();
     }

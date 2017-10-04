@@ -61,6 +61,11 @@ let utils = {
   // TODO: move this randomId to the backend.
   randomId() {
     return Date.now().toString(36).substr(2) + Math.random().toString(36).substr(2);
+  },
+  setUrlParam(name, value) {
+    let url = new URL(document.location.href);
+    url.searchParams.set(name, value);
+    window.history.replaceState({}, "", decodeURIComponent(url.href));
   }
 };
 

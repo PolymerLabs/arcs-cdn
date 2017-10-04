@@ -85,7 +85,7 @@
       this.dirty = true;
     }
     _onApply(e) {
-      this.dispatchEvent(new CustomEvent('object-change'));
+      this.dispatchEvent(new CustomEvent('manifests-change'));
       this.dirty = false;
     }
   }

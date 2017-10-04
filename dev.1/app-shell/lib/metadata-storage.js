@@ -1,24 +1,4 @@
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-database.js"></script>
-<!--
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-messaging.js"></script>
--->
-<script>
-(function() {
-
-  let version = typeof Arcs === 'undefined' || !Arcs.version ? '/' : Arcs.version.replace(/\./g, '_');
-
-  let firebaseConfig = {
-    apiKey: "AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8",
-    authDomain: "arcs-storage.firebaseapp.com",
-    databaseURL: "https://arcs-storage.firebaseio.com",
-    projectId: "arcs-storage",
-    storageBucket: "arcs-storage.appspot.com",
-    messagingSenderId: "779656349412"
-  };
-
-  let db = firebase.initializeApp(firebaseConfig, 'arcs-storage').database().ref(version);
+(function(scope) {
 
   //const storeLog = `background: #c43e00; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
   const pre = [`%cMetadataStorage`, `background: #c43e00; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
@@ -34,9 +14,62 @@
 
   // Class that pulls in shared Arcs into the current Arc context.
   class SharedArcs {
-    constructor({ arc }) {
+    constructor({arc}) {
       this._arc = arc;
-      this._syncedViews = new Set();
+      this._watchedViews = new Set();
+      this._watchOffs = [];
+    }
+    _on(thing, event, cb) {
+      thing.on(event, cb);
+      this._watchOffs.push(() => thing.off(event, cb));
+    }
+    unwatchAll() {
+      this._watchOffs.forEach(w => w());
+      this._watchOffs = [];
+    }
+    // [{key, isProfile, inFriendProfile, notifier}]
+    watchAll(viewSpecs) {
+      viewSpecs.forEach(vs => this.watch(vs));
+    }
+    // Syncs all of the views in the given shared Arc amkey to the local context.
+    watch({key, isProfile, inFriendProfile, notifier}) {
+      log(`watching enabled for arcs/${key}/views`);
+      let node = db.child(`arcs/${key}/views`);
+      this._on(node, 'value', viewSnaps => {
+        log(`watch triggered for arcs/${key}/views`);
+        viewSnaps.forEach(snap => this._watchView(snap, key, isProfile));
+        notifier && notifier();
+      });
+    }
+    _watchView(snapshot, key, isProfile) {
+      // get view `metadata`
+      let metadata = snapshot.child('metadata').val();
+      // construct type object
+      let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
+      // construct id
+      let viewId = this._getContextViewId(type, metadata.tags, key, isProfile);
+      // only watch each viewId once
+      if (this._watchedViews.has(viewId)) {
+        warn(`View id already watched in Arc: ${viewId}`);
+        return;
+      }
+      this._watchedViews.add(viewId);
+      // find or create a view in the arc context
+      let localView = this._getContextView(type, metadata.name, viewId, metadata.tags);
+      // get view `values`
+      let remoteView = snapshot.child('values').ref;
+      if (localView.type.isView) {
+        // One-way syncing. Whenever a new entity is added / removed in the remote
+        // view it should get reflected in the context.
+        remoteView.on('child_added', function (data) {
+          localView.store(data.val());
+        });
+        remoteView.on('child_removed', function (data) {
+          localView.remove(data.val().id);
+        });
+      } else if (localView.type.isVariable) {
+        console.warn(...pre, 'Shared Variable syncing not implemented');
+      }
     }
 
     // Creates or returns a context view for the given params.
@@ -51,51 +84,16 @@
 
     // Returns the context view id for the given params.
     _getContextViewId(type, tags, amkey, isProfile) {
-      let viewid = 'shared:';
-      if (isProfile) {
-        viewid += 'PROFILE/';
-      } else {
-        viewid += `AMKEY${amkey}/`;
-      }
-      viewid += type.toString().replace(' ', '-') + '/';
+      let viewid =
+        `shared:${isProfile ? `PROFILE/` : `AMKEY${amkey}/`}`
+        + type.toString().replace(' ', '-') + '/'
+      ;
       if (tags && [...tags].length) {
         viewid += [...tags].sort().join('-').replace(/#/g, '') + '/';
       }
       return viewid;
     }
 
-    // Syncs all of the views in the given shared Arc amkey to the local context.
-    sync({ key, isProfile, inFriendProfile }) {
-      log(`watching enabled for arcs/${key}/views`);
-      let arc = db.child('arcs/' + key);
-      arc.child('views').on('value', remoteViews => {
-        log(`watch triggered for arcs/${key}/views`);
-        remoteViews.forEach(remoteViewMeta => {
-          let metadata = remoteViewMeta.child('metadata').val();
-          let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
-          let viewId = this._getContextViewId(type, metadata.tags, key, isProfile);
-          if (this._syncedViews.has(viewId)) {
-            console.warn(...pre, `View id already synced in Arc: ${viewId}`);
-            return;
-          }
-          this._syncedViews.add(viewId);
-          let localView = this._getContextView(type, metadata.name, viewId, metadata.tags);
-          let remoteView = remoteViewMeta.child('values');
-          if (localView.type.isView) {
-            // One-way syncing. Whenever a new entity is added / removed in the remote
-            // view it should get reflected in the context.
-            remoteView.on('child_added', function (data) {
-              localView.store(data.val());
-            });
-            remoteView.on('child_removed', function (data) {
-              localView.remove(data.val().id);
-            });
-          } else if (localView.type.isVariable) {
-            console.warn(...pre, 'Shared Variable syncing not implemented');
-          }
-        });
-      });
-    }
   }
   window.SharedArcs = SharedArcs;
 
@@ -276,8 +274,7 @@
     }
   }
 
-  window.db = db;
-  window.ArcMetadataStorage = ArcMetadataStorage;
-})();
+  scope.db = db;
+  scope.ArcMetadataStorage = ArcMetadataStorage;
 
-</script>
+})(this);

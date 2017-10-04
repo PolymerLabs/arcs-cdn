@@ -3,29 +3,6 @@
 const userLog = `background: #20AA20; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
 const log = console.log.bind(console, '%cUserTools', userLog);
 
-/*
-let users = [
-  {
-    name: "Melchior",
-    friends: "Caspar",
-    foods: "Frankincense",
-    avatar: "user (1).jpg"
-  },
-  {
-    name: "Caspar",
-    friends: "Melchior,Balthazar",
-    foods: "Myrrh,Frankincense",
-    avatar: "user (2).jpg"
-  },
-  {
-    name: "Balthazar",
-    friends: "Melchior",
-    foods: "Gold",
-    avatar: "user (3).jpg"
-  }
-];
-*/
-
 UserTools = {
   async init(config, arc, loader) {
     this.usersDb = db.child('users');
@@ -51,12 +28,13 @@ UserTools = {
     let identity = manifest.newView(personSchema.type, 'Identity', arc.generateID(), ['#identity']);
     //identity.set({id: arc.generateID(), rawData: users[0]});
     //
-    arc.context.imports.push(manifest);
+    //arc.context.imports.push(manifest);
     //
     this.userName = localStorage.getItem('currentUser') || '';
     this.users = users;
     this.identities = identities;
     this.identity = identity;
+    this.identityManifest = manifest;
     //
     return users;
   },
