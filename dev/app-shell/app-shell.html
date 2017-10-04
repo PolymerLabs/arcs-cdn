@@ -407,8 +407,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
               if (user.shared[amkey].shared) {
                 this._syncSharedViews({
                   key: amkey,
+                  user: this._currentUser,
                   owner: name,
-                  isProfile: name == this._currentUser,
+                  isProfile: false,
                   inFriendProfile: Boolean((user.profile || {})[amkey])});
               }
             });
@@ -419,6 +420,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         Object.keys(this._users[this._currentUser].profile || {}).forEach(key => {
           this._syncSharedViews({
             key,
+            user: this._currentUser,
             owner: this._currentUser,
             isProfile: true,
             inFriendProfile: false});

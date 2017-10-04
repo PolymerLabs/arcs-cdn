@@ -30,8 +30,8 @@
       this._syncedViews = new Set();
     }
 
-    _getViewDescription(name, tags, isProfile, owner) {
-      let pronoun = isProfile ? 'My' : `${owner}'s`;
+    _getViewDescription(name, tags, user, owner) {
+      let pronoun = (user == owner) ? 'My' : `${owner}'s`;
       if (tags && tags.length) {
         return `${pronoun} ${tags[0].substring(1)}`;
       } 
@@ -70,7 +70,7 @@
     }
 
     // Syncs all of the views in the given shared Arc amkey to the local context.
-    sync({ key, owner, isProfile, inFriendProfile }) {
+    sync({ key, user, owner, isProfile, inFriendProfile }) {
       let arc = db.ref('arcs/' + key);
 
       arc.child('views').on('value', remoteViews => {
@@ -83,7 +83,7 @@
             return;
           }
           this._syncedViews.add(viewId);
-          let viewDescription = this._getViewDescription(metadata.name, metadata.tags, isProfile, owner);
+          let viewDescription = this._getViewDescription(metadata.name, metadata.tags, user, owner);
           let localView = this._getContextView(type, metadata.name, viewId, metadata.tags, viewDescription);
           let remoteView = remoteViewMeta.child('values').ref;
           if (localView.type.isView) {
