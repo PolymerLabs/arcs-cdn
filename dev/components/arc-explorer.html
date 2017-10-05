@@ -45,7 +45,10 @@
     }
     _willReceiveProps(props, state) {
       let user = UserTools.findUser(props.username);
-      if (user && user.profile) {
+      if (!user || !user.profile) {
+        this._setState({profiles: null});
+      }
+      else {
         let keys = Object.keys(user.profile);
         let profiles = keys.map(async key => {
           let snap = await db.child(`arcs/${key}`).once('value');
