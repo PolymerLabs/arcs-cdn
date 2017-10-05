@@ -20,7 +20,7 @@ TBD.
 
 ## Build Process
 
-The Arcs engine and some other primary resources live in PolymerLabs/Arcs repository. Here are instructions on how to rebuild
+The Arcs engine and other primary resources live in https://github.com/PolymerLabs/arcs repository. `ArcsLib.js` (and other artifacts in `lib`) are built out of sources in `arcs`. Here are build instructions.
 
 Initial Setup
 
