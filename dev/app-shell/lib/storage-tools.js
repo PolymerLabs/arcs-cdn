@@ -61,15 +61,17 @@ StorageTools = {
       warn("attempt to save shared state without selected user failed");
       return;
     }
-    UserTools.userDb(user).child(`shared/${this._amkey}`).set({
-      shared,
-      when: Date.now()
-    });
+    let node = UserTools.userDb(user).child(`shared/${this._amkey}`);
+    if (shared) {
+      node.set({when: Date.now()});
+    } else {
+      node.remove();
+    }
   },
   saveProfileState(profile) {
     let user = UserTools.currentUser;
     if (!user || !this._amkey) {
-      warn("attempt to save shared state without selected user failed");
+      warn("attempt to save profile arc without selected user failed");
       return;
     }
     let node = UserTools.userDb(user).child(`profile/${this._amkey}`);

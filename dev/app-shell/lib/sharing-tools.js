@@ -61,17 +61,14 @@ SharingTools = {
   },
   _watchFriendsArc(friend, watches) {
     Object.keys(friend.shared).forEach(amkey => {
-      // TODO(sjmiles): why can `user.shared[amkey].shared` be false?
-      if (friend.shared[amkey].shared) {
-        log(`_watchFriendsArc: adding ${friend.name}'s arc to watch list, amkey=`, amkey);
-        watches.push({
-          key: amkey,
-          user: UserTools.currentUser,
-          owner: name,
-          isProfile: name === UserTools.currentUser,
-          inFriendProfile: Boolean((friend.profile || {})[amkey])
-        });
-      }
+      log(`_watchFriendsArc: adding ${friend.name}'s arc to watch list, amkey=`, amkey);
+      watches.push({
+        key: amkey,
+        user: UserTools.currentUser,
+        owner: name,
+        isProfile: name === UserTools.currentUser,
+        inFriendProfile: Boolean((friend.profile || {})[amkey])
+      });
     });
   },
   _watchProfileArcs(user, watches) {
