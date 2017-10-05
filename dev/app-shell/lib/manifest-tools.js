@@ -26,7 +26,13 @@ this.ManifestTools = {
       path = './arcs.manifest';
     }
     let folder = path.split('/').slice(0, -1).join('/') || '.';
-    let manifest = await Arcs.utils.parseManifest(`${folder}/`, content, loader);
+    let manifest;
+    try {
+      manifest = await Arcs.utils.parseManifest(`${folder}/`, content, loader);
+    } catch(x) {
+      console.warn(x);
+      manifest = Arcs.utils.parseManifest(`${folder}/`, '', loader);
+    }
     return {manifest, manifests, remotes, exclusions};
   },
   async _fetchManifestList() {
