@@ -325,9 +325,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.watchSharedArcs();
     }
     async loadManifest() {
-      let {manifest, manifests, remotes, exclusions} = await ManifestTools.loadManifest(this._config, this._loader);
-      this._setState({remotes, exclusions});
-      return manifest;
+      let manifests = await this._fetchManifestList();
+      return await ManifestTools.loadManifest(this._config, this._loader, manifests);
+    }
+    async _fetchManifestList() {
+      let manifests = await ManifestTools.fetchManifestList();
+      this._setState({
+        remotes: manifests.remotes,
+        exclusions: manifests.exclusions
+      });
+      return manifests;
     }
     watchSharedArcs() {
       if (!this._config.nokey) {
