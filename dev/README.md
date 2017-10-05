@@ -4,31 +4,19 @@
 
 ### Arcs Webapp
 
-https://polymerlabs.github.io/arcs-cdn/v0.2/apps/web/
+https://polymerlabs.github.io/arcs-cdn/dev/apps/web/
 
 ### Arcs VR
 
-https://polymerlabs.github.io/arcs-cdn/v0.2/apps/vr/
+https://polymerlabs.github.io/arcs-cdn/devv/apps/vr/
 
 ### Arcs ChromeCast
 
-https://polymerlabs.github.io/arcs-cdn/v0.2/apps/chromecast/
+https://polymerlabs.github.io/arcs-cdn/dev/apps/chromecast/
 
 ### Arcs Home
 
 TBD.
-
-## Versions and Development
-
-Generally the pattern for resources is:
-
-`...arcs-cdn/[version]/...`
-
-Where `[version]` is `v[Major].[Minor].[Release]`.
-
-There is some basic semver support, so `arcs-cdn/v0.1/apps/web` will call up the latest version of `apps/web` that matches `0.1.*`.
-
-The _in-development_ version is at version `dev` (e.g. https://polymerlabs.github.io/arcs-cdn/dev/apps/web/). This version has no SLA (it may be broken at any particular time).
 
 ## Build Process
 

@@ -4,7 +4,7 @@
 
 Generally the pattern for resources is:
 
-`...arcs-cdn/[version]/...`
+`arcs-cdn/[version]/...`
 
 Where `[version]` is `v[Major].[Minor].[Release]`.
 
@@ -14,5 +14,5 @@ The _in-development_ version is at version `dev` (e.g. https://polymerlabs.githu
 
 ## READMEs
 
-See `arcs-cdn/[version]/README.md` for general information about `[version]`.
-See `arcs-cdn/[version]/apps/[app]/README.me` for information about using `[app]`
+- See `arcs-cdn/[version]/README.md` for general information about `[version]`.
+- See `arcs-cdn/[version]/apps/[app]/README.me` for information about using `[app]`.
