@@ -1,47 +1,94 @@
+<link rel="import" href="data-explorer.html">
+
 <template>
   <style>
+    arc-explorer > [banner] {
+      padding: 6px 4px;
+      background-color: whitesmoke;
+      margin-bottom: 8px;
+      border-top: 1px dotted silver;
+    }
   </style>
-  <div arc>
-    <x-list items="{{particles}}">
-      <template>
-        <div particle>
-          <div name title="{{name}}"><a href="{{file}}" target="_blank">{{name}}</a></div>
-          <x-list items="{{slots}}">
-            <template>
-              <div slot>consumes: <span>{{name}}</span></div>
-            </template>
-          </x-list>
-        </div>
-      </template>
-    </x-list>
-  </div>
+  <div banner>Views in Profile Data</div>
+  <div style="padding: 8px;">{{profiles}}</div>
+  <hr>
+  <button on-click="dumpDb">Dump Database</button>
+  <data-explorer style="font-size: 0.6em;" object="{{data}}"></data-explorer>
+</template>
+
+<template profile>
+  <div>{{views}}</div>
+  <hr>
+  <pre style="margin: 0; font-size: 0.8em;">{{info}}</pre>
+</template>
+
+<template view>
+  <div style="line-height:1.4em;"><b>{{name}}</b></div>
 </template>
 
 <script>
   class ArcExplorer extends XenState(XenElement) {
-    static get observedAttributes() { return ['arc']; }
+    static get observedAttributes() { return ['username']; }
+    get template() {
+      return ArcExplorer.module.querySelector('template');
+    }
     _doMount() {
-      this._arc = {};
-      this._dom = Xen.stamp(ArcExplorer.module.querySelector('template')).events(this).appendTo(this);
+      this._stamp();
+    }
+    _stamp() {
+      this._dom = Xen.stamp(this.template).events(this).appendTo(this);
+    }
+    dumpDb() {
+      db.child('arcs').once('value').then(s => {
+        this._setState({data: s.val()});
+      });
+    }
+    _willReceiveProps(props, state) {
+      let user = UserTools.findUser(props.username);
+      if (user && user.profile) {
+        let keys = Object.keys(user.profile);
+        let profiles = keys.map(async key => {
+          let snap = await db.child(`arcs/${key}`).once('value');
+          let data = snap.val();
+          return {
+            key: key,
+            data: snap.val()
+          }
+        });
+        Promise.all(profiles).then(profiles => this._setState({profiles}));
+      }
     }
     _update(props, state) {
       this._dom.set(this._render(props, state));
     }
     _render(props, state) {
-      let particles = {};
-      if (props.arc) {
-        particles = props.arc._activeRecipe._particles.map(p => {
-          return {
-            name: p.name,
-            file: p.spec.implFile,
-            slots: [...p.spec.slots.values()].map(s => {return {name: s.name}})
-          };
-        });
-      }
       return {
-        arc: props.arc || {},
-        particles: particles
+        data: state.data,
+        profiles: {
+          template: ArcExplorer.module.querySelector('[profile]'),
+          models: this._renderProfileArcs(state.profiles || [])
+        }
       };
+    }
+    _renderProfileArcs(profiles) {
+      return profiles.map(({key, data}) => {
+        let views = data.views;
+        let info = Object.keys(views).map(name => { return { name } });
+        Object.keys(views).forEach(name => {
+          let view = views[name];
+          if (view.metadata) {
+            view.metadata.type = '<type information hidden>';
+            //delete view.metadata.type;
+          }
+        });
+        return {
+          info: JSON.stringify(data, null, '  '),
+          views: {
+            template: ArcExplorer.module.querySelector('[view]'),
+            models: info
+          }
+        };
+      });
     }
   }
   ArcExplorer.module = document.currentScript.ownerDocument;

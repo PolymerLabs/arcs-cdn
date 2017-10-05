@@ -63,7 +63,7 @@ SharingTools = {
     Object.keys(friend.shared).forEach(amkey => {
       // TODO(sjmiles): why can `user.shared[amkey].shared` be false?
       if (friend.shared[amkey].shared) {
-        log('_watchFriendsArc: adding view to watch from amkey=', amkey);
+        log(`_watchFriendsArc: adding ${friend.name}'s arc to watch list, amkey=`, amkey);
         watches.push({
           key: amkey,
           user: UserTools.currentUser,
@@ -77,7 +77,7 @@ SharingTools = {
   _watchProfileArcs(user, watches) {
     if (user.profile) {
       Object.keys(user.profile).forEach(key => {
-        log(`_watchProfileArcs: adding view to watch for ${user.name}:`, key);
+        log(`_watchProfileArcs: adding ${user.name}'s profile arc to watch list, amkey=`, key);
         watches.push({
           key,
           user: UserTools.currentUser,

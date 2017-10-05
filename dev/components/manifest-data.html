@@ -12,6 +12,7 @@
     <button on-click="_onApply" disabled="{{applyDisabled}}">Apply Changes</button>
   </div>
   <div>{{items}}</div>
+  <br>
 </template>
 
 <template manifest-item>
@@ -85,7 +86,7 @@
       this.dirty = true;
     }
     _onApply(e) {
-      this.dispatchEvent(new CustomEvent('object-change'));
+      this.dispatchEvent(new CustomEvent('manifests-change'));
       this.dirty = false;
     }
   }

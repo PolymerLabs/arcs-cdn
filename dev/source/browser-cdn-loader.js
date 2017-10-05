@@ -10,8 +10,8 @@
 "use strict";
 
 const Loader = require('../../../arcs/runtime/loader.js');
-const particle = require('../../../arcs/runtime/particle.js');
-const DomParticle = require('../../../arcs/runtime/dom-particle.js');
+const particle = require("../../../arcs/runtime/particle.js");
+const DomParticle = require("../../../arcs/runtime/dom-particle.js");
 
 module.exports = class BrowserLoader extends Loader {
   constructor(urlMap) {

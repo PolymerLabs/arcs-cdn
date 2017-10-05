@@ -95,7 +95,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.dirty = true;
     }
     _onApply(e) {
-      this.dispatchEvent(new CustomEvent('manifests-change'));
+      this.dispatchEvent(new CustomEvent('object-change'));
       this.dirty = false;
     }
   }
