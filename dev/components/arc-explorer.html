@@ -80,7 +80,7 @@
         Object.keys(views).forEach(name => {
           let view = views[name];
           if (view.metadata) {
-            view.metadata.type = '<type information hidden>';
+            view.metadata.type = '<redacted>';
             //delete view.metadata.type;
           }
         });
