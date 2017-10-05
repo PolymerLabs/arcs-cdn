@@ -137,7 +137,7 @@ SharingTools = {
       // Find all mapped views to be remembered.
       // Store as string, as we'll only use it to find exact matches later. (String is easier to compare)
       let mappedViews =
-        plan.views.filter(v => v.fate == "map" && v.id.substr(0, 7) == "shared:").map(v => v.id).sort().toString();
+        plan.views.filter(v => (v.fate == "map") && (v.id.substr(0, 7) == "shared:")).map(v => v.id).sort().toString();
 
       return {
         recipe: firstGeneration.result.toString(),

@@ -76,8 +76,8 @@
     _renderProfileArcs(profiles) {
       return profiles.map(({key, data}) => {
         let views = data.views;
-        let info = Object.keys(views).map(name => { return { name } });
-        Object.keys(views).forEach(name => {
+        let info = Object.keys(views || {}).map(name => { return { name } });
+        Object.keys(views || {}).forEach(name => {
           let view = views[name];
           if (view.metadata) {
             view.metadata.type = '<redacted>';
