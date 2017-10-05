@@ -127,7 +127,7 @@
     }
 
     _getViewId(view, tags) {
-      let viewid = view.type.toString().replace(' ', '-');
+      let viewid = view.type.toString().replace(/ /g, '-').replace(/[\[\]]/g, '!');
       if (tags && [...tags].length) {
         viewid += '-' + [...tags][0].replace(/#/g, '');
       }

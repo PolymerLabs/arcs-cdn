@@ -45,7 +45,10 @@
     }
     _willReceiveProps(props, state) {
       let user = UserTools.findUser(props.username);
-      if (user && user.profile) {
+      if (!user || !user.profile) {
+        this._setState({profiles: null});
+      }
+      else {
         let keys = Object.keys(user.profile);
         let profiles = keys.map(async key => {
           let snap = await db.child(`arcs/${key}`).once('value');
@@ -77,7 +80,7 @@
         Object.keys(views).forEach(name => {
           let view = views[name];
           if (view.metadata) {
-            view.metadata.type = '<type information hidden>';
+            view.metadata.type = '<redacted>';
             //delete view.metadata.type;
           }
         });
