@@ -80,6 +80,23 @@ StorageTools = {
     } else {
       node.remove();
     }
+  },
+  _userDataForCurrentUser() {
+    let user = UserTools.currentUser;
+    if (!user) return null;
+
+    let userData = UserTools.findUser(user);
+    if (!userData) return null;
+
+    return userData;
+  },
+  loadSharedState() {
+    let userData = this._userDataForCurrentUser();
+    return !!Object.keys(userData && userData.shared || {}).includes(this._amkey);
+  },
+  loadProfileState() {
+    let userData = this._userDataForCurrentUser();
+    return !!Object.keys(userData && userData.profile || {}).includes(this._amkey);
   }
 };
 

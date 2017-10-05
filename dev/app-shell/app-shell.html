@@ -314,6 +314,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         //Arcs.utils.setUrlParam('user', user);
       }
       // update ui
+      this._shared = StorageTools.loadSharedState();
+      this._isProfile = StorageTools.loadProfileState();
       this._updateUserSelectWidget();
       this._updateSharedStateIcon();
       this._updateProfileStateIcon();
