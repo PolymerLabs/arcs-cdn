@@ -11,14 +11,13 @@
 (() => {
 
 this.ManifestTools = {
-  async loadManifest(config, loader) {
+  async loadManifest(config, loader, manifests) {
     let {manifestPath, soloPath} = config;
     let path, content;
     if (soloPath) {
       content = await loader.loadResource(soloPath);
       path = soloPath;
     } else {
-      var {manifests, remotes, exclusions} = await this._fetchManifestList();
       if (manifestPath) {
         manifests.push(manifestPath);
       }
@@ -33,7 +32,7 @@ this.ManifestTools = {
       console.warn(x);
       manifest = Arcs.utils.parseManifest(`${folder}/`, '', loader);
     }
-    return {manifest, manifests, remotes, exclusions};
+    return manifest;
   },
   async _fetchManifestList() {
     // TODO(sjmiles): using the global `db` that is currently leaking out
@@ -44,7 +43,9 @@ this.ManifestTools = {
     snapshot.forEach(s => {remotes.push(s.val())});
     let exclusions = this._readExclusions();
     let manifests = remotes.filter(m => exclusions.indexOf(m) < 0);
-    return {manifests, remotes, exclusions};
+    manifests.remotes = remotes;
+    manifests.exlusions = exclusions;
+    return manifests;
   },
   _readExclusions() {
     try {
