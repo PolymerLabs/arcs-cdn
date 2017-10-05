@@ -34,7 +34,7 @@ this.ManifestTools = {
     }
     return manifest;
   },
-  async _fetchManifestList() {
+  async fetchManifestList() {
     // TODO(sjmiles): using the global `db` that is currently leaking out
     // of metadata-storage.html
     let snapshot = await db.child('manifests').once('value');
