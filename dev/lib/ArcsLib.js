@@ -6059,7 +6059,7 @@ var Particle = __webpack_require__(265);
 var Search = __webpack_require__(117);
 var Slot = __webpack_require__(267);
 var View = __webpack_require__(270);
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 
 class Recipe {
   constructor() {
@@ -6176,6 +6176,13 @@ class Recipe {
       viewConnections.push(...particle._unnamedConnections);
     });
     return viewConnections;
+  }
+
+  isEmpty() {
+    return this.particles.length == 0 &&
+           this.views.length == 0 &&
+           this.slots.length == 0 &&
+           this._connectionConstraints.length == 0;
   }
 
   findView(id) {
@@ -6379,13 +6386,13 @@ class Recipe {
 
   _makeLocalNameMap() {
     let names = new Set();
-    for (let particle in this.particles) {
+    for (let particle of this.particles) {
       names.add(particle.localName);
     }
-    for (let view in this.views) {
+    for (let view of this.views) {
       names.add(view.localName);
     }
-    for (let slot in this.slots) {
+    for (let slot of this.slots) {
       names.add(slot.localName);
     }
 
@@ -6911,8 +6918,15 @@ class Type {
     return Type.newView(this);
   }
 
-  // TODO: rename toString to describe
   toString() {
+    if (this.isView)
+      return `[${this.primitiveType().toString()}]`;
+    if (this.isEntity)
+      return this.entitySchema.name;
+    assert('Add support to serializing type:', type);
+  }
+
+  toPrettyString() {
     if (this.isRelation)
       return JSON.stringify(this.data);
     if (this.isView)
@@ -7031,6 +7045,68 @@ module.exports = Walker;
 
 /***/ }),
 /* 12 */
+/***/ (function(module, exports, __webpack_require__) {
+
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+var assert = __webpack_require__(1);
+
+function compareNulls(o1, o2) {
+  if (o1 == o2) return 0;
+  if (o1 == null) return -1;
+  return 1;
+}
+function compareStrings(s1, s2) {
+  if (s1 == null || s2 == null) return compareNulls(s1, s2);
+  return s1.localeCompare(s2);
+}
+function compareNumbers(n1, n2) {
+  if (n1 == null || n2 == null) return compareNulls(n1, n2);
+  return n1 - n2;
+}
+function compareBools(b1, b2) {
+  if (b1 == null || b2 == null) return compareNulls(b1, b2);
+  return b1 - b2;
+}
+function compareArrays(a1, a2, compare) {
+  assert(a1 != null);
+  assert(a2 != null);
+  if (a1.length != a2.length) return compareNumbers(a1.length, a2.length);
+  for (let i = 0; i < a1.length; i++) {
+    let result;
+    if ((result = compare(a1[i], a2[i])) != 0) return result;
+  }
+  return 0;
+}
+function compareObjects(o1, o2, compare) {
+  let keys = Object.keys(o1);
+  let result;
+  if ((result = compareNumbers(keys.length, Object.keys(o2).length)) != 0) return result;
+  for (let key of keys) {
+    if ((result = compare(o1[key], o2[key])) != 0) return result;
+  }
+  return 0;
+}
+function compareComparables(o1, o2) {
+  if (o1 == null || o2 == null) return compareNulls(o1, o2);
+  return o1._compareTo(o2);
+}
+
+exports.compareNulls = compareNulls;
+exports.compareStrings = compareStrings;
+exports.compareNumbers = compareNumbers;
+exports.compareBools = compareBools;
+exports.compareArrays = compareArrays;
+exports.compareObjects = compareObjects;
+exports.compareComparables = compareComparables;
+
+
+/***/ }),
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7290,7 +7366,7 @@ exports.shr64_lo = shr64_lo;
 
 
 /***/ }),
-/* 13 */
+/* 14 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* eslint-disable node/no-deprecated-api */
@@ -7358,11 +7434,11 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 
 /***/ }),
-/* 14 */
+/* 15 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var Buffer = __webpack_require__(13).Buffer
-var Transform = __webpack_require__(15).Transform
+var Buffer = __webpack_require__(14).Buffer
+var Transform = __webpack_require__(16).Transform
 var StringDecoder = __webpack_require__(36).StringDecoder
 var inherits = __webpack_require__(2)
 
@@ -7463,7 +7539,7 @@ module.exports = CipherBase
 
 
 /***/ }),
-/* 15 */
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright Joyent, Inc. and other Node contributors.
@@ -7596,7 +7672,7 @@ Stream.prototype.pipe = function(dest, options) {
 
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -7848,68 +7924,6 @@ class RecipeUtil {
 }
 
 module.exports = RecipeUtil;
-
-
-/***/ }),
-/* 17 */
-/***/ (function(module, exports, __webpack_require__) {
-
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-var assert = __webpack_require__(1);
-
-function compareNulls(o1, o2) {
-  if (o1 == o2) return 0;
-  if (o1 == null) return -1;
-  return 1;
-}
-function compareStrings(s1, s2) {
-  if (s1 == null || s2 == null) return compareNulls(s1, s2);
-  return s1.localeCompare(s2);
-}
-function compareNumbers(n1, n2) {
-  if (n1 == null || n2 == null) return compareNulls(n1, n2);
-  return n1 - n2;
-}
-function compareBools(b1, b2) {
-  if (b1 == null || b2 == null) return compareNulls(b1, b2);
-  return b1 - b2;
-}
-function compareArrays(a1, a2, compare) {
-  assert(a1 != null);
-  assert(a2 != null);
-  if (a1.length != a2.length) return compareNumbers(a1.length, a2.length);
-  for (let i = 0; i < a1.length; i++) {
-    let result;
-    if ((result = compare(a1[i], a2[i])) != 0) return result;
-  }
-  return 0;
-}
-function compareObjects(o1, o2, compare) {
-  let keys = Object.keys(o1);
-  let result;
-  if ((result = compareNumbers(keys.length, Object.keys(o2).length)) != 0) return result;
-  for (let key of keys) {
-    if ((result = compare(o1[key], o2[key])) != 0) return result;
-  }
-  return 0;
-}
-function compareComparables(o1, o2) {
-  if (o1 == null || o2 == null) return compareNulls(o1, o2);
-  return o1._compareTo(o2);
-}
-
-exports.compareNulls = compareNulls;
-exports.compareStrings = compareStrings;
-exports.compareNumbers = compareNumbers;
-exports.compareBools = compareBools;
-exports.compareArrays = compareArrays;
-exports.compareObjects = compareObjects;
-exports.compareComparables = compareComparables;
 
 
 /***/ }),
@@ -8493,6 +8507,25 @@ class Schema {
     }
     return clazz;
   }
+
+  toString() {
+    let results = [];
+    results.push(`schema ${this.name}`.concat(this.parent ? ` extends ${this.parent.name}` : ''));
+
+    let propertiesToString = (properties, keyword) => {
+      if (Object.keys(properties).length > 0) {
+        results.push(`  ${keyword}`);
+        Object.keys(properties).forEach(name => {
+          let schemaType = Array.isArray(properties[name]) && properties[name].length > 1 ? `(${properties[name].join(' or ')})` : properties[name];
+          results.push(`    ${schemaType} ${name}`);
+        });
+      }
+    }
+
+    propertiesToString(this.normative, 'normative');
+    propertiesToString(this.optional, 'optional');
+    return results.join('\n');
+  }
 }
 
 module.exports = Schema;
@@ -8667,7 +8700,7 @@ var md5 = __webpack_require__(33)
 var RIPEMD160 = __webpack_require__(54)
 var sha = __webpack_require__(55)
 
-var Base = __webpack_require__(14)
+var Base = __webpack_require__(15)
 
 function HashNoConstructor (hash) {
   Base.call(this, 'digest')
@@ -8723,7 +8756,7 @@ module.exports = function createHash (alg) {
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var assert = __webpack_require__(10);
 
 function BlockHash() {
@@ -8826,7 +8859,7 @@ function oldBrowser () {
   throw new Error('secure random number generation not supported by this browser\nuse chrome, FireFox or Internet Explorer 11')
 }
 
-var Buffer = __webpack_require__(13).Buffer
+var Buffer = __webpack_require__(14).Buffer
 var crypto = global.crypto || global.msCrypto
 
 if (crypto && crypto.getRandomValues) {
@@ -10952,6 +10985,33 @@ class ParticleSpec {
       assert(d == "pattern" || this.connectionMap.has(d), `Unexpected description for ${d}`);
     });
   }
+
+  toString() {
+    let results = [];
+    results.push(`particle ${this.name} in '${this.implFile}'`);
+    let connRes = this.connections.map(cs => `${cs.direction} ${cs.type.toString()} ${cs.name}`);
+    results.push(`  ${this.primaryVerb}(${connRes.join(', ')})`);
+    this.affordance.filter(a => a != 'mock').forEach(a => results.push(`  affordance ${a}`));
+    // TODO: support form factors
+    this.slots.forEach(s => {
+    results.push(`  ${s.isRequired ? 'must ' : ''}consume ${s.isSet ? 'set of ' : ''}${s.name}`);
+      s.providedSlots.forEach(ps => {
+        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`)
+        // TODO: support form factors
+        ps.views.forEach(psv => results.push(`      view ${psv}`))
+      });
+    });
+    // Description
+    if (this.description.hasPattern()) {
+      results.push(`  description \`${this.description.pattern}\``);
+      this.connections.forEach(cs => {
+        if (cs.description.hasPattern()) {
+          results.push(`    ${cs.name} \`${cs.description.pattern}\``);
+        }
+      });
+    }
+    return results.join('\n');
+  }
 }
 
 module.exports = ParticleSpec;
@@ -11200,6 +11260,7 @@ exports.identifier = Symbol('id');
 const assert = __webpack_require__(1);
 const tracing = __webpack_require__(20);
 const scheduler = __webpack_require__(118);
+const util = __webpack_require__(12);
 
 class ViewBase {
   constructor(type, arc, name, id) {
@@ -11210,6 +11271,7 @@ class ViewBase {
     this.name = name;
     this._version = 0;
     this.id = id || this._arc.generateID();
+    this.source = null;
     trace.end();
   }
 
@@ -11248,6 +11310,38 @@ class ViewBase {
 
     callTrace.end();
   }
+
+  _compareTo(other) {
+    let cmp;
+    if ((cmp = util.compareStrings(this.name, other.name)) != 0) return cmp;
+    if ((cmp = util.compareNumbers(this._version, other._version)) != 0) return cmp;
+    if ((cmp = util.compareStrings(this.source, other.source)) != 0) return cmp;
+    if ((cmp = util.compareStrings(this.id, other.id)) != 0) return cmp;
+    return 0;
+  }
+
+  toString(viewTags) {
+    let results = [];
+    let viewStr = [];
+    viewStr.push(`view`);
+    if (this.name) {
+      viewStr.push(`${this.name}`);
+    }
+    viewStr.push(`of ${this.type.toString()}`);
+    if (this.id) {
+      viewStr.push(`'${this.id}'`);
+    }
+    if (viewTags && viewTags.length) {
+      viewStr.push(`${[...viewTags].join(' ')}`);
+    }
+    if (this.source) {
+      viewStr.push(`in '${this.source}'`);
+    }
+    results.push(viewStr.join(' '));
+    if (this.description)
+      results.push(`  description \`${this.description}\``)
+    return results.join('\n');
+  }
 }
 
 class View extends ViewBase {
@@ -11263,6 +11357,8 @@ class View extends ViewBase {
   }
 
   cloneFrom(view) {
+    this.name = view.name;
+    this.source = view.source;
     this._items = new Map(view._items);
     this._version = view._version;
     this.description = view.description;
@@ -11426,6 +11522,7 @@ const ParticleSpec = __webpack_require__(42);
 const Schema = __webpack_require__(21);
 const Search = __webpack_require__(117);
 const {View, Variable} = __webpack_require__(45);
+const util = __webpack_require__(12);
 
 class Manifest {
   constructor() {
@@ -11834,6 +11931,7 @@ ${e.message}
     type = type.resolveSchemas(resolveSchema);
 
     let view = manifest.newView(type, name, id, tags);
+    view.source = item.source;
     view.description = item.description;
     // TODO: How to set the version?
     // view.version = item.version;
@@ -11862,6 +11960,34 @@ ${e.message}
     let recipe = new Recipe();
     this._recipes.push(recipe);
     return recipe;
+  }
+
+  toString(options) {
+    // TODO: sort?
+    let results = []
+
+    this._imports.forEach(i => {
+      results.push(`import '${i.fileName}'`);
+    });
+
+    Object.values(this._schemas).forEach(s => {
+      results.push(s.toString());
+    });
+
+    Object.values(this._particles).forEach(p => {
+      results.push(p.toString());
+    });
+
+    this._recipes.forEach(r => {
+      results.push(r.toString(options));
+    });
+
+    let views = [...this.views].sort(util.compareComparables);
+    views.forEach(v => {
+      results.push(v.toString(this._viewTags.get(v)));
+    });
+
+    return results.join('\n');
   }
 }
 
@@ -12260,7 +12386,7 @@ function isUndefined(arg) {
 
 var hash = exports;
 
-hash.utils = __webpack_require__(12);
+hash.utils = __webpack_require__(13);
 hash.common = __webpack_require__(27);
 hash.sha = __webpack_require__(177);
 hash.ripemd = __webpack_require__(176);
@@ -12367,7 +12493,7 @@ var Stream = __webpack_require__(102);
 /*</replacement>*/
 
 /*<replacement>*/
-var Buffer = __webpack_require__(13).Buffer;
+var Buffer = __webpack_require__(14).Buffer;
 var OurUint8Array = global.Uint8Array || function () {};
 function _uint8ArrayToBuffer(chunk) {
   return Buffer.from(chunk);
@@ -14050,6 +14176,7 @@ class Description {
     this._tokens = [];
     this._initTokens(this._pattern);
   }
+  get pattern() { return this._pattern; }
   hasPattern() {
     return this._tokens.length > 0;
   }
@@ -14108,7 +14235,7 @@ class ValueToken {
     let view = options.findViewById(viewConnection.view.id);
     if (this._useType) {  // view type
       // Use view type (eg "Products list")
-      result.push(viewConnection.type.toString().toLowerCase());
+      result.push(viewConnection.type.toPrettyString().toLowerCase());
     } else if (this._values) {  // view values
       // Use view values (eg "How to draw book, Hockey stick")
       result.push(this._formatViewValue(view));
@@ -14150,7 +14277,7 @@ class ValueToken {
         result.push(chosenConnectionSpec.description._tokens.map(token => token.toString(options, chosenConnection.particle)).join(""));
       } else {
         // Add the connection type.
-        result.push(chosenConnection.type.toString().toLowerCase());
+        result.push(chosenConnection.type.toPrettyString().toLowerCase());
       }
 
       if (options.includeViewValues !== false) {
@@ -14279,7 +14406,7 @@ module.exports = [["0","\u0000",127,"€"],["8140","丂丄丅丆丏丒丗丟丠�
 
 var convert = __webpack_require__(235).convert;
 var bodyStream = __webpack_require__(255);
-var PassThrough = __webpack_require__(15).PassThrough;
+var PassThrough = __webpack_require__(16).PassThrough;
 var FetchError = __webpack_require__(116);
 
 module.exports = Body;
@@ -14782,7 +14909,7 @@ Object.assign(exports, {
 let {Strategy} = __webpack_require__(7);
 let RecipeWalker = __webpack_require__(11);
 let Recipe = __webpack_require__(6);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 let assert = __webpack_require__(1);
 
 class ViewMapperBase extends Strategy {
@@ -14829,7 +14956,6 @@ class ViewMapperBase extends Strategy {
           return;
         }
         var views = self.getMappableViews(type, tags);
-
         if (views.length == 0)
           return;
 
@@ -15715,7 +15841,7 @@ if (typeof self === 'object') {
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(30)
-var Transform = __webpack_require__(14)
+var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
 var GHASH = __webpack_require__(137)
 var xor = __webpack_require__(24)
@@ -15978,7 +16104,7 @@ exports.encrypt = function (self, chunk) {
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(30)
-var Transform = __webpack_require__(14)
+var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
 
 inherits(StreamCipher, Transform)
@@ -16025,8 +16151,8 @@ module.exports = {"1.3.132.0.10":"secp256k1","1.3.132.0.33":"p224","1.2.840.1004
 
 var inherits = __webpack_require__(2)
 var Legacy = __webpack_require__(150)
-var Base = __webpack_require__(14)
-var Buffer = __webpack_require__(13).Buffer
+var Base = __webpack_require__(15)
+var Buffer = __webpack_require__(14).Buffer
 var md5 = __webpack_require__(33)
 var RIPEMD160 = __webpack_require__(54)
 
@@ -16204,7 +16330,7 @@ function findPrime(bits, gen) {
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var common = __webpack_require__(27);
 var shaCommon = __webpack_require__(84);
 var assert = __webpack_require__(10);
@@ -16316,7 +16442,7 @@ SHA256.prototype._digest = function digest(enc) {
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var common = __webpack_require__(27);
 var assert = __webpack_require__(10);
 
@@ -16653,7 +16779,7 @@ function g1_512_lo(xh, xl) {
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var rotr32 = utils.rotr32;
 
 function ft_1(s, x, y, z) {
@@ -17296,7 +17422,7 @@ var sha = __webpack_require__(55)
 
 var checkParameters = __webpack_require__(94)
 var defaultEncoding = __webpack_require__(93)
-var Buffer = __webpack_require__(13).Buffer
+var Buffer = __webpack_require__(14).Buffer
 var ZEROS = Buffer.alloc(128)
 var sizes = {
   md5: 16,
@@ -17504,7 +17630,7 @@ var Stream = __webpack_require__(102);
 // TODO(bmeurer): Change this back to const once hole checks are
 // properly optimized away early in Ignition+TurboFan.
 /*<replacement>*/
-var Buffer = __webpack_require__(13).Buffer;
+var Buffer = __webpack_require__(14).Buffer;
 var OurUint8Array = global.Uint8Array || function () {};
 function _uint8ArrayToBuffer(chunk) {
   return Buffer.from(chunk);
@@ -19492,12 +19618,12 @@ class ThingMapper {
   }
 
   identifierForThing(thing) {
-    assert(this._reverseIdMap.has(thing));
+    assert(this._reverseIdMap.has(thing), `Missing thing ${thing}`);
     return this._reverseIdMap.get(thing);
   }
 
   thingForIdentifier(id) {
-    assert(this._idMap.has(id));
+    assert(this._idMap.has(id), `Missing id: ${id}`);
     return this._idMap.get(id);
   }
 }
@@ -19677,6 +19803,7 @@ class PECOuterPort extends APIPort {
     this.registerHandler("ViewToList", {view: this.Mapped, callback: this.Direct});
     this.registerHandler("ViewSet", {view: this.Mapped, data: this.Direct});
     this.registerHandler("ViewStore", {view: this.Mapped, data: this.Direct});
+    this.registerHandler("ViewRemove", {view: this.Mapped, data: this.Direct});
     this.registerHandler("ViewClear", {view: this.Mapped});
     this.registerHandler("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
@@ -19711,6 +19838,7 @@ class PECInnerPort extends APIPort {
     this.registerCall("ViewToList", {view: this.Mapped, callback: this.LocalMapped});
     this.registerCall("ViewSet", {view: this.Mapped, data: this.Direct});
     this.registerCall("ViewStore", {view: this.Mapped, data: this.Direct});
+    this.registerCall("ViewRemove", {view: this.Mapped, data: this.Direct});
     this.registerCall("ViewClear", {view: this.Mapped});
     this.registerCall("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
@@ -20478,7 +20606,7 @@ __webpack_require__(57).inherits(FetchError, Error);
 // http://polymer.github.io/PATENTS.txt
 
 var assert = __webpack_require__(1);
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 
 class Search {
   constructor(phrase, unresolvedTokens) {
@@ -20796,6 +20924,9 @@ function cloneData(data) {
 function restore(entry, entityClass) {
   let {id, rawData} = entry;
   var entity = new entityClass(cloneData(rawData));
+  if (entry.id) {
+    entity.identify(entry.id);
+  }
 
   // TODO some relation magic, somewhere, at some point.
 
@@ -20897,6 +21028,19 @@ class View extends Viewlet {
     var serialization = this._serialize(entity);
     return this._view.store(serialization);
   }
+
+  /** @method remove(entity)
+   * Removes an entity from the View.
+   * throws: Error if this view is not configured as a writeable view (i.e. 'out' or 'inout')
+     in the particle's manifest.
+   */
+  remove(entity) {
+    if (!this.canWrite)
+      throw new Error("View not writeable");
+    var serialization = this._serialize(entity);
+    return this._view.remove(serialization.id);
+  }
+
   async debugString() {
     var list = await this.toList();
     return list ? ('[' + list.map(p => p.debugString).join(", ") + ']') : 'undefined';
@@ -21061,6 +21205,7 @@ const OuterPec = __webpack_require__(262);
 const Recipe = __webpack_require__(6);
 const Manifest = __webpack_require__(46);
 const Description = __webpack_require__(58);
+const util = __webpack_require__(12);
 
 class Arc {
   constructor({id, context, pecFactory, slotComposer}) {
@@ -21304,8 +21449,8 @@ class Arc {
   findViewsByType(type, options) {
     // TODO: use options (location, labels, etc.) somehow.
     var views = this._viewsByType.get(Arc._viewKey(type)) || [];
-    if (options && options.tag) {
-      views = views.filter(view => this._viewTags.get(view).has(options.tag));
+    if (options && options.tags) {
+      views = views.filter(view => options.tags.filter(tag => !this._viewTags.get(view).has(tag)).length == 0);
     }
     return views;
   }
@@ -21353,6 +21498,23 @@ class Arc {
   stop() {
     this.pec.stop();
   }
+
+  toContextString(options) {
+    let results = [];
+    let views = [...this._viewsById.values()].sort(util.compareComparables);
+    views.forEach(v => {
+      results.push(v.toString(this._viewTags.get(v)));
+    });
+
+    // TODO: include views entities
+    // TODO: include (remote) slots?
+
+    if (!this._activeRecipe.isEmpty()) {
+      results.push(this._activeRecipe.toString());
+    }
+
+    return results.join('\n');
+  }
 }
 
 module.exports = Arc;
@@ -21372,7 +21534,7 @@ module.exports = Arc;
 let {Strategy, Strategizer} = __webpack_require__(7);
 var assert = __webpack_require__(1);
 let Recipe = __webpack_require__(6);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 let RecipeWalker = __webpack_require__(11);
 let ConvertConstraintsToConnections = __webpack_require__(277);
 let AssignRemoteViews = __webpack_require__(275);
@@ -22821,7 +22983,7 @@ function fromByteArray (uint8) {
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(30)
-var Transform = __webpack_require__(14)
+var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
 var modes = __webpack_require__(31)
 var StreamCipher = __webpack_require__(77)
@@ -22965,7 +23127,7 @@ exports.createDecipheriv = createDecipheriv
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(30)
-var Transform = __webpack_require__(14)
+var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
 var modes = __webpack_require__(31)
 var ebtk = __webpack_require__(35)
@@ -23277,7 +23439,7 @@ exports.listCiphers = exports.getCiphers = getCiphers
 /* 139 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var CipherBase = __webpack_require__(14)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var CipherBase = __webpack_require__(15)
 var des = __webpack_require__(49)
 var inherits = __webpack_require__(2)
 
@@ -23365,7 +23527,7 @@ module.exports = __webpack_require__(78)
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var createHash = __webpack_require__(26)
-var stream = __webpack_require__(15)
+var stream = __webpack_require__(16)
 var inherits = __webpack_require__(2)
 var sign = __webpack_require__(143)
 var verify = __webpack_require__(144)
@@ -24804,9 +24966,9 @@ module.exports = function hash (buf, fn) {
 "use strict";
 
 var inherits = __webpack_require__(2)
-var Buffer = __webpack_require__(13).Buffer
+var Buffer = __webpack_require__(14).Buffer
 
-var Base = __webpack_require__(14)
+var Base = __webpack_require__(15)
 
 var ZEROS = Buffer.alloc(128)
 var blocksize = 64
@@ -29777,7 +29939,7 @@ module.exports = {"_args":[[{"raw":"elliptic@^6.0.0","scope":null,"escapedName":
 
 "use strict";
 /* WEBPACK VAR INJECTION */(function(Buffer) {
-var Transform = __webpack_require__(15).Transform
+var Transform = __webpack_require__(16).Transform
 var inherits = __webpack_require__(2)
 
 function HashBase (blockSize) {
@@ -29869,7 +30031,7 @@ module.exports = HashBase
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var assert = __webpack_require__(10);
 
 function Hmac(hash, key, enc) {
@@ -29923,7 +30085,7 @@ Hmac.prototype.digest = function digest(enc) {
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var common = __webpack_require__(27);
 
 var rotl32 = utils.rotl32;
@@ -30090,7 +30252,7 @@ exports.sha512 = __webpack_require__(83);
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var common = __webpack_require__(27);
 var shaCommon = __webpack_require__(84);
 
@@ -30171,7 +30333,7 @@ SHA1.prototype._digest = function digest(enc) {
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 var SHA256 = __webpack_require__(82);
 
 function SHA224() {
@@ -30208,7 +30370,7 @@ SHA224.prototype._digest = function digest(enc) {
 "use strict";
 
 
-var utils = __webpack_require__(12);
+var utils = __webpack_require__(13);
 
 var SHA512 = __webpack_require__(83);
 
@@ -36138,7 +36300,7 @@ module.exports = function (okey, password) {
 /* WEBPACK VAR INJECTION */(function(global, process) {var checkParameters = __webpack_require__(94)
 var defaultEncoding = __webpack_require__(93)
 var sync = __webpack_require__(95)
-var Buffer = __webpack_require__(13).Buffer
+var Buffer = __webpack_require__(14).Buffer
 
 var ZERO_BUF
 var subtle = global.crypto && global.crypto.subtle
@@ -37270,7 +37432,7 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var Buffer = __webpack_require__(13).Buffer;
+var Buffer = __webpack_require__(14).Buffer;
 /*</replacement>*/
 
 function copyBuffer(src, target, offset) {
@@ -43775,7 +43937,7 @@ class SetDomContext {
   initContext(context) {
     Object.keys(context).forEach(subId => {
       if (!this._contextBySubId[subId] || !this._contextBySubId[subId].isEqual(context[subId])) {
-        this._contextBySubId[subId] = new DomContext(this._containerKind);
+        this._contextBySubId[subId] = new DomContext(null, this._containerKind);
       }
       this._contextBySubId[subId].initContext(context[subId]);
     });
@@ -43881,8 +44043,10 @@ class DomSlot extends Slot {
     }
   }
   _createDomContext() {
-    let type = this.consumeConn.slotSpec.isSet ? SetDomContext : DomContext;
-    return new (type)(null, this._containerKind);
+    if (this.consumeConn.slotSpec.isSet) {
+      return new SetDomContext(this._containerKind);
+    }
+    return new DomContext(null, this._containerKind);
   }
   _initMutationObserver() {
     return new MutationObserver(() => {
@@ -44098,6 +44262,10 @@ class RemoteView {
 
   store(entity) {
     this._port.ViewStore({data: entity, view: this});
+  }
+
+  remove(entityId) {
+    this._port.ViewRemove({data: entityId, view: this});
   }
 
   clear() {
@@ -46937,7 +47105,7 @@ module.exports = function (iconv) {
 
         // -- Readable -------------------------------------------------------------
         if (iconv.supportsStreams) {
-            var Readable = __webpack_require__(15).Readable;
+            var Readable = __webpack_require__(16).Readable;
 
             original.ReadableSetEncoding = Readable.prototype.setEncoding;
             Readable.prototype.setEncoding = function setEncoding(enc, options) {
@@ -46971,7 +47139,7 @@ module.exports = function (iconv) {
         Buffer.prototype.write = original.BufferWrite;
 
         if (iconv.supportsStreams) {
-            var Readable = __webpack_require__(15).Readable;
+            var Readable = __webpack_require__(16).Readable;
 
             Readable.prototype.setEncoding = original.ReadableSetEncoding;
             delete Readable.prototype.collect;
@@ -47146,7 +47314,7 @@ if (false) {
 
 
 var Buffer = __webpack_require__(0).Buffer,
-    Transform = __webpack_require__(15).Transform;
+    Transform = __webpack_require__(16).Transform;
 
 
 // == Exports ==================================================================
@@ -47657,7 +47825,7 @@ var resolve_url = __webpack_require__(40).resolve;
 var http = __webpack_require__(56);
 var https = __webpack_require__(182);
 var zlib = __webpack_require__(146);
-var stream = __webpack_require__(15);
+var stream = __webpack_require__(16);
 
 var Body = __webpack_require__(60);
 var Response = __webpack_require__(260);
@@ -48136,6 +48304,7 @@ class OuterPEC extends PEC {
     this._apiPort.onViewSet = ({view, data}) => view.set(data);
     this._apiPort.onViewStore = ({view, data}) => view.store(data);
     this._apiPort.onViewClear = ({view}) => view.clear();
+    this._apiPort.onViewRemove = ({view, data}) => view.remove(data);
 
     this._apiPort.onIdle = ({version, relevance}) => {
       if (version == this._idleVersion) {
@@ -48147,9 +48316,8 @@ class OuterPEC extends PEC {
     this._apiPort.onConstructInnerArc = ({callback, particle}) => {
       this._apiPort.ParticleCallback({callback});
     }
-
   }
-  
+
   stop() {
     this._apiPort.Stop();
   }
@@ -48263,7 +48431,7 @@ module.exports = ParticleExecutionContext;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 
 class ConnectionConstraint {
   constructor(from, fromConnection, to, toConnection) {
@@ -48309,7 +48477,7 @@ module.exports = ConnectionConstraint;
 var assert = __webpack_require__(1)
 var SlotConnection = __webpack_require__(266);
 var ViewConnection = __webpack_require__(269);
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 
 class Particle {
   constructor(recipe, name) {
@@ -48558,7 +48726,7 @@ module.exports = Particle;
 // http://polymer.github.io/PATENTS.txt
 
 var assert = __webpack_require__(1);
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 
 class SlotConnection {
   constructor(name, particle) {
@@ -48710,10 +48878,6 @@ class SlotConnection {
       }
       provideRes.push(`${psName} as ${(nameMap && nameMap.get(providedSlot)) || providedSlot}`);
       result.push(provideRes.join(" "));
-
-      providedSlot.viewConnections.forEach(vc => {
-        result.push(`    view ${vc.name}`);
-      });
     });
     return result.join("\n");
   }
@@ -48734,7 +48898,7 @@ module.exports = SlotConnection;
 // http://polymer.github.io/PATENTS.txt
 
 var assert = __webpack_require__(1);
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 
 class Slot {
   constructor(recipe, name) {
@@ -49006,7 +49170,7 @@ module.exports = TypeChecker;
 // http://polymer.github.io/PATENTS.txt
 
 var assert = __webpack_require__(1);
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 
 class ViewConnection {
   constructor(name, particle) {
@@ -49179,7 +49343,7 @@ module.exports = ViewConnection;
 // http://polymer.github.io/PATENTS.txt
 
 var assert = __webpack_require__(1);
-var util = __webpack_require__(17);
+var util = __webpack_require__(12);
 var TypeChecker = __webpack_require__(268);
 
 class View {
@@ -49325,7 +49489,7 @@ class View {
     result.push(`as ${(nameMap && nameMap.get(this)) || this.localName}`);
     if (this.type) {
       result.push('#');
-      result.push(this.type.toString());
+      result.push(this.type.toPrettyString());
     }
     if (options && options.showUnresolved) {
       let options = {};
@@ -49626,7 +49790,7 @@ module.exports = AddUseViews;
 let {Strategy} = __webpack_require__(7);
 let RecipeWalker = __webpack_require__(11);
 let Recipe = __webpack_require__(6);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 let ViewMapperBase = __webpack_require__(64);
 let Schema = __webpack_require__(21);
 
@@ -49665,7 +49829,7 @@ module.exports = AssignRemoteViews;
 let {Strategy} = __webpack_require__(7);
 let RecipeWalker = __webpack_require__(11);
 let Recipe = __webpack_require__(6);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 let ViewMapperBase = __webpack_require__(64);
 
 let assert = __webpack_require__(1);
@@ -49679,7 +49843,7 @@ class AssignViewsByTagAndType extends ViewMapperBase {
 
   getMappableViews(type, tags) {
     if (tags.length > 0) {
-      return this.arc.findViewsByType(type, {tag: tags[0]});
+      return this.arc.findViewsByType(type, {tags});
     } else {
       return this.arc.findViewsByType(type);
     }
@@ -49703,7 +49867,7 @@ module.exports = AssignViewsByTagAndType;
 let {Strategy} = __webpack_require__(7);
 let Recipe = __webpack_require__(6);
 let RecipeWalker = __webpack_require__(11);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 
 class ConvertConstraintsToConnections extends Strategy {
   constructor(arc) {
@@ -49797,7 +49961,7 @@ module.exports = ConvertConstraintsToConnections;
 let {Strategy} = __webpack_require__(7);
 let RecipeWalker = __webpack_require__(11);
 let Recipe = __webpack_require__(6);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 let ViewMapperBase = __webpack_require__(64);
 let Schema = __webpack_require__(21);
 
@@ -49812,7 +49976,7 @@ class CopyRemoteViews extends ViewMapperBase {
 
   getMappableViews(type, tags) {
     if (tags.length > 0) {
-      return this._arc.context.findViewsByType(type, {tag: tags[0]});
+      return this._arc.context.findViewsByType(type, {tags});
     } else {
       return this._arc.context.findViewsByType(type);
     }
@@ -49938,7 +50102,7 @@ module.exports = class InitSearch extends Strategy {
 let {Strategy} = __webpack_require__(7);
 let Recipe = __webpack_require__(6);
 let RecipeWalker = __webpack_require__(11);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 
 class MapConsumedSlots extends Strategy {
   async generate(strategizer) {
@@ -50003,7 +50167,7 @@ module.exports = MapConsumedSlots;
 let {Strategy} = __webpack_require__(7);
 let Recipe = __webpack_require__(6);
 let RecipeWalker = __webpack_require__(11);
-let RecipeUtil = __webpack_require__(16);
+let RecipeUtil = __webpack_require__(17);
 
 class MapRemoteSlots extends Strategy {
   constructor(arc) {

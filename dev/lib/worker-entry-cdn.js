@@ -1861,37 +1861,10 @@ function isnan (val) {
   return val !== val // eslint-disable-line no-self-compare
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
 /* 1 */
-/***/ (function(module, exports) {
-
-var g;
-
-// This works in non-strict mode
-g = (function() {
-	return this;
-})();
-
-try {
-	// This works if eval is allowed (see CSP)
-	g = g || Function("return this")() || (1,eval)("this");
-} catch(e) {
-	// This works if the window reference is available
-	if(typeof window === "object")
-		g = window;
-}
-
-// g can still be undefined, but nothing to do about it...
-// We return undefined, instead of nothing here, so it's
-// easier to handle this case. if(!global) { ...}
-
-module.exports = g;
-
-
-/***/ }),
-/* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2386,7 +2359,34 @@ var objectKeys = Object.keys || function (obj) {
   return keys;
 };
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
+
+/***/ }),
+/* 2 */
+/***/ (function(module, exports) {
+
+var g;
+
+// This works in non-strict mode
+g = (function() {
+	return this;
+})();
+
+try {
+	// This works if eval is allowed (see CSP)
+	g = g || Function("return this")() || (1,eval)("this");
+} catch(e) {
+	// This works if the window reference is available
+	if(typeof window === "object")
+		g = window;
+}
+
+// g can still be undefined, but nothing to do about it...
+// We return undefined, instead of nothing here, so it's
+// easier to handle this case. if(!global) { ...}
+
+module.exports = g;
+
 
 /***/ }),
 /* 3 */
@@ -2621,7 +2621,7 @@ if (typeof Object.create === 'function') {
 // http://polymer.github.io/PATENTS.txt
 
 
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 
 let nextVariableId = 0;
 
@@ -2746,8 +2746,15 @@ class Type {
     return Type.newView(this);
   }
 
-  // TODO: rename toString to describe
   toString() {
+    if (this.isView)
+      return `[${this.primitiveType().toString()}]`;
+    if (this.isEntity)
+      return this.entitySchema.name;
+    assert('Add support to serializing type:', type);
+  }
+
+  toPrettyString() {
     if (this.isRelation)
       return JSON.stringify(this.data);
     if (this.isView)
@@ -4076,7 +4083,7 @@ Url.prototype.parseHost = function() {
 // http://polymer.github.io/PATENTS.txt
 
 
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const Symbols = __webpack_require__(15);
 const Type = __webpack_require__(5);
 
@@ -4132,7 +4139,7 @@ module.exports = Entity;
 var runtime = __webpack_require__(45);
 var ParticleSpec = __webpack_require__(27);
 var tracing = __webpack_require__(26);
-var assert = __webpack_require__(2);
+var assert = __webpack_require__(1);
 const Schema = __webpack_require__(28);
 
 const DEBUGGING = false;
@@ -5549,7 +5556,7 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(76).setImmediate, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(76).setImmediate, __webpack_require__(2)))
 
 /***/ }),
 /* 20 */
@@ -5702,7 +5709,7 @@ http.METHODS = [
 	'UNLOCK',
 	'UNSUBSCRIBE'
 ]
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
 /* 22 */
@@ -6295,7 +6302,7 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2), __webpack_require__(3)))
 
 /***/ }),
 /* 23 */
@@ -6569,7 +6576,7 @@ Body.prototype._clone = function(instance) {
 // expose Promise
 Body.Promise = global.Promise;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(2)))
 
 /***/ }),
 /* 25 */
@@ -6965,7 +6972,7 @@ function init() {
 
 init();
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2), __webpack_require__(3)))
 
 /***/ }),
 /* 27 */
@@ -6986,7 +6993,7 @@ init();
 const runtime = __webpack_require__(45);
 const {ParticleDescription, ConnectionDescription} = __webpack_require__(88);
 const Type = __webpack_require__(5);
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 
 class ConnectionSpec {
   constructor(rawData, typeVarMap) {
@@ -7108,6 +7115,33 @@ class ParticleSpec {
       assert(d == "pattern" || this.connectionMap.has(d), `Unexpected description for ${d}`);
     });
   }
+
+  toString() {
+    let results = [];
+    results.push(`particle ${this.name} in '${this.implFile}'`);
+    let connRes = this.connections.map(cs => `${cs.direction} ${cs.type.toString()} ${cs.name}`);
+    results.push(`  ${this.primaryVerb}(${connRes.join(', ')})`);
+    this.affordance.filter(a => a != 'mock').forEach(a => results.push(`  affordance ${a}`));
+    // TODO: support form factors
+    this.slots.forEach(s => {
+    results.push(`  ${s.isRequired ? 'must ' : ''}consume ${s.isSet ? 'set of ' : ''}${s.name}`);
+      s.providedSlots.forEach(ps => {
+        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`)
+        // TODO: support form factors
+        ps.views.forEach(psv => results.push(`      view ${psv}`))
+      });
+    });
+    // Description
+    if (this.description.hasPattern()) {
+      results.push(`  description \`${this.description.pattern}\``);
+      this.connections.forEach(cs => {
+        if (cs.description.hasPattern()) {
+          results.push(`    ${cs.name} \`${cs.description.pattern}\``);
+        }
+      });
+    }
+    return results.join('\n');
+  }
 }
 
 module.exports = ParticleSpec;
@@ -7128,7 +7162,7 @@ module.exports = ParticleSpec;
  */
 
 const Entity = __webpack_require__(13);
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const Type = __webpack_require__(5);
 
 class Schema {
@@ -7238,6 +7272,25 @@ class Schema {
       });
     }
     return clazz;
+  }
+
+  toString() {
+    let results = [];
+    results.push(`schema ${this.name}`.concat(this.parent ? ` extends ${this.parent.name}` : ''));
+
+    let propertiesToString = (properties, keyword) => {
+      if (Object.keys(properties).length > 0) {
+        results.push(`  ${keyword}`);
+        Object.keys(properties).forEach(name => {
+          let schemaType = Array.isArray(properties[name]) && properties[name].length > 1 ? `(${properties[name].join(' or ')})` : properties[name];
+          results.push(`    ${schemaType} ${name}`);
+        });
+      }
+    }
+
+    propertiesToString(this.normative, 'normative');
+    propertiesToString(this.optional, 'optional');
+    return results.join('\n');
   }
 }
 
@@ -7669,7 +7722,7 @@ util.inherits = __webpack_require__(4);
 /*</replacement>*/
 
 /*<replacement>*/
-var debugUtil = __webpack_require__(121);
+var debugUtil = __webpack_require__(122);
 var debug = void 0;
 if (debugUtil && debugUtil.debuglog) {
   debug = debugUtil.debuglog('stream');
@@ -8605,7 +8658,7 @@ function indexOf(xs, x) {
   }
   return -1;
 }
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2), __webpack_require__(3)))
 
 /***/ }),
 /* 35 */
@@ -8993,7 +9046,7 @@ function isFunction (value) {
 
 xhr = null // Help gc
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
 /* 40 */
@@ -9211,7 +9264,7 @@ __webpack_require__(22).inherits(FetchError, Error);
 // http://polymer.github.io/PATENTS.txt
 
 
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const Entity = __webpack_require__(13);
 const Type = __webpack_require__(5);
 const Symbols = __webpack_require__(15);
@@ -9250,7 +9303,7 @@ module.exports = Relation;
  */
 
 
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const view = __webpack_require__(46);
 const Symbols = __webpack_require__(15);
 const Entity = __webpack_require__(13);
@@ -9298,9 +9351,10 @@ Object.assign(exports, {
 // http://polymer.github.io/PATENTS.txt
 
 
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const tracing = __webpack_require__(26);
-const scheduler = __webpack_require__(119);
+const scheduler = __webpack_require__(120);
+const util = __webpack_require__(119);
 
 class ViewBase {
   constructor(type, arc, name, id) {
@@ -9311,6 +9365,7 @@ class ViewBase {
     this.name = name;
     this._version = 0;
     this.id = id || this._arc.generateID();
+    this.source = null;
     trace.end();
   }
 
@@ -9349,6 +9404,38 @@ class ViewBase {
 
     callTrace.end();
   }
+
+  _compareTo(other) {
+    let cmp;
+    if ((cmp = util.compareStrings(this.name, other.name)) != 0) return cmp;
+    if ((cmp = util.compareNumbers(this._version, other._version)) != 0) return cmp;
+    if ((cmp = util.compareStrings(this.source, other.source)) != 0) return cmp;
+    if ((cmp = util.compareStrings(this.id, other.id)) != 0) return cmp;
+    return 0;
+  }
+
+  toString(viewTags) {
+    let results = [];
+    let viewStr = [];
+    viewStr.push(`view`);
+    if (this.name) {
+      viewStr.push(`${this.name}`);
+    }
+    viewStr.push(`of ${this.type.toString()}`);
+    if (this.id) {
+      viewStr.push(`'${this.id}'`);
+    }
+    if (viewTags && viewTags.length) {
+      viewStr.push(`${[...viewTags].join(' ')}`);
+    }
+    if (this.source) {
+      viewStr.push(`in '${this.source}'`);
+    }
+    results.push(viewStr.join(' '));
+    if (this.description)
+      results.push(`  description \`${this.description}\``)
+    return results.join('\n');
+  }
 }
 
 class View extends ViewBase {
@@ -9364,6 +9451,8 @@ class View extends ViewBase {
   }
 
   cloneFrom(view) {
+    this.name = view.name;
+    this.source = view.source;
     this._items = new Map(view._items);
     this._version = view._version;
     this.description = view.description;
@@ -9588,9 +9677,9 @@ module.exports = class BrowserLoader extends Loader {
 
 
 const Type = __webpack_require__(5);
-const viewlet = __webpack_require__(120);
+const viewlet = __webpack_require__(121);
 const define = __webpack_require__(14).define;
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const PECInnerPort = __webpack_require__(86).PECInnerPort;
 const ParticleSpec = __webpack_require__(27);
 const Schema = __webpack_require__(28);
@@ -9635,6 +9724,10 @@ class RemoteView {
 
   store(entity) {
     this._port.ViewStore({data: entity, view: this});
+  }
+
+  remove(entityId) {
+    this._port.ViewRemove({data: entityId, view: this});
   }
 
   clear() {
@@ -9828,7 +9921,7 @@ class InnerPEC {
 
 module.exports = InnerPEC;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
 /* 49 */
@@ -9848,12 +9941,12 @@ module.exports = InnerPEC;
 const InnerPec = __webpack_require__(48);
 const Loader = __webpack_require__(47);
 
-const preamble = [`%cworker-entry`, `background: #12005e; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
+const log = console.log.bind(console, `%cworker-entry`, `background: #12005e; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`);
 
 self.onmessage = function(e) {
   self.onmessage = null;
   let {id, base} = e.data;
-  console.log(...preamble, 'starting worker', id);
+  log(...preamble, 'starting worker', id);
   new InnerPec(e.ports[0], id, new Loader(base));
 };
 
@@ -10251,7 +10344,7 @@ var Transform = __webpack_require__(38);
 
 var binding = __webpack_require__(51);
 var util = __webpack_require__(22);
-var assert = __webpack_require__(2).ok;
+var assert = __webpack_require__(1).ok;
 
 // zlib doesn't provide these, so kludge them in following the same
 // const naming scheme zlib uses.
@@ -16947,7 +17040,7 @@ module.exports = ZStream;
 
 }(this));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(83)(module), __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(83)(module), __webpack_require__(2)))
 
 /***/ }),
 /* 65 */
@@ -17488,7 +17581,7 @@ module.exports = __webpack_require__(19);
     attachTo.clearImmediate = clearImmediate;
 }(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2), __webpack_require__(3)))
 
 /***/ }),
 /* 74 */
@@ -17801,7 +17894,7 @@ var unsafeHeaders = [
 	'via'
 ]
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(1), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(2), __webpack_require__(3)))
 
 /***/ }),
 /* 75 */
@@ -17990,7 +18083,7 @@ IncomingMessage.prototype._onXHRProgress = function () {
 	}
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(0).Buffer, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(0).Buffer, __webpack_require__(2)))
 
 /***/ }),
 /* 76 */
@@ -18179,7 +18272,7 @@ function config (name) {
   return String(val).toLowerCase() === 'true';
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
 /* 80 */
@@ -18527,7 +18620,7 @@ module.exports = JsonldToManifest;
  */
 
 
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const ParticleSpec = __webpack_require__(27);
 
 class ThingMapper {
@@ -18578,12 +18671,12 @@ class ThingMapper {
   }
 
   identifierForThing(thing) {
-    assert(this._reverseIdMap.has(thing));
+    assert(this._reverseIdMap.has(thing), `Missing thing ${thing}`);
     return this._reverseIdMap.get(thing);
   }
 
   thingForIdentifier(id) {
-    assert(this._idMap.has(id));
+    assert(this._idMap.has(id), `Missing id: ${id}`);
     return this._idMap.get(id);
   }
 }
@@ -18763,6 +18856,7 @@ class PECOuterPort extends APIPort {
     this.registerHandler("ViewToList", {view: this.Mapped, callback: this.Direct});
     this.registerHandler("ViewSet", {view: this.Mapped, data: this.Direct});
     this.registerHandler("ViewStore", {view: this.Mapped, data: this.Direct});
+    this.registerHandler("ViewRemove", {view: this.Mapped, data: this.Direct});
     this.registerHandler("ViewClear", {view: this.Mapped});
     this.registerHandler("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
@@ -18797,6 +18891,7 @@ class PECInnerPort extends APIPort {
     this.registerCall("ViewToList", {view: this.Mapped, callback: this.LocalMapped});
     this.registerCall("ViewSet", {view: this.Mapped, data: this.Direct});
     this.registerCall("ViewStore", {view: this.Mapped, data: this.Direct});
+    this.registerCall("ViewRemove", {view: this.Mapped, data: this.Direct});
     this.registerCall("ViewClear", {view: this.Mapped});
     this.registerCall("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
@@ -18936,7 +19031,7 @@ module.exports = XenStaterMixin;
  */
 
 
-var assert = __webpack_require__(2);
+var assert = __webpack_require__(1);
 var Type = __webpack_require__(5);
 
 function getSuggestion(recipe, arc, relevance) {
@@ -19020,6 +19115,7 @@ class Description {
     this._tokens = [];
     this._initTokens(this._pattern);
   }
+  get pattern() { return this._pattern; }
   hasPattern() {
     return this._tokens.length > 0;
   }
@@ -19078,7 +19174,7 @@ class ValueToken {
     let view = options.findViewById(viewConnection.view.id);
     if (this._useType) {  // view type
       // Use view type (eg "Products list")
-      result.push(viewConnection.type.toString().toLowerCase());
+      result.push(viewConnection.type.toPrettyString().toLowerCase());
     } else if (this._values) {  // view values
       // Use view values (eg "How to draw book, Hockey stick")
       result.push(this._formatViewValue(view));
@@ -19120,7 +19216,7 @@ class ValueToken {
         result.push(chosenConnectionSpec.description._tokens.map(token => token.toString(options, chosenConnection.particle)).join(""));
       } else {
         // Add the connection type.
-        result.push(chosenConnection.type.toString().toLowerCase());
+        result.push(chosenConnection.type.toPrettyString().toLowerCase());
       }
 
       if (options.includeViewValues !== false) {
@@ -19244,7 +19340,7 @@ Object.assign(module.exports, {
 // http://polymer.github.io/PATENTS.txt
 
 
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 const Type = __webpack_require__(5);
 
 // TODO: relation identifier should incorporate key/value identifiers
@@ -19283,7 +19379,7 @@ module.exports = Identifier;
 
 
 var fs = __webpack_require__(17);
-var assert = __webpack_require__(2);
+var assert = __webpack_require__(1);
 const particle = __webpack_require__(14);
 const DomParticle = __webpack_require__(40);
 const vm = __webpack_require__(82);
@@ -19362,7 +19458,7 @@ class Loader {
 
 module.exports = Loader;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ }),
 /* 91 */
@@ -22925,7 +23021,7 @@ Fetch.Response = Response;
 Fetch.Headers = Headers;
 Fetch.Request = Request;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(1)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(2)))
 
 /***/ }),
 /* 116 */
@@ -23091,6 +23187,68 @@ module.exports = parseArgs(process.argv.slice(2));
 /* 119 */
 /***/ (function(module, exports, __webpack_require__) {
 
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+var assert = __webpack_require__(1);
+
+function compareNulls(o1, o2) {
+  if (o1 == o2) return 0;
+  if (o1 == null) return -1;
+  return 1;
+}
+function compareStrings(s1, s2) {
+  if (s1 == null || s2 == null) return compareNulls(s1, s2);
+  return s1.localeCompare(s2);
+}
+function compareNumbers(n1, n2) {
+  if (n1 == null || n2 == null) return compareNulls(n1, n2);
+  return n1 - n2;
+}
+function compareBools(b1, b2) {
+  if (b1 == null || b2 == null) return compareNulls(b1, b2);
+  return b1 - b2;
+}
+function compareArrays(a1, a2, compare) {
+  assert(a1 != null);
+  assert(a2 != null);
+  if (a1.length != a2.length) return compareNumbers(a1.length, a2.length);
+  for (let i = 0; i < a1.length; i++) {
+    let result;
+    if ((result = compare(a1[i], a2[i])) != 0) return result;
+  }
+  return 0;
+}
+function compareObjects(o1, o2, compare) {
+  let keys = Object.keys(o1);
+  let result;
+  if ((result = compareNumbers(keys.length, Object.keys(o2).length)) != 0) return result;
+  for (let key of keys) {
+    if ((result = compare(o1[key], o2[key])) != 0) return result;
+  }
+  return 0;
+}
+function compareComparables(o1, o2) {
+  if (o1 == null || o2 == null) return compareNulls(o1, o2);
+  return o1._compareTo(o2);
+}
+
+exports.compareNulls = compareNulls;
+exports.compareStrings = compareStrings;
+exports.compareNumbers = compareNumbers;
+exports.compareBools = compareBools;
+exports.compareArrays = compareArrays;
+exports.compareObjects = compareObjects;
+exports.compareComparables = compareComparables;
+
+
+/***/ }),
+/* 120 */
+/***/ (function(module, exports, __webpack_require__) {
+
 "use strict";
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -23102,7 +23260,7 @@ module.exports = parseArgs(process.argv.slice(2));
 
 
 const tracing = __webpack_require__(26);
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 
 class Scheduler {
   constructor() {
@@ -23186,7 +23344,7 @@ module.exports = new Scheduler();
 
 
 /***/ }),
-/* 120 */
+/* 121 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -23206,7 +23364,7 @@ const Relation = __webpack_require__(44);
 const Symbols = __webpack_require__(15);
 const underlyingView = __webpack_require__(46);
 let identifier = Symbols.identifier;
-const assert = __webpack_require__(2);
+const assert = __webpack_require__(1);
 
 // TODO: This won't be needed once runtime is transferred between contexts.
 function cloneData(data) {
@@ -23217,6 +23375,9 @@ function cloneData(data) {
 function restore(entry, entityClass) {
   let {id, rawData} = entry;
   var entity = new entityClass(cloneData(rawData));
+  if (entry.id) {
+    entity.identify(entry.id);
+  }
 
   // TODO some relation magic, somewhere, at some point.
 
@@ -23318,6 +23479,19 @@ class View extends Viewlet {
     var serialization = this._serialize(entity);
     return this._view.store(serialization);
   }
+
+  /** @method remove(entity)
+   * Removes an entity from the View.
+   * throws: Error if this view is not configured as a writeable view (i.e. 'out' or 'inout')
+     in the particle's manifest.
+   */
+  remove(entity) {
+    if (!this.canWrite)
+      throw new Error("View not writeable");
+    var serialization = this._serialize(entity);
+    return this._view.remove(serialization.id);
+  }
+
   async debugString() {
     var list = await this.toList();
     return list ? ('[' + list.map(p => p.debugString).join(", ") + ']') : 'undefined';
@@ -23391,7 +23565,7 @@ module.exports = { viewletFor };
 
 
 /***/ }),
-/* 121 */
+/* 122 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
