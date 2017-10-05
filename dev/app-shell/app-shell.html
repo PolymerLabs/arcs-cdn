@@ -240,6 +240,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._dom.set(state);
       }
     }
+    // TODO(sjmiles): make easier to override
     _configure({urls, manifest}) {
       let appShellPath = AppShell.module.URL.split('/').slice(0, -2).join('/');
       let params = (new URL(document.location)).searchParams;
@@ -254,11 +255,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         shared: params.getAll('shared'),
         search: params.get('search'),
         container: this._dom.$('#particles'),
+        arcsDevTools: localStorage.getItem('arcs-dev-tools'),
         urls
       };
     }
     async _start(config) {
       this._config = config;
+      // UI config
+      if (config.arcsDevTools === 'open') {
+        this.setAttribute('expanded', '');
+      }
       // create a system loader
       this._loader = this._marshalLoader(config);
       // load manifest
@@ -492,6 +498,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onNavClick() {
       // toggles boolean attribute `expanded` on `this`
       Xen.setBoolAttribute(this, 'expanded');
+      localStorage.setItem('arcs-dev-tools', this.hasAttribute('expanded') ? 'open' : 'closed');
     }
     _onCastClick() {
       CastTools.cast();
