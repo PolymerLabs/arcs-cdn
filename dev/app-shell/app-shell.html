@@ -459,15 +459,19 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onUserSelected(e) {
       this._setCurrentUser(e.target.value);
     }
-    _onProfileClick() {
+    async _onProfileClick() {
       this._isProfile = !this._isProfile;
       this._updateProfileStateIcon();
       StorageTools.saveProfileState(this._isProfile);
+      await UserTools.loadUsers();
+      this._setState({users: UserTools.users});
     }
-    _onShareClick() {
+    async _onShareClick() {
       this._shared = !this._shared;
       this._updateSharedStateIcon();
       StorageTools.saveSharedState(this._shared);
+      await UserTools.loadUsers();
+      this._setState({users: UserTools.users});
     }
     _onSearch(e) {
       this.search = e.target.value.toLowerCase();

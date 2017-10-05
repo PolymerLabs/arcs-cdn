@@ -16,8 +16,7 @@ const log = console.log.bind(console, '%cUserTools', userLog);
 UserTools = {
   async init(config, arc, loader) {
     this.usersDb = db.child('users');
-    let users = this.users = await this.usersDb.once('value').then(snap => snap.val());
-    log(`users`, users);
+    let users = await this.loadUsers();
     //
     if (config.user && !this.findUser(config.user)) {
       if (!this.createUser(config.user)) {
@@ -51,6 +50,11 @@ UserTools = {
     this.identityManifest = manifest;
     //
     return users;
+  },
+  async loadUsers() {
+    this.users = await this.usersDb.once('value').then(snap => snap.val());
+    log(`users`, this.users);
+    return this.users;
   },
   findUser(name) {
    return this.users.find(u => u.name == name);
