@@ -55,6 +55,18 @@ StorageTools = {
       SharingTools.newAcceptedSteps(steps);
     });
   },
+  syncDescription(callback) {
+    db.child(`arc/${this._amkey}/metadata/description`).on('value', snap => {
+      let description = snap.val();
+      callback(description.computed, description.user_generated);
+    });
+  },
+  saveComputedDescription(description) {
+    db.child(`arc/${this._amkey}/metadata/description/computed`).set(description);
+  },
+  saveUserGeneratedDescription(description) {
+    db.child(`arc/${this._amkey}/metadata/description/user_generated`).set(description);
+  },
   saveSharedState(shared) {
     let user = UserTools.currentUser;
     if (!user || !this._amkey) {

@@ -137,7 +137,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <!-- header -->
     <app-header>
       <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large</i>
-      <span style="flex: 1;"></span>
+      <span style="flex: 1; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis">&nbsp;<span>{{title}}</span></span>
       <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
         <!--<i class="material-icons">person</i>-->
         <select on-change="_onUserSelected">{{usersOptions}}</select>
@@ -291,9 +291,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({dotsDisabled: true});
       // configure search
       this.search = config.search;
-      // watch for steps, until turned off
-      StorageTools.syncSteps();
-      //this.findSuggestions();
+      if (!config.nokey) {
+        // watch for updates of description
+        StorageTools.syncDescription((computed, userGenerated) => this._onNewDescription(computed, userGenerated));
+        // watch for steps, until turned off
+        StorageTools.syncSteps();
+      } else {
+        this.findSuggestions();
+      }
     }
     _marshalLoader(config) {
       // create default URL map
@@ -389,8 +394,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       StorageTools.syncStorage();
       document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
     }
+    _describeArc() {
+      let combinedSuggestion = Arcs.Description.getSuggestion(this.arc._activeRecipe, this.arc, null);
+      let tags = Object.keys(this.arc._tags);
+      return tags.join(", ") + " – " + combinedSuggestion;
+    }
     addAcceptedStep(plan) {
       SharingTools.addAcceptedStep(plan, this._plans.generations);
+      this._computedDescription = this._describeArc();
+      this._updateTitle();
+      StorageTools.saveComputedDescription(this._computedDescription);
     }
     _onPlanSelected(e) {
       let {plan} = e.detail;
@@ -449,6 +462,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           })
         }
       })
+    }
+    _updateTitle() {
+      this._setState({title: this._userGeneratedDescription || this._computedDescription || '(untitled)'});
+    }
+    _onNewDescription(computed, userGenerated) {
+      this._computedDescription = computed;
+      this._userGeneratedDescription = userGenerated;
+      this._updateTitle();
     }
     async _onPromoteManifest() {
       let remotes = await ManifestTools.publishManifest(this._config);
