@@ -164,6 +164,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <!-- config panel -->
   <app-tools>
     <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
+    <arc-list user="{{user}}" users="{{users}}"></arc-list>
     <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
     <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-manifests-change="_onManifestsChange"></manifest-data>
     <arc-explorer username="{{user}}"></arc-explorer>
