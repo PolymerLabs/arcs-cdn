@@ -16,6 +16,9 @@
   <div>{{sharedArcs}}</div>
   <div banner>Views in Profile Data</div>
   <div style="padding: 8px;">{{profiles}}</div>
+  <br>
+  <div banner>Danger Zone</div>
+  <div style="padding:8px;"><button on-click="_onPrivatize">Global Privatize (remove all shares)</button></div>
   <hr>
   <!--<button on-click="dumpDb">Dump Database</button>-->
   <data-explorer style="font-size: 0.6em;" object="{{data}}"></data-explorer>
@@ -49,12 +52,10 @@
     }
     _queryProfileArcs(profiles) {
       // get a map of async function invocations,
-      // when all functions complete, update profiles state
+      // when all functions complete, update state
       Promise.all(this._arcPromises(profiles)).then(profiles => this._setState({profiles}));
     }
     _querySharedArcs(shared) {
-      // get a map of async function invocations,
-      // when all functions complete, update profiles state
       Promise.all(this._arcPromises(shared)).then(shared => this._setState({shared}));
     }
     _arcPromises(keys) {
@@ -92,28 +93,14 @@
         });
       });
       return result;
-/*
-      let view_t = ArcExplorer.module.querySelector('template[view]');
-      let list = (template, models) => { return {template,models}; };
-      return profiles && profiles.map(({key, data}) => {
-        let views = data.views;
-        Object.keys(views || {}).forEach(name => {
-          let view = views[name];
-          if (view.metadata) {
-            view.metadata.type = '<redacted>';
-          }
-        });
-        return {
-          data: views,
-          views: list(view_t, Object.keys(views || {}).map(name => { return { name } }))
-        };
-      });
-*/
     }
     dumpDb() {
       db.child('arcs').once('value').then(s => {
         this._setState({data: s.val()});
       });
+    }
+    _onPrivatize(e) {
+      UserTools.privatize();
     }
   }
   ArcExplorer.module = document.currentScript.ownerDocument;
