@@ -200,27 +200,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   const log = console.log.bind(console, ...logPre);
 
   class AppShell extends HTMLElement {
-    constructor() {
-      super();
-      this._initHotKeys();
-    }
-    _initHotKeys() {
-      addEventListener('keydown', e => {
-        if (e.ctrlKey && this.arc && !{input:1, textArea:1}[e.target.localName] && this.hotkey(e.key, e)) {
-          e.preventDefault();
-        }
-      });
-    }
-    hotkey(key, e) {
-      switch(key) {
-        case 's':
-          this.findSuggestions();
-          break;
-        default:
-          return false;
-      }
-      return true;
-    }
     get template() {
       return AppShell.module.querySelector('template');
     }
@@ -228,6 +207,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!this._mounted) {
         this._mounted = true;
         this.setAttribute('app-shell', '');
+        this._initHotKeys();
         this._dom = Xen.stamp(this.template).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
         try {
@@ -245,6 +225,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           throw x;
         }
       }
+    }
+    _initHotKeys() {
+      addEventListener('keydown', e => {
+        if (e.ctrlKey && this.arc && !{input:1, textArea:1}[e.target.localName] && this.hotkey(e.key, e)) {
+          e.preventDefault();
+        }
+      });
+    }
+    hotkey(key, e) {
+      switch(key) {
+        case 's':
+          this.findSuggestions();
+          break;
+        default:
+          return false;
+      }
+      return true;
     }
     get search() {
       return this._search;
