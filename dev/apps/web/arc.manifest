@@ -3,8 +3,8 @@
 import '../../../../arc-stories/0.2/People/People.recipes'
 import '../../../../arc-stories/0.2/Messages/Messages.recipes'
 import '../../../../arc-stories/0.2/Accounts/Accounts.recipes'
-#import '../../../../arc-stories/0.2/Identity/recipes.manifest'
-#import '../../../../arc-stories/0.2/Restaurants/recipes.manifest'
+import '../../../../arc-stories/0.2/Restaurants/Restaurants.recipes'
+import '../../../../arc-stories/0.2/Identity/Identity.recipes'
 
 #import 'https://noelutz.github.io/arcs-stories/artifacts/Chat/Chat.manifest'
 #import '../../../arc-stories/artifacts/Restaurants/recipes.manifest'
