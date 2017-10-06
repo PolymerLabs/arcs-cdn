@@ -1,0 +1,133 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<template>
+    <style>
+      arc-list {
+        display: block;
+        padding-bottom: 8px;
+      }
+      arc-list [banner] {
+        padding: 6px 4px;
+        background-color: whitesmoke;
+        margin-bottom: 8px;
+        border-top: 1px dotted silver;
+      }
+      arc-list [banner2] {
+        margin-top: 8px;
+        padding: 4px 4px;
+        background-color: #f1f1f1;
+        font-size: 0.7em;
+        border-top: 1px dotted silver;
+      }
+      arc-list [editor] {
+        display: flex;
+        align-items: center;
+        padding: 4px 8px;
+      }
+      arc-list [label] {
+        width: 64px;
+        font-size: 0.8em;
+        text-align: right;
+        vertical-align: middle;
+        margin-right: 8px;
+      }
+      arc-list [editor] input {
+        flex: 1;
+        margin-right: 8px;
+        padding: 4px;
+      }
+      arc-list i {
+        margin: 0 4px;
+      }
+    </style>
+    <div banner>My Arcs</div>
+    <div banner2>Profile</div>
+    <div>{{profile}}</div>
+    <div banner2>Shared</div>
+    <div>{{shared}}</div>
+    <div banner2>Recent</div>
+    <div>{{recent}}</div>
+  </template>
+  
+  <template arc-list-item>
+    <div style="padding: 8px 0; border-top: 1px dotted silver;" style%="{{style}}">
+      <a on-click="_onOpenArc">{{amkey}}</a>
+    </div>
+  </template>
+  
+  <script>
+    class ArcList extends HTMLElement {
+      connectedCallback() {
+        this.text = '';
+        this._dom = Xen.stamp(ArcList.module.querySelector('template')).events(this).appendTo(this);
+      }
+      set user(user) {
+        this._user = user;
+        this._dom.set({user});
+        this._update();
+      }
+      set users(users) {
+        this._users = users;
+        this._update();
+      }
+      _update() {
+        if (this._user) {
+          this._userData = UserTools.findUser(this._user);
+          if (this._userData) {
+            this._render();
+          }
+        }
+      }
+      _render() {
+        let profileArcs = Object.keys(this._userData.profile || {});
+        let sharedArcs = Object.keys(this._userData.shared || {});
+        let recentArcs = [];
+        let makeModel = (amkey) => {
+          return {
+            key: amkey,
+            amkey,
+          };
+        };
+        let item_template = ArcList.module.querySelector('[arc-list-item]');
+        this._dom.set({
+          profile: {
+            template: item_template,
+            models: profileArcs.map(name => makeModel(name))
+          },
+          shared: {
+            template: item_template,
+            models: sharedArcs.map(name => makeModel(name))
+          },
+          recent: {
+            template: item_template,
+            models: recentArcs.map(name => makeModel(name))
+          },
+        });
+      }
+      _onCheckInput(e) {
+        if (this._userData) {
+          let {key, checked} = e.currentTarget;
+          let friends = (this._userData.friends || '').split(',');
+          friends = checked ? friends.concat([key]) : friends.filter(f => f != key);
+          friends = friends.filter(name => name != '');
+          this._userData.friends = friends.join(',');
+          this._render();
+          this.dispatchEvent(new CustomEvent('data-changed'));
+        }
+      }
+      _onPrivatize(e) {
+        UserTools.privatize();
+      }
+    }
+    ArcList.module = document.currentScript.ownerDocument;
+    customElements.define('arc-list', ArcList);
+  </script>
+  

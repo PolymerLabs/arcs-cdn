@@ -55,21 +55,35 @@ StorageTools = {
       SharingTools.newAcceptedSteps(steps);
     });
   },
+  syncDescription(callback) {
+    db.child(`arc/${this._amkey}/metadata/description`).on('value', snap => {
+      let description = snap.val();
+      callback(description.computed, description.user_generated);
+    });
+  },
+  saveComputedDescription(description) {
+    db.child(`arc/${this._amkey}/metadata/description/computed`).set(description);
+  },
+  saveUserGeneratedDescription(description) {
+    db.child(`arc/${this._amkey}/metadata/description/user_generated`).set(description);
+  },
   saveSharedState(shared) {
     let user = UserTools.currentUser;
     if (!user || !this._amkey) {
       warn("attempt to save shared state without selected user failed");
       return;
     }
-    UserTools.userDb(user).child(`shared/${this._amkey}`).set({
-      shared,
-      when: Date.now()
-    });
+    let node = UserTools.userDb(user).child(`shared/${this._amkey}`);
+    if (shared) {
+      node.set({when: Date.now()});
+    } else {
+      node.remove();
+    }
   },
   saveProfileState(profile) {
     let user = UserTools.currentUser;
     if (!user || !this._amkey) {
-      warn("attempt to save shared state without selected user failed");
+      warn("attempt to save profile arc without selected user failed");
       return;
     }
     let node = UserTools.userDb(user).child(`profile/${this._amkey}`);
@@ -78,6 +92,23 @@ StorageTools = {
     } else {
       node.remove();
     }
+  },
+  _userDataForCurrentUser() {
+    let user = UserTools.currentUser;
+    if (!user) return null;
+
+    let userData = UserTools.findUser(user);
+    if (!userData) return null;
+
+    return userData;
+  },
+  loadSharedState() {
+    let userData = this._userDataForCurrentUser();
+    return !!Object.keys(userData && userData.shared || {}).includes(this._amkey);
+  },
+  loadProfileState() {
+    let userData = this._userDataForCurrentUser();
+    return !!Object.keys(userData && userData.profile || {}).includes(this._amkey);
   }
 };
 

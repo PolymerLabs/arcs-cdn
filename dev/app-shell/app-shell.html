@@ -137,7 +137,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <!-- header -->
     <app-header>
       <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large</i>
-      <span style="flex: 1;"></span>
+      <span style="flex: 1; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis">&nbsp;<span>{{title}}</span></span>
       <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
         <!--<i class="material-icons">person</i>-->
         <select on-change="_onUserSelected">{{usersOptions}}</select>
@@ -164,6 +164,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <!-- config panel -->
   <app-tools>
     <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
+    <arc-list user="{{user}}" users="{{users}}"></arc-list>
     <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
     <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-manifests-change="_onManifestsChange"></manifest-data>
     <arc-explorer username="{{user}}"></arc-explorer>
@@ -239,6 +240,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._dom.set(state);
       }
     }
+    // TODO(sjmiles): make easier to override
     _configure({urls, manifest}) {
       let appShellPath = AppShell.module.URL.split('/').slice(0, -2).join('/');
       let params = (new URL(document.location)).searchParams;
@@ -253,11 +255,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         shared: params.getAll('shared'),
         search: params.get('search'),
         container: this._dom.$('#particles'),
+        arcsDevTools: localStorage.getItem('arcs-dev-tools'),
         urls
       };
     }
     async _start(config) {
       this._config = config;
+      // UI config
+      if (config.arcsDevTools === 'open') {
+        this.setAttribute('expanded', '');
+      }
       // create a system loader
       this._loader = this._marshalLoader(config);
       // load manifest
@@ -290,9 +297,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({dotsDisabled: true});
       // configure search
       this.search = config.search;
-      // watch for steps, until turned off
-      StorageTools.syncSteps();
-      //this.findSuggestions();
+      if (!config.nokey) {
+        // watch for updates of description
+        StorageTools.syncDescription((computed, userGenerated) => this._onNewDescription(computed, userGenerated));
+        // watch for steps, until turned off
+        StorageTools.syncSteps();
+      } else {
+        this.findSuggestions();
+      }
     }
     _marshalLoader(config) {
       // create default URL map
@@ -314,6 +326,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         //Arcs.utils.setUrlParam('user', user);
       }
       // update ui
+      this._shared = StorageTools.loadSharedState();
+      this._isProfile = StorageTools.loadProfileState();
       this._updateUserSelectWidget();
       this._updateSharedStateIcon();
       this._updateProfileStateIcon();
@@ -322,9 +336,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.watchSharedArcs();
     }
     async loadManifest() {
-      let {manifest, manifests, remotes, exclusions} = await ManifestTools.loadManifest(this._config, this._loader);
-      this._setState({remotes, exclusions});
-      return manifest;
+      let manifests = await this._fetchManifestList();
+      return await ManifestTools.loadManifest(this._config, this._loader, manifests);
+    }
+    async _fetchManifestList() {
+      let manifests = await ManifestTools.fetchManifestList();
+      this._setState({
+        remotes: manifests.remotes,
+        exclusions: manifests.exclusions
+      });
+      return manifests;
     }
     watchSharedArcs() {
       if (!this._config.nokey) {
@@ -379,8 +400,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       StorageTools.syncStorage();
       document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
     }
+    _describeArc() {
+      let combinedSuggestion = Arcs.Description.getSuggestion(this.arc._activeRecipe, this.arc, null);
+      let tags = Object.keys(this.arc._tags);
+      return tags.join(", ") + " – " + combinedSuggestion;
+    }
     addAcceptedStep(plan) {
       SharingTools.addAcceptedStep(plan, this._plans.generations);
+      this._computedDescription = this._describeArc();
+      this._updateTitle();
+      StorageTools.saveComputedDescription(this._computedDescription);
     }
     _onPlanSelected(e) {
       let {plan} = e.detail;
@@ -417,7 +446,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this.findSuggestions();
     }
     _updateSharedStateIcon() {
-      let icon = !UserTools.currentUser ? '' : this._shared ? "supervisor_account" : "lock_outline";
+      let icon = !UserTools.currentUser ? '' : this._shared ? "supervisor_account" : "link";
       this._setState({sharedStateIcon: icon});
     }
     _updateProfileStateIcon() {
@@ -439,6 +468,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           })
         }
       })
+    }
+    _updateTitle() {
+      this._setState({title: this._userGeneratedDescription || this._computedDescription || '(untitled)'});
+    }
+    _onNewDescription(computed, userGenerated) {
+      this._computedDescription = computed;
+      this._userGeneratedDescription = userGenerated;
+      this._updateTitle();
     }
     async _onPromoteManifest() {
       let remotes = await ManifestTools.publishManifest(this._config);
@@ -482,6 +519,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onNavClick() {
       // toggles boolean attribute `expanded` on `this`
       Xen.setBoolAttribute(this, 'expanded');
+      localStorage.setItem('arcs-dev-tools', this.hasAttribute('expanded') ? 'open' : 'closed');
     }
     _onCastClick() {
       CastTools.cast();
