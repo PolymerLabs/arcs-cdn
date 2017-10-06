@@ -34,6 +34,7 @@ SharingTools = {
     this._appliedSteps = {};
   },
   watchSharedArcs() {
+    if (!this._shell) return;
     StorageTools.shared.unwatchAll();
     let user = UserTools.findUser(UserTools.currentUser);
     if (user) {
@@ -89,6 +90,7 @@ SharingTools = {
     }
   },
   addAcceptedStep(plan, generations) {
+    if (!this._shell) return;
     let step = this._createOriginatingStep(plan, generations);
     log("addAcceptedStep", step);
     this._steps = this._steps || [];
@@ -97,6 +99,7 @@ SharingTools = {
     StorageTools.syncAcceptedSteps(this._steps);
   },
   async newAcceptedSteps(steps) {
+    if (!this._shell) return;
     // Assume same length means we just get our own latest state
     if (steps && (!this._steps || steps.length !== this._steps.length)) {
       log('newAcceptedSteps', steps);
@@ -106,7 +109,7 @@ SharingTools = {
     this._shell.stepsChanged();
   },
   applyAcceptedSteps(plans) {
-    if (!this._steps || !plans) return;
+    if (!this._steps || !plans || !this._shell) return;
     if (!this._appliedSteps) this._appliedSteps = {};
     plans.forEach(suggestion => {
       let step = this._createOriginatingStep(suggestion.plan, plans.generations);
