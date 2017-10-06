@@ -266,7 +266,7 @@ let _setSubTemplate = function(node, value, controller) {
     template = container.querySelector(`template[${value.$template}]`);
   }
   node.textContent = '';
-  if (template) {
+  if (template && value.models) {
     for (let m of value.models) {
       stamp(template).events(controller).set(m).appendTo(node);
     }
