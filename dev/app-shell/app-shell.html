@@ -512,7 +512,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._editingTitle = true;
       this._setState({titleText: this._userGeneratedDescription || this._computedDescription || ""});
       this._updateTitle();
-      let inputElement = this.querySelector(`input[arc-title-edit]`);
+      let inputElement = e.currentTarget.nextElementSibling;
       inputElement.select();
       window.setTimeout(() => inputElement.focus(), 50);
     }
