@@ -35,41 +35,54 @@ StorageTools = {
     // Store the manifest file path for the Arc to test out metadata storage
     storage.store('manifest', {url: new URL(config.manifestPath, location.href).href});
   },
+  get initialized() {
+    return this._amkey !== undefined;
+  },
   syncStorage() {
-    if (this._amkey) {
+    if (this.initialized) {
       //if (!config.nosync) {
       // If sync is enabled, sync views after a new plan was incorporated to the Arc
       this.storage.sync({key: this._amkey});
     }
   },
   syncAcceptedSteps(steps) {
-    if (this._amkey) {
+    if (this.initialized) {
       this.storage.store("accepted_steps", steps);
     }
   },
   syncSteps() {
-    log('syncSteps', `arcs/${this._amkey}/metadata/accepted_steps`);
-    db.child(`arcs/${this._amkey}/metadata/accepted_steps`).on('value', snap => {
-      let steps = snap.val();
-      log('accepted_steps changed', steps);
-      SharingTools.newAcceptedSteps(steps);
-    });
+    if (this.initialized) {
+      log('syncSteps', `arcs/${this._amkey}/metadata/accepted_steps`);
+      db.child(`arcs/${this._amkey}/metadata/accepted_steps`).on('value', snap => {
+        let steps = snap.val();
+        log('accepted_steps changed', steps);
+        SharingTools.newAcceptedSteps(steps);
+      });
+    }
   },
   syncDescription(callback) {
-    db.child(`arc/${this._amkey}/metadata/description`).on('value', snap => {
-      let description = snap.val();
-      callback(description.computed, description.user_generated);
-    });
+    if (this.initialized) {
+      db.child(`arc/${this._amkey}/metadata/description`).on('value', snap => {
+        let description = snap.val();
+        if (description) {
+          callback(description.computed, description.user_generated);
+        }
+      });
+    }
   },
   saveComputedDescription(description) {
-    db.child(`arc/${this._amkey}/metadata/description/computed`).set(description);
+    if (this.initialized) {
+      db.child(`arc/${this._amkey}/metadata/description/computed`).set(description);
+    }
   },
   saveUserGeneratedDescription(description) {
-    db.child(`arc/${this._amkey}/metadata/description/user_generated`).set(description);
+    if (this.initialized) {
+      db.child(`arc/${this._amkey}/metadata/description/user_generated`).set(description);
+    }
   },
   saveSharedState(shared) {
     let user = UserTools.currentUser;
-    if (!user || !this._amkey) {
+    if (!user || !this.initialized) {
       warn("attempt to save shared state without selected user failed");
       return;
     }
@@ -82,7 +95,7 @@ StorageTools = {
   },
   saveProfileState(profile) {
     let user = UserTools.currentUser;
-    if (!user || !this._amkey) {
+    if (!user || !this.initialized) {
       warn("attempt to save profile arc without selected user failed");
       return;
     }

@@ -4987,10 +4987,10 @@ module.exports = Entity;
 
 
 var runtime = __webpack_require__(58);
-var ParticleSpec = __webpack_require__(31);
-var tracing = __webpack_require__(30);
+var ParticleSpec = __webpack_require__(30);
+var tracing = __webpack_require__(32);
 var assert = __webpack_require__(4);
-const Schema = __webpack_require__(32);
+const Schema = __webpack_require__(31);
 
 const DEBUGGING = false;
 
@@ -7122,6 +7122,329 @@ Headers.prototype.raw = function() {
 /* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
+"use strict";
+  /**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+
+const runtime = __webpack_require__(58);
+const {ParticleDescription, ConnectionDescription} = __webpack_require__(110);
+const Type = __webpack_require__(8);
+const assert = __webpack_require__(4);
+
+class ConnectionSpec {
+  constructor(rawData, typeVarMap) {
+    this.rawData = rawData;
+    this.direction = rawData.direction;
+    this.name = rawData.name;
+    this.type = rawData.type.assignVariableIds(typeVarMap);
+  }
+
+  get isInput() {
+    return this.direction == "in" || this.direction == "inout";
+  }
+
+  get isOutput() {
+    return this.direction == "out" || this.direction == "inout";
+  }
+}
+
+class SlotSpec {
+  constructor(slotModel) {
+    this.name = slotModel.name;
+    this.isRequired = slotModel.isRequired;
+    this.isSet = slotModel.isSet;
+    this.formFactor = slotModel.formFactor;
+    this.providedSlots = [];
+    slotModel.providedSlots.forEach(ps => {
+      this.providedSlots.push(new ProvidedSlotSpec(ps.name, ps.isSet, ps.formFactor, ps.views));
+    });
+  }
+}
+
+class ProvidedSlotSpec {
+  constructor(name, isSet, formFactor, views) {
+    this.name = name;
+    this.isSet = isSet;
+    this.formFactor = formFactor;
+    this.views = views;
+  }
+}
+
+class ParticleSpec {
+  constructor(model, resolveSchema) {
+    // TODO: This should really happen after parsing, not here.
+    if (model.args)
+      model.args.forEach(arg => arg.type = arg.type.resolveSchemas(resolveSchema));
+    else
+      model.args = [];
+    this._model = model;
+    this.name = model.name;
+    this.verbs = model.verbs;
+    var typeVarMap = new Map();
+    this.connections = model.args.map(a => new ConnectionSpec(a, typeVarMap));
+    this.connectionMap = new Map();
+    this.connections.forEach(a => this.connectionMap.set(a.name, a));
+    this.inputs = this.connections.filter(a => a.isInput);
+    this.outputs = this.connections.filter(a => a.isOutput);
+    this.transient = model.transient;
+
+    // initialize descriptions.
+    model.description = model.description || {};
+    this.validateDescription(model.description);
+    this.description = new ParticleDescription(model.description["pattern"], this);
+    this.connections.forEach(connectionSpec => {
+      connectionSpec.description = new ConnectionDescription(model.description[connectionSpec.name], this, connectionSpec);
+    });
+
+    this.implFile = model.implFile;
+    this.affordance = model.affordance;
+    this.slots = new Map();
+    if (model.slots)
+      model.slots.forEach(s => this.slots.set(s.name, new SlotSpec(s)));
+    // Verify provided slots use valid view connection names.
+    this.slots.forEach(slot => {
+      slot.providedSlots.forEach(ps => {
+        ps.views.forEach(v => assert(this.connectionMap.has(v), "Cannot provide slot for nonexistent view constraint ", v));
+      });
+    });
+  }
+
+  isInput(param) {
+    for (let input of this.inputs) if (input.name == param) return true;
+  }
+
+  isOutput(param) {
+    for (let outputs of this.outputs) if (outputs.name == param) return true;
+  }
+
+  getSlotSpec(slotName) {
+    return this.slots.get(slotName);
+  }
+
+  get primaryVerb() {
+    if (this.verbs.length > 0) {
+      return this.verbs[0];
+    }
+  }
+
+  matchAffordance(affordance) {
+    return this.slots.size <= 0 || this.affordance.includes(affordance);
+  }
+
+  toLiteral() {
+    let {args, name, verbs, transient, description, implFile, affordance, slots} = this._model;
+    args = args.map(a => {
+      let {type, direction, name} = a;
+      type = type.toLiteral();
+      return {type, direction, name};
+    });
+    return {args, name, verbs, transient, description, implFile, affordance, slots};
+  }
+
+  static fromLiteral(literal) {
+    literal.args.forEach(a => a.type = Type.fromLiteral(a.type));
+    return new ParticleSpec(literal, () => assert(false));
+  }
+
+  validateDescription(description) {
+    Object.keys(description || []).forEach(d => {
+      assert(d == "pattern" || this.connectionMap.has(d), `Unexpected description for ${d}`);
+    });
+  }
+
+  toString() {
+    let results = [];
+    results.push(`particle ${this.name} in '${this.implFile}'`);
+    let connRes = this.connections.map(cs => `${cs.direction} ${cs.type.toString()} ${cs.name}`);
+    results.push(`  ${this.primaryVerb}(${connRes.join(', ')})`);
+    this.affordance.filter(a => a != 'mock').forEach(a => results.push(`  affordance ${a}`));
+    // TODO: support form factors
+    this.slots.forEach(s => {
+    results.push(`  ${s.isRequired ? 'must ' : ''}consume ${s.isSet ? 'set of ' : ''}${s.name}`);
+      s.providedSlots.forEach(ps => {
+        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`)
+        // TODO: support form factors
+        ps.views.forEach(psv => results.push(`      view ${psv}`))
+      });
+    });
+    // Description
+    if (this.description.hasPattern()) {
+      results.push(`  description \`${this.description.pattern}\``);
+      this.connections.forEach(cs => {
+        if (cs.description.hasPattern()) {
+          results.push(`    ${cs.name} \`${cs.description.pattern}\``);
+        }
+      });
+    }
+    return results.join('\n');
+  }
+}
+
+module.exports = ParticleSpec;
+
+
+/***/ }),
+/* 31 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+const Entity = __webpack_require__(17);
+const assert = __webpack_require__(4);
+const Type = __webpack_require__(8);
+
+class Schema {
+  constructor(model) {
+    this._model = model;
+    this.name = model.name;
+    this.parent = model.parent ? new Schema(model.parent) : null;
+    this._normative = {};
+    this._optional = {};
+    assert(model.sections);
+    for (var section of model.sections) {
+      var into = section.sectionType == 'normative' ? this._normative : this._optional;
+      for (var field in section.fields) {
+        // TODO normalize field types here?
+        into[field] = section.fields[field];
+      }
+    }
+  }
+
+  toLiteral() {
+    return this._model;
+  }
+
+  get type() {
+    return Type.newEntity(this.toLiteral());
+  }
+
+  get normative() {
+    var dict = this.parent ? this.parent.normative : {};
+    Object.assign(dict, this._normative);
+    return dict;
+  }
+
+  get optional() {
+    var dict = this.parent ? this.parent.optional : {};
+    Object.assign(dict, this._optional);
+    return dict;
+  }
+
+  entityClass() {
+    let schema = this;
+    const className = this.name;
+    var properties = Object.keys(this.normative).concat(Object.keys(this.optional));
+    var classJunk = ['toJSON', 'prototype', 'toString'];
+
+    var clazz = class extends Entity {
+      constructor(data) {
+        var p = new Proxy(data, {
+          get: (target, name) => {
+            if (classJunk.includes(name))
+              return undefined;
+            if (name.constructor == Symbol)
+              return undefined;
+            if (!properties.includes(name))
+              throw new Error(`Can't access field ${name} not in schema ${className}`);
+            return target[name];
+          },
+          set: (target, name, value) => {
+            if (!properties.includes(name)) {
+              throw new Error(`Can't write field ${name} not in schema ${className}`);
+            }
+            target[name] = value;
+            return true;
+          }
+        });
+        super();
+        this.rawData = p;
+      }
+
+      dataClone() {
+        var clone = {};
+        properties.forEach(prop => clone[prop] = this.rawData[prop]);
+        return clone;
+      }
+
+      static get key() {
+        return {
+          tag: 'entity',
+          schema: schema.toLiteral(),
+        };
+      }
+    }
+
+    Object.defineProperty(clazz, 'type', {value: this.type});
+    Object.defineProperty(clazz, 'name', {value: this.name});
+    for (let property in this.normative) {
+      // TODO: type checking, make a distinction between normative
+      // and optional properties.
+      // TODO: add query / getter functions for user properties
+      Object.defineProperty(clazz.prototype, property, {
+        get: function() {
+          return this.rawData[property];
+        },
+        set: function(v) {
+          this.rawData[property] = v;
+        }
+      });
+    }
+    for (let property in this.optional) {
+      Object.defineProperty(clazz.prototype, property, {
+        get: function() {
+          return this.rawData[property];
+        },
+        set: function(v) {
+          this.rawData[property] = v;
+        }
+      });
+    }
+    return clazz;
+  }
+
+  toString() {
+    let results = [];
+    results.push(`schema ${this.name}`.concat(this.parent ? ` extends ${this.parent.name}` : ''));
+
+    let propertiesToString = (properties, keyword) => {
+      if (Object.keys(properties).length > 0) {
+        results.push(`  ${keyword}`);
+        Object.keys(properties).forEach(name => {
+          let schemaType = Array.isArray(properties[name]) && properties[name].length > 1 ? `(${properties[name].join(' or ')})` : properties[name];
+          results.push(`    ${schemaType} ${name}`);
+        });
+      }
+    }
+
+    propertiesToString(this.normative, 'normative');
+    propertiesToString(this.optional, 'optional');
+    return results.join('\n');
+  }
+}
+
+module.exports = Schema;
+
+
+/***/ }),
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
 /* WEBPACK VAR INJECTION */(function(global, process) {/*
   Copyright 2015 Google Inc. All Rights Reserved.
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -7136,9 +7459,9 @@ Headers.prototype.raw = function() {
 */
 
 var fs = __webpack_require__(20);
-var mkdirp = __webpack_require__(136);
+var mkdirp = __webpack_require__(142);
 var path = __webpack_require__(41);
-var options = __webpack_require__(140);
+var options = __webpack_require__(143);
 
 var events = [];
 if (global.document) {
@@ -7366,329 +7689,6 @@ function init() {
 init();
 
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(1), __webpack_require__(3)))
-
-/***/ }),
-/* 31 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-  /**
- * @license
- * Copyright (c) 2017 Google Inc. All rights reserved.
- * This code may only be used under the BSD style license found at
- * http://polymer.github.io/LICENSE.txt
- * Code distributed by Google as part of this project is also
- * subject to an additional IP rights grant found at
- * http://polymer.github.io/PATENTS.txt
- */
-
-
-const runtime = __webpack_require__(58);
-const {ParticleDescription, ConnectionDescription} = __webpack_require__(110);
-const Type = __webpack_require__(8);
-const assert = __webpack_require__(4);
-
-class ConnectionSpec {
-  constructor(rawData, typeVarMap) {
-    this.rawData = rawData;
-    this.direction = rawData.direction;
-    this.name = rawData.name;
-    this.type = rawData.type.assignVariableIds(typeVarMap);
-  }
-
-  get isInput() {
-    return this.direction == "in" || this.direction == "inout";
-  }
-
-  get isOutput() {
-    return this.direction == "out" || this.direction == "inout";
-  }
-}
-
-class SlotSpec {
-  constructor(slotModel) {
-    this.name = slotModel.name;
-    this.isRequired = slotModel.isRequired;
-    this.isSet = slotModel.isSet;
-    this.formFactor = slotModel.formFactor;
-    this.providedSlots = [];
-    slotModel.providedSlots.forEach(ps => {
-      this.providedSlots.push(new ProvidedSlotSpec(ps.name, ps.isSet, ps.formFactor, ps.views));
-    });
-  }
-}
-
-class ProvidedSlotSpec {
-  constructor(name, isSet, formFactor, views) {
-    this.name = name;
-    this.isSet = isSet;
-    this.formFactor = formFactor;
-    this.views = views;
-  }
-}
-
-class ParticleSpec {
-  constructor(model, resolveSchema) {
-    // TODO: This should really happen after parsing, not here.
-    if (model.args)
-      model.args.forEach(arg => arg.type = arg.type.resolveSchemas(resolveSchema));
-    else
-      model.args = [];
-    this._model = model;
-    this.name = model.name;
-    this.verbs = model.verbs;
-    var typeVarMap = new Map();
-    this.connections = model.args.map(a => new ConnectionSpec(a, typeVarMap));
-    this.connectionMap = new Map();
-    this.connections.forEach(a => this.connectionMap.set(a.name, a));
-    this.inputs = this.connections.filter(a => a.isInput);
-    this.outputs = this.connections.filter(a => a.isOutput);
-    this.transient = model.transient;
-
-    // initialize descriptions.
-    model.description = model.description || {};
-    this.validateDescription(model.description);
-    this.description = new ParticleDescription(model.description["pattern"], this);
-    this.connections.forEach(connectionSpec => {
-      connectionSpec.description = new ConnectionDescription(model.description[connectionSpec.name], this, connectionSpec);
-    });
-
-    this.implFile = model.implFile;
-    this.affordance = model.affordance;
-    this.slots = new Map();
-    if (model.slots)
-      model.slots.forEach(s => this.slots.set(s.name, new SlotSpec(s)));
-    // Verify provided slots use valid view connection names.
-    this.slots.forEach(slot => {
-      slot.providedSlots.forEach(ps => {
-        ps.views.forEach(v => assert(this.connectionMap.has(v), "Cannot provide slot for nonexistent view constraint ", v));
-      });
-    });
-  }
-
-  isInput(param) {
-    for (let input of this.inputs) if (input.name == param) return true;
-  }
-
-  isOutput(param) {
-    for (let outputs of this.outputs) if (outputs.name == param) return true;
-  }
-
-  getSlotSpec(slotName) {
-    return this.slots.get(slotName);
-  }
-
-  get primaryVerb() {
-    if (this.verbs.length > 0) {
-      return this.verbs[0];
-    }
-  }
-
-  matchAffordance(affordance) {
-    return this.slots.size <= 0 || this.affordance.includes(affordance);
-  }
-
-  toLiteral() {
-    let {args, name, verbs, transient, description, implFile, affordance, slots} = this._model;
-    args = args.map(a => {
-      let {type, direction, name} = a;
-      type = type.toLiteral();
-      return {type, direction, name};
-    });
-    return {args, name, verbs, transient, description, implFile, affordance, slots};
-  }
-
-  static fromLiteral(literal) {
-    literal.args.forEach(a => a.type = Type.fromLiteral(a.type));
-    return new ParticleSpec(literal, () => assert(false));
-  }
-
-  validateDescription(description) {
-    Object.keys(description || []).forEach(d => {
-      assert(d == "pattern" || this.connectionMap.has(d), `Unexpected description for ${d}`);
-    });
-  }
-
-  toString() {
-    let results = [];
-    results.push(`particle ${this.name} in '${this.implFile}'`);
-    let connRes = this.connections.map(cs => `${cs.direction} ${cs.type.toString()} ${cs.name}`);
-    results.push(`  ${this.primaryVerb}(${connRes.join(', ')})`);
-    this.affordance.filter(a => a != 'mock').forEach(a => results.push(`  affordance ${a}`));
-    // TODO: support form factors
-    this.slots.forEach(s => {
-    results.push(`  ${s.isRequired ? 'must ' : ''}consume ${s.isSet ? 'set of ' : ''}${s.name}`);
-      s.providedSlots.forEach(ps => {
-        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`)
-        // TODO: support form factors
-        ps.views.forEach(psv => results.push(`      view ${psv}`))
-      });
-    });
-    // Description
-    if (this.description.hasPattern()) {
-      results.push(`  description \`${this.description.pattern}\``);
-      this.connections.forEach(cs => {
-        if (cs.description.hasPattern()) {
-          results.push(`    ${cs.name} \`${cs.description.pattern}\``);
-        }
-      });
-    }
-    return results.join('\n');
-  }
-}
-
-module.exports = ParticleSpec;
-
-
-/***/ }),
-/* 32 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/**
- * @license
- * Copyright (c) 2017 Google Inc. All rights reserved.
- * This code may only be used under the BSD style license found at
- * http://polymer.github.io/LICENSE.txt
- * Code distributed by Google as part of this project is also
- * subject to an additional IP rights grant found at
- * http://polymer.github.io/PATENTS.txt
- */
-
-const Entity = __webpack_require__(17);
-const assert = __webpack_require__(4);
-const Type = __webpack_require__(8);
-
-class Schema {
-  constructor(model) {
-    this._model = model;
-    this.name = model.name;
-    this.parent = model.parent ? new Schema(model.parent) : null;
-    this._normative = {};
-    this._optional = {};
-    assert(model.sections);
-    for (var section of model.sections) {
-      var into = section.sectionType == 'normative' ? this._normative : this._optional;
-      for (var field in section.fields) {
-        // TODO normalize field types here?
-        into[field] = section.fields[field];
-      }
-    }
-  }
-
-  toLiteral() {
-    return this._model;
-  }
-
-  get type() {
-    return Type.newEntity(this.toLiteral());
-  }
-
-  get normative() {
-    var dict = this.parent ? this.parent.normative : {};
-    Object.assign(dict, this._normative);
-    return dict;
-  }
-
-  get optional() {
-    var dict = this.parent ? this.parent.optional : {};
-    Object.assign(dict, this._optional);
-    return dict;
-  }
-
-  entityClass() {
-    let schema = this;
-    const className = this.name;
-    var properties = Object.keys(this.normative).concat(Object.keys(this.optional));
-    var classJunk = ['toJSON', 'prototype', 'toString'];
-
-    var clazz = class extends Entity {
-      constructor(data) {
-        var p = new Proxy(data, {
-          get: (target, name) => {
-            if (classJunk.includes(name))
-              return undefined;
-            if (name.constructor == Symbol)
-              return undefined;
-            if (!properties.includes(name))
-              throw new Error(`Can't access field ${name} not in schema ${className}`);
-            return target[name];
-          },
-          set: (target, name, value) => {
-            if (!properties.includes(name)) {
-              throw new Error(`Can't write field ${name} not in schema ${className}`);
-            }
-            target[name] = value;
-            return true;
-          }
-        });
-        super();
-        this.rawData = p;
-      }
-
-      dataClone() {
-        var clone = {};
-        properties.forEach(prop => clone[prop] = this.rawData[prop]);
-        return clone;
-      }
-
-      static get key() {
-        return {
-          tag: 'entity',
-          schema: schema.toLiteral(),
-        };
-      }
-    }
-
-    Object.defineProperty(clazz, 'type', {value: this.type});
-    Object.defineProperty(clazz, 'name', {value: this.name});
-    for (let property in this.normative) {
-      // TODO: type checking, make a distinction between normative
-      // and optional properties.
-      // TODO: add query / getter functions for user properties
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
-    }
-    for (let property in this.optional) {
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
-    }
-    return clazz;
-  }
-
-  toString() {
-    let results = [];
-    results.push(`schema ${this.name}`.concat(this.parent ? ` extends ${this.parent.name}` : ''));
-
-    let propertiesToString = (properties, keyword) => {
-      if (Object.keys(properties).length > 0) {
-        results.push(`  ${keyword}`);
-        Object.keys(properties).forEach(name => {
-          let schemaType = Array.isArray(properties[name]) && properties[name].length > 1 ? `(${properties[name].join(' or ')})` : properties[name];
-          results.push(`    ${schemaType} ${name}`);
-        });
-      }
-    }
-
-    propertiesToString(this.normative, 'normative');
-    propertiesToString(this.optional, 'optional');
-    return results.join('\n');
-  }
-}
-
-module.exports = Schema;
-
 
 /***/ }),
 /* 33 */
@@ -13674,7 +13674,7 @@ const assert = __webpack_require__(4);
 const view = __webpack_require__(59);
 const Symbols = __webpack_require__(19);
 const Entity = __webpack_require__(17);
-const Schema = __webpack_require__(32);
+const Schema = __webpack_require__(31);
 const Type = __webpack_require__(8);
 const Relation = __webpack_require__(57);
 
@@ -13719,9 +13719,9 @@ Object.assign(exports, {
 
 
 const assert = __webpack_require__(4);
-const tracing = __webpack_require__(30);
-const scheduler = __webpack_require__(142);
-const util = __webpack_require__(141);
+const tracing = __webpack_require__(32);
+const scheduler = __webpack_require__(139);
+const util = __webpack_require__(138);
 
 class ViewBase {
   constructor(type, arc, name, id) {
@@ -14044,12 +14044,12 @@ module.exports = class BrowserLoader extends Loader {
 
 
 const Type = __webpack_require__(8);
-const viewlet = __webpack_require__(143);
+const viewlet = __webpack_require__(140);
 const define = __webpack_require__(18).define;
 const assert = __webpack_require__(4);
 const PECInnerPort = __webpack_require__(108).PECInnerPort;
-const ParticleSpec = __webpack_require__(31);
-const Schema = __webpack_require__(32);
+const ParticleSpec = __webpack_require__(30);
+const Schema = __webpack_require__(31);
 
 class RemoteView {
   constructor(id, type, port, pec, name, version) {
@@ -23192,7 +23192,7 @@ module.exports = JsonldToManifest;
 
 
 const assert = __webpack_require__(4);
-const ParticleSpec = __webpack_require__(31);
+const ParticleSpec = __webpack_require__(30);
 
 class ThingMapper {
   constructor(prefix) {
@@ -23956,7 +23956,7 @@ const DomParticle = __webpack_require__(53);
 const vm = __webpack_require__(104);
 let JsonldToManifest = __webpack_require__(107);
 
-let fetch = global.fetch || __webpack_require__(137);
+let fetch = global.fetch || __webpack_require__(135);
 
 function schemaLocationFor(name) {
   return `../entities/${name}.schema`;
@@ -26973,353 +26973,6 @@ isStream.transform = function (stream) {
 
 /***/ }),
 /* 135 */
-/***/ (function(module, exports) {
-
-module.exports = function (args, opts) {
-    if (!opts) opts = {};
-    
-    var flags = { bools : {}, strings : {}, unknownFn: null };
-
-    if (typeof opts['unknown'] === 'function') {
-        flags.unknownFn = opts['unknown'];
-    }
-
-    if (typeof opts['boolean'] === 'boolean' && opts['boolean']) {
-      flags.allBools = true;
-    } else {
-      [].concat(opts['boolean']).filter(Boolean).forEach(function (key) {
-          flags.bools[key] = true;
-      });
-    }
-    
-    var aliases = {};
-    Object.keys(opts.alias || {}).forEach(function (key) {
-        aliases[key] = [].concat(opts.alias[key]);
-        aliases[key].forEach(function (x) {
-            aliases[x] = [key].concat(aliases[key].filter(function (y) {
-                return x !== y;
-            }));
-        });
-    });
-
-    [].concat(opts.string).filter(Boolean).forEach(function (key) {
-        flags.strings[key] = true;
-        if (aliases[key]) {
-            flags.strings[aliases[key]] = true;
-        }
-     });
-
-    var defaults = opts['default'] || {};
-    
-    var argv = { _ : [] };
-    Object.keys(flags.bools).forEach(function (key) {
-        setArg(key, defaults[key] === undefined ? false : defaults[key]);
-    });
-    
-    var notFlags = [];
-
-    if (args.indexOf('--') !== -1) {
-        notFlags = args.slice(args.indexOf('--')+1);
-        args = args.slice(0, args.indexOf('--'));
-    }
-
-    function argDefined(key, arg) {
-        return (flags.allBools && /^--[^=]+$/.test(arg)) ||
-            flags.strings[key] || flags.bools[key] || aliases[key];
-    }
-
-    function setArg (key, val, arg) {
-        if (arg && flags.unknownFn && !argDefined(key, arg)) {
-            if (flags.unknownFn(arg) === false) return;
-        }
-
-        var value = !flags.strings[key] && isNumber(val)
-            ? Number(val) : val
-        ;
-        setKey(argv, key.split('.'), value);
-        
-        (aliases[key] || []).forEach(function (x) {
-            setKey(argv, x.split('.'), value);
-        });
-    }
-
-    function setKey (obj, keys, value) {
-        var o = obj;
-        keys.slice(0,-1).forEach(function (key) {
-            if (o[key] === undefined) o[key] = {};
-            o = o[key];
-        });
-
-        var key = keys[keys.length - 1];
-        if (o[key] === undefined || flags.bools[key] || typeof o[key] === 'boolean') {
-            o[key] = value;
-        }
-        else if (Array.isArray(o[key])) {
-            o[key].push(value);
-        }
-        else {
-            o[key] = [ o[key], value ];
-        }
-    }
-    
-    function aliasIsBoolean(key) {
-      return aliases[key].some(function (x) {
-          return flags.bools[x];
-      });
-    }
-
-    for (var i = 0; i < args.length; i++) {
-        var arg = args[i];
-        
-        if (/^--.+=/.test(arg)) {
-            // Using [\s\S] instead of . because js doesn't support the
-            // 'dotall' regex modifier. See:
-            // http://stackoverflow.com/a/1068308/13216
-            var m = arg.match(/^--([^=]+)=([\s\S]*)$/);
-            var key = m[1];
-            var value = m[2];
-            if (flags.bools[key]) {
-                value = value !== 'false';
-            }
-            setArg(key, value, arg);
-        }
-        else if (/^--no-.+/.test(arg)) {
-            var key = arg.match(/^--no-(.+)/)[1];
-            setArg(key, false, arg);
-        }
-        else if (/^--.+/.test(arg)) {
-            var key = arg.match(/^--(.+)/)[1];
-            var next = args[i + 1];
-            if (next !== undefined && !/^-/.test(next)
-            && !flags.bools[key]
-            && !flags.allBools
-            && (aliases[key] ? !aliasIsBoolean(key) : true)) {
-                setArg(key, next, arg);
-                i++;
-            }
-            else if (/^(true|false)$/.test(next)) {
-                setArg(key, next === 'true', arg);
-                i++;
-            }
-            else {
-                setArg(key, flags.strings[key] ? '' : true, arg);
-            }
-        }
-        else if (/^-[^-]+/.test(arg)) {
-            var letters = arg.slice(1,-1).split('');
-            
-            var broken = false;
-            for (var j = 0; j < letters.length; j++) {
-                var next = arg.slice(j+2);
-                
-                if (next === '-') {
-                    setArg(letters[j], next, arg)
-                    continue;
-                }
-                
-                if (/[A-Za-z]/.test(letters[j]) && /=/.test(next)) {
-                    setArg(letters[j], next.split('=')[1], arg);
-                    broken = true;
-                    break;
-                }
-                
-                if (/[A-Za-z]/.test(letters[j])
-                && /-?\d+(\.\d*)?(e-?\d+)?$/.test(next)) {
-                    setArg(letters[j], next, arg);
-                    broken = true;
-                    break;
-                }
-                
-                if (letters[j+1] && letters[j+1].match(/\W/)) {
-                    setArg(letters[j], arg.slice(j+2), arg);
-                    broken = true;
-                    break;
-                }
-                else {
-                    setArg(letters[j], flags.strings[letters[j]] ? '' : true, arg);
-                }
-            }
-            
-            var key = arg.slice(-1)[0];
-            if (!broken && key !== '-') {
-                if (args[i+1] && !/^(-|--)[^-]/.test(args[i+1])
-                && !flags.bools[key]
-                && (aliases[key] ? !aliasIsBoolean(key) : true)) {
-                    setArg(key, args[i+1], arg);
-                    i++;
-                }
-                else if (args[i+1] && /true|false/.test(args[i+1])) {
-                    setArg(key, args[i+1] === 'true', arg);
-                    i++;
-                }
-                else {
-                    setArg(key, flags.strings[key] ? '' : true, arg);
-                }
-            }
-        }
-        else {
-            if (!flags.unknownFn || flags.unknownFn(arg) !== false) {
-                argv._.push(
-                    flags.strings['_'] || !isNumber(arg) ? arg : Number(arg)
-                );
-            }
-            if (opts.stopEarly) {
-                argv._.push.apply(argv._, args.slice(i + 1));
-                break;
-            }
-        }
-    }
-    
-    Object.keys(defaults).forEach(function (key) {
-        if (!hasKey(argv, key.split('.'))) {
-            setKey(argv, key.split('.'), defaults[key]);
-            
-            (aliases[key] || []).forEach(function (x) {
-                setKey(argv, x.split('.'), defaults[key]);
-            });
-        }
-    });
-    
-    if (opts['--']) {
-        argv['--'] = new Array();
-        notFlags.forEach(function(key) {
-            argv['--'].push(key);
-        });
-    }
-    else {
-        notFlags.forEach(function(key) {
-            argv._.push(key);
-        });
-    }
-
-    return argv;
-};
-
-function hasKey (obj, keys) {
-    var o = obj;
-    keys.slice(0,-1).forEach(function (key) {
-        o = (o[key] || {});
-    });
-
-    var key = keys[keys.length - 1];
-    return key in o;
-}
-
-function isNumber (x) {
-    if (typeof x === 'number') return true;
-    if (/^0x[0-9a-f]+$/i.test(x)) return true;
-    return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(e[-+]?\d+)?$/.test(x);
-}
-
-
-
-/***/ }),
-/* 136 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* WEBPACK VAR INJECTION */(function(process) {var path = __webpack_require__(41);
-var fs = __webpack_require__(20);
-var _0777 = parseInt('0777', 8);
-
-module.exports = mkdirP.mkdirp = mkdirP.mkdirP = mkdirP;
-
-function mkdirP (p, opts, f, made) {
-    if (typeof opts === 'function') {
-        f = opts;
-        opts = {};
-    }
-    else if (!opts || typeof opts !== 'object') {
-        opts = { mode: opts };
-    }
-    
-    var mode = opts.mode;
-    var xfs = opts.fs || fs;
-    
-    if (mode === undefined) {
-        mode = _0777 & (~process.umask());
-    }
-    if (!made) made = null;
-    
-    var cb = f || function () {};
-    p = path.resolve(p);
-    
-    xfs.mkdir(p, mode, function (er) {
-        if (!er) {
-            made = made || p;
-            return cb(null, made);
-        }
-        switch (er.code) {
-            case 'ENOENT':
-                mkdirP(path.dirname(p), opts, function (er, made) {
-                    if (er) cb(er, made);
-                    else mkdirP(p, opts, cb, made);
-                });
-                break;
-
-            // In the case of any other error, just see if there's a dir
-            // there already.  If so, then hooray!  If not, then something
-            // is borked.
-            default:
-                xfs.stat(p, function (er2, stat) {
-                    // if the stat fails, then that's super weird.
-                    // let the original error be the failure reason.
-                    if (er2 || !stat.isDirectory()) cb(er, made)
-                    else cb(null, made);
-                });
-                break;
-        }
-    });
-}
-
-mkdirP.sync = function sync (p, opts, made) {
-    if (!opts || typeof opts !== 'object') {
-        opts = { mode: opts };
-    }
-    
-    var mode = opts.mode;
-    var xfs = opts.fs || fs;
-    
-    if (mode === undefined) {
-        mode = _0777 & (~process.umask());
-    }
-    if (!made) made = null;
-
-    p = path.resolve(p);
-
-    try {
-        xfs.mkdirSync(p, mode);
-        made = made || p;
-    }
-    catch (err0) {
-        switch (err0.code) {
-            case 'ENOENT' :
-                made = sync(path.dirname(p), opts, made);
-                sync(p, opts, made);
-                break;
-
-            // In the case of any other error, just see if there's a dir
-            // there already.  If so, then hooray!  If not, then something
-            // is borked.
-            default:
-                var stat;
-                try {
-                    stat = xfs.statSync(p);
-                }
-                catch (err1) {
-                    throw err0;
-                }
-                if (!stat.isDirectory()) throw err0;
-                break;
-        }
-    }
-
-    return made;
-};
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
-
-/***/ }),
-/* 137 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer, global) {
@@ -27337,9 +26990,9 @@ var zlib = __webpack_require__(65);
 var stream = __webpack_require__(14);
 
 var Body = __webpack_require__(28);
-var Response = __webpack_require__(139);
+var Response = __webpack_require__(137);
 var Headers = __webpack_require__(29);
-var Request = __webpack_require__(138);
+var Request = __webpack_require__(136);
 var FetchError = __webpack_require__(56);
 
 // commonjs
@@ -27597,7 +27250,7 @@ Fetch.Request = Request;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(1)))
 
 /***/ }),
-/* 138 */
+/* 136 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -27678,7 +27331,7 @@ Request.prototype.clone = function() {
 
 
 /***/ }),
-/* 139 */
+/* 137 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
@@ -27734,30 +27387,7 @@ Response.prototype.clone = function() {
 
 
 /***/ }),
-/* 140 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* WEBPACK VAR INJECTION */(function(process) {/*
-  Copyright 2015 Google Inc. All Rights Reserved.
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-      http://www.apache.org/licenses/LICENSE-2.0
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-*/
-
-var parseArgs = __webpack_require__(135);
-
-module.exports = parseArgs(process.argv.slice(2));
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
-
-/***/ }),
-/* 141 */
+/* 138 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -27819,7 +27449,7 @@ exports.compareComparables = compareComparables;
 
 
 /***/ }),
-/* 142 */
+/* 139 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -27832,7 +27462,7 @@ exports.compareComparables = compareComparables;
 // http://polymer.github.io/PATENTS.txt
 
 
-const tracing = __webpack_require__(30);
+const tracing = __webpack_require__(32);
 const assert = __webpack_require__(4);
 
 class Scheduler {
@@ -27917,7 +27547,7 @@ module.exports = new Scheduler();
 
 
 /***/ }),
-/* 143 */
+/* 140 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -28136,6 +27766,376 @@ function viewletFor(view, isView, canRead, canWrite) {
 
 module.exports = { viewletFor };
 
+
+/***/ }),
+/* 141 */
+/***/ (function(module, exports) {
+
+module.exports = function (args, opts) {
+    if (!opts) opts = {};
+    
+    var flags = { bools : {}, strings : {}, unknownFn: null };
+
+    if (typeof opts['unknown'] === 'function') {
+        flags.unknownFn = opts['unknown'];
+    }
+
+    if (typeof opts['boolean'] === 'boolean' && opts['boolean']) {
+      flags.allBools = true;
+    } else {
+      [].concat(opts['boolean']).filter(Boolean).forEach(function (key) {
+          flags.bools[key] = true;
+      });
+    }
+    
+    var aliases = {};
+    Object.keys(opts.alias || {}).forEach(function (key) {
+        aliases[key] = [].concat(opts.alias[key]);
+        aliases[key].forEach(function (x) {
+            aliases[x] = [key].concat(aliases[key].filter(function (y) {
+                return x !== y;
+            }));
+        });
+    });
+
+    [].concat(opts.string).filter(Boolean).forEach(function (key) {
+        flags.strings[key] = true;
+        if (aliases[key]) {
+            flags.strings[aliases[key]] = true;
+        }
+     });
+
+    var defaults = opts['default'] || {};
+    
+    var argv = { _ : [] };
+    Object.keys(flags.bools).forEach(function (key) {
+        setArg(key, defaults[key] === undefined ? false : defaults[key]);
+    });
+    
+    var notFlags = [];
+
+    if (args.indexOf('--') !== -1) {
+        notFlags = args.slice(args.indexOf('--')+1);
+        args = args.slice(0, args.indexOf('--'));
+    }
+
+    function argDefined(key, arg) {
+        return (flags.allBools && /^--[^=]+$/.test(arg)) ||
+            flags.strings[key] || flags.bools[key] || aliases[key];
+    }
+
+    function setArg (key, val, arg) {
+        if (arg && flags.unknownFn && !argDefined(key, arg)) {
+            if (flags.unknownFn(arg) === false) return;
+        }
+
+        var value = !flags.strings[key] && isNumber(val)
+            ? Number(val) : val
+        ;
+        setKey(argv, key.split('.'), value);
+        
+        (aliases[key] || []).forEach(function (x) {
+            setKey(argv, x.split('.'), value);
+        });
+    }
+
+    function setKey (obj, keys, value) {
+        var o = obj;
+        keys.slice(0,-1).forEach(function (key) {
+            if (o[key] === undefined) o[key] = {};
+            o = o[key];
+        });
+
+        var key = keys[keys.length - 1];
+        if (o[key] === undefined || flags.bools[key] || typeof o[key] === 'boolean') {
+            o[key] = value;
+        }
+        else if (Array.isArray(o[key])) {
+            o[key].push(value);
+        }
+        else {
+            o[key] = [ o[key], value ];
+        }
+    }
+    
+    function aliasIsBoolean(key) {
+      return aliases[key].some(function (x) {
+          return flags.bools[x];
+      });
+    }
+
+    for (var i = 0; i < args.length; i++) {
+        var arg = args[i];
+        
+        if (/^--.+=/.test(arg)) {
+            // Using [\s\S] instead of . because js doesn't support the
+            // 'dotall' regex modifier. See:
+            // http://stackoverflow.com/a/1068308/13216
+            var m = arg.match(/^--([^=]+)=([\s\S]*)$/);
+            var key = m[1];
+            var value = m[2];
+            if (flags.bools[key]) {
+                value = value !== 'false';
+            }
+            setArg(key, value, arg);
+        }
+        else if (/^--no-.+/.test(arg)) {
+            var key = arg.match(/^--no-(.+)/)[1];
+            setArg(key, false, arg);
+        }
+        else if (/^--.+/.test(arg)) {
+            var key = arg.match(/^--(.+)/)[1];
+            var next = args[i + 1];
+            if (next !== undefined && !/^-/.test(next)
+            && !flags.bools[key]
+            && !flags.allBools
+            && (aliases[key] ? !aliasIsBoolean(key) : true)) {
+                setArg(key, next, arg);
+                i++;
+            }
+            else if (/^(true|false)$/.test(next)) {
+                setArg(key, next === 'true', arg);
+                i++;
+            }
+            else {
+                setArg(key, flags.strings[key] ? '' : true, arg);
+            }
+        }
+        else if (/^-[^-]+/.test(arg)) {
+            var letters = arg.slice(1,-1).split('');
+            
+            var broken = false;
+            for (var j = 0; j < letters.length; j++) {
+                var next = arg.slice(j+2);
+                
+                if (next === '-') {
+                    setArg(letters[j], next, arg)
+                    continue;
+                }
+                
+                if (/[A-Za-z]/.test(letters[j]) && /=/.test(next)) {
+                    setArg(letters[j], next.split('=')[1], arg);
+                    broken = true;
+                    break;
+                }
+                
+                if (/[A-Za-z]/.test(letters[j])
+                && /-?\d+(\.\d*)?(e-?\d+)?$/.test(next)) {
+                    setArg(letters[j], next, arg);
+                    broken = true;
+                    break;
+                }
+                
+                if (letters[j+1] && letters[j+1].match(/\W/)) {
+                    setArg(letters[j], arg.slice(j+2), arg);
+                    broken = true;
+                    break;
+                }
+                else {
+                    setArg(letters[j], flags.strings[letters[j]] ? '' : true, arg);
+                }
+            }
+            
+            var key = arg.slice(-1)[0];
+            if (!broken && key !== '-') {
+                if (args[i+1] && !/^(-|--)[^-]/.test(args[i+1])
+                && !flags.bools[key]
+                && (aliases[key] ? !aliasIsBoolean(key) : true)) {
+                    setArg(key, args[i+1], arg);
+                    i++;
+                }
+                else if (args[i+1] && /true|false/.test(args[i+1])) {
+                    setArg(key, args[i+1] === 'true', arg);
+                    i++;
+                }
+                else {
+                    setArg(key, flags.strings[key] ? '' : true, arg);
+                }
+            }
+        }
+        else {
+            if (!flags.unknownFn || flags.unknownFn(arg) !== false) {
+                argv._.push(
+                    flags.strings['_'] || !isNumber(arg) ? arg : Number(arg)
+                );
+            }
+            if (opts.stopEarly) {
+                argv._.push.apply(argv._, args.slice(i + 1));
+                break;
+            }
+        }
+    }
+    
+    Object.keys(defaults).forEach(function (key) {
+        if (!hasKey(argv, key.split('.'))) {
+            setKey(argv, key.split('.'), defaults[key]);
+            
+            (aliases[key] || []).forEach(function (x) {
+                setKey(argv, x.split('.'), defaults[key]);
+            });
+        }
+    });
+    
+    if (opts['--']) {
+        argv['--'] = new Array();
+        notFlags.forEach(function(key) {
+            argv['--'].push(key);
+        });
+    }
+    else {
+        notFlags.forEach(function(key) {
+            argv._.push(key);
+        });
+    }
+
+    return argv;
+};
+
+function hasKey (obj, keys) {
+    var o = obj;
+    keys.slice(0,-1).forEach(function (key) {
+        o = (o[key] || {});
+    });
+
+    var key = keys[keys.length - 1];
+    return key in o;
+}
+
+function isNumber (x) {
+    if (typeof x === 'number') return true;
+    if (/^0x[0-9a-f]+$/i.test(x)) return true;
+    return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(e[-+]?\d+)?$/.test(x);
+}
+
+
+
+/***/ }),
+/* 142 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(process) {var path = __webpack_require__(41);
+var fs = __webpack_require__(20);
+var _0777 = parseInt('0777', 8);
+
+module.exports = mkdirP.mkdirp = mkdirP.mkdirP = mkdirP;
+
+function mkdirP (p, opts, f, made) {
+    if (typeof opts === 'function') {
+        f = opts;
+        opts = {};
+    }
+    else if (!opts || typeof opts !== 'object') {
+        opts = { mode: opts };
+    }
+    
+    var mode = opts.mode;
+    var xfs = opts.fs || fs;
+    
+    if (mode === undefined) {
+        mode = _0777 & (~process.umask());
+    }
+    if (!made) made = null;
+    
+    var cb = f || function () {};
+    p = path.resolve(p);
+    
+    xfs.mkdir(p, mode, function (er) {
+        if (!er) {
+            made = made || p;
+            return cb(null, made);
+        }
+        switch (er.code) {
+            case 'ENOENT':
+                mkdirP(path.dirname(p), opts, function (er, made) {
+                    if (er) cb(er, made);
+                    else mkdirP(p, opts, cb, made);
+                });
+                break;
+
+            // In the case of any other error, just see if there's a dir
+            // there already.  If so, then hooray!  If not, then something
+            // is borked.
+            default:
+                xfs.stat(p, function (er2, stat) {
+                    // if the stat fails, then that's super weird.
+                    // let the original error be the failure reason.
+                    if (er2 || !stat.isDirectory()) cb(er, made)
+                    else cb(null, made);
+                });
+                break;
+        }
+    });
+}
+
+mkdirP.sync = function sync (p, opts, made) {
+    if (!opts || typeof opts !== 'object') {
+        opts = { mode: opts };
+    }
+    
+    var mode = opts.mode;
+    var xfs = opts.fs || fs;
+    
+    if (mode === undefined) {
+        mode = _0777 & (~process.umask());
+    }
+    if (!made) made = null;
+
+    p = path.resolve(p);
+
+    try {
+        xfs.mkdirSync(p, mode);
+        made = made || p;
+    }
+    catch (err0) {
+        switch (err0.code) {
+            case 'ENOENT' :
+                made = sync(path.dirname(p), opts, made);
+                sync(p, opts, made);
+                break;
+
+            // In the case of any other error, just see if there's a dir
+            // there already.  If so, then hooray!  If not, then something
+            // is borked.
+            default:
+                var stat;
+                try {
+                    stat = xfs.statSync(p);
+                }
+                catch (err1) {
+                    throw err0;
+                }
+                if (!stat.isDirectory()) throw err0;
+                break;
+        }
+    }
+
+    return made;
+};
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
+
+/***/ }),
+/* 143 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/* WEBPACK VAR INJECTION */(function(process) {/*
+  Copyright 2015 Google Inc. All Rights Reserved.
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+      http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+var parseArgs = __webpack_require__(141);
+
+module.exports = parseArgs(process.argv.slice(2));
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
 
 /***/ }),
 /* 144 */

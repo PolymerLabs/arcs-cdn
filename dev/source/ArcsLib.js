@@ -11,11 +11,12 @@
 let Arcs = {
   version: '0.2',
   Arc: require(`../../../arcs/runtime/arc.js`),
+  BrowserLoader: require(`./browser-cdn-loader.js`),
+  Description: require('../../../arcs/runtime/description.js'),
   Manifest: require("../../../arcs/runtime/manifest.js"),
-  SlotComposer: require(`../../../arcs/runtime/slot-composer.js`),
   Planner: require(`../../../arcs/runtime/planner.js`),
   Type: require('../../../arcs/runtime/type.js'),
-  BrowserLoader: require(`./browser-cdn-loader.js`)
+  SlotComposer: require(`../../../arcs/runtime/slot-composer.js`)
 };
 
 window.Arcs = Arcs;
