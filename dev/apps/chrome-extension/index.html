@@ -57,6 +57,13 @@
         let sup = await super._fetchManifestList();
         return [].concat(...sup, ...this._config.additionalManifests);
       }
+
+      async _start() {
+        super._start();
+
+        // always take the browser arc public
+        saveProfileState(true);
+      }
       
     }
 

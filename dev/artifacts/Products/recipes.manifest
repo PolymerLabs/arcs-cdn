@@ -8,12 +8,8 @@
 import 'Product.schema'
 import 'ShowProducts/ShowProducts.manifest'
 
-view Products of [Product] #shortlist in 'foo.json'
-
 recipe
-  copy #shortlist as shortlist
+  copy as shortlist
 
-  # this works after accepting a suggestion
-  # # create #shortlist as shortlist
   ShowProducts
     list <- shortlist
