@@ -22,7 +22,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <template>
   <style>
-    app-shell {
+    [app-shell] {
       display: block;
       overflow: hidden;
       padding-top: 32px;
@@ -95,7 +95,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       border: none;
       outline: none;
     }
-    [title] {
+    [arc-title] {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -103,7 +103,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       font-size: medium;
       cursor: text;
     }
-    [title-edit] {
+    [arc-title-edit] {
       background-color: #155c70;
       border: none;
       outline: none;
@@ -111,7 +111,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       font-size: medium;
       font-family: sans-serif;
       padding: 5px;
-      margin: -5px;
+      /*margin: -5px;*/
       border-radius: 3px;
     }
     #particles {
@@ -156,8 +156,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <!-- header -->
     <app-header>
       <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large&nbsp;</i>
-      <span title style="flex: 1; display: none" style%={{titleStatic}} on-click="_onStartEditingTitle">{{title}}</span>
-      <input title-edit style="flex: 1; display: none" style%={{titleEditing}} value="{{titleText}}" on-input="_onEditingTitle" on-change="_onEndEditingTitle" on-keypress="_onMaybeEndEditingTitle"/>
+      <span arc-title style="flex: 1; display: none" style%={{titleStatic}} on-click="_onStartEditingTitle" unsafe-html="{{title}}"></span>
+      <input arc-title-edit style="flex: 1; display: none" style%={{titleEditing}} value="{{titleText}}" on-input="_onEditingTitle" on-change="_onEndEditingTitle" on-keypress="_onMaybeEndEditingTitle"/>
       <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
         <!--<i class="material-icons">person</i>-->
         <select on-change="_onUserSelected">{{usersOptions}}</select>
@@ -227,6 +227,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async connectedCallback() {
       if (!this._mounted) {
         this._mounted = true;
+        this.setAttribute('app-shell', '');
         this._dom = Xen.stamp(this.template).events(this).appendTo(this);
         this._setState({dotsActive: true, toastOpen: true, mainActive: true});
         try {
@@ -383,6 +384,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           plans = await Arcs.utils.makePlans(this.arc, 5000);
           log(`plans`, plans, 'iterations left:', max_iterations);
         } while (SharingTools.applyAcceptedSteps(plans) && --max_iterations > 0);
+        // TODO(sjmiles): we need to makePlans if SharingTools applied a step, but applyAcceptedSteps
+        // never returns true. Until we fix it, we'll just plan one more time.
+        plans = await Arcs.utils.makePlans(this.arc, 5000);
+        log(`plans`, plans, 'iterations left:', max_iterations);
+        // TODO(sjmiles): ^
         document.dispatchEvent(new CustomEvent('generations', {detail: plans.generations}));
         this._setState({dotsDisabled: plans && plans.length === 0});
         this._plans = plans;
@@ -493,8 +499,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _updateTitle() {
       this._setState({
         title: this._userGeneratedDescription || this._computedDescription || ' ',
-        titleStatic: { display: this._editingTitle ? "none" : "inherit" },
-        titleEditing: { display: this._editingTitle ? "inherit" : "none" }
+        titleStatic: { display: this._editingTitle ? "none" : "initial" },
+        titleEditing: { display: this._editingTitle ? "initial" : "none" }
       });
     }
     _onNewDescription(computed, userGenerated) {
@@ -506,7 +512,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._editingTitle = true;
       this._setState({titleText: this._userGeneratedDescription || this._computedDescription || ""});
       this._updateTitle();
-      let inputElement = e.target.nextElementSibling;
+      let inputElement = this.querySelector(`input[arc-title-edit]`);
       inputElement.select();
       window.setTimeout(() => inputElement.focus(), 50);
     }
@@ -514,10 +520,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let description = e.target.value;
       this._editingTitle = false;
       e.target.blur();
-
       this._userGeneratedDescription = description;
       this._updateTitle();
-
       StorageTools.saveUserGeneratedDescription(description);
     }
     _onMaybeEndEditingTitle(e) {
