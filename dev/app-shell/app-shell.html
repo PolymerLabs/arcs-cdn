@@ -317,8 +317,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // configure search
       this.search = config.search;
       if (!config.nokey) {
-        // watch for updates of description
+        // set initial title and watch for updates of description
         StorageTools.syncDescription((computed, userGenerated) => this._onNewDescription(computed, userGenerated));
+        this._updateTitle();
         // watch for steps, until turned off
         StorageTools.syncSteps();
       } else {
@@ -490,7 +491,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _updateTitle() {
       this._setState({
-        title: this._userGeneratedDescription || this._computedDescription || '(untitled)',
+        title: this._userGeneratedDescription || this._computedDescription || ' ',
         titleStatic: { display: this._editingTitle ? "none" : "inherit" },
         titleEditing: { display: this._editingTitle ? "inherit" : "none" }
       });
