@@ -183,11 +183,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   </div>
   <!-- config panel -->
   <app-tools>
-    <user-data user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
-    <arc-list user="{{user}}" users="{{users}}"></arc-list>
-    <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
-    <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-manifests-change="_onManifestsChange"></manifest-data>
-    <arc-explorer username="{{user}}"></arc-explorer>
+    <simple-tabs>
+      <user-data title="User Sharing" user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
+      <!--<arc-list user="{{user}}" users="{{users}}"></arc-list>-->
+      <arc-explorer title="Shared Arcs" username="{{user}}"></arc-explorer>
+      <div title="Manifests">
+        <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
+        <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-manifests-change="_onManifestsChange"></manifest-data>
+      </div>
+    </simple-tabs>
   </app-tools>
   <!-- sub-templates -->
   <template users-options>
