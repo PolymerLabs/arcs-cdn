@@ -1,4 +1,4 @@
-/**
+OB/**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
  * This code may only be used under the BSD style license found at
@@ -15,8 +15,8 @@ let Arcs = {
   Description: require('../../../arcs/runtime/description.js'),
   Manifest: require("../../../arcs/runtime/manifest.js"),
   Planner: require(`../../../arcs/runtime/planner.js`),
-  Type: require('../../../arcs/runtime/type.js'),
   SlotComposer: require(`../../../arcs/runtime/slot-composer.js`)
+  Type: require('../../../arcs/runtime/type.js')
 };
 
 window.Arcs = Arcs;
