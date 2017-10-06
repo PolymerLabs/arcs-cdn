@@ -157,8 +157,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <!-- header -->
     <app-header>
       <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large&nbsp;</i>
-      <span arc-title style="flex: 1; display: none" style%={{titleStatic}} on-click="_onStartEditingTitle" unsafe-html="{{title}}"></span>
-      <input arc-title-edit style="flex: 1; display: none" style%={{titleEditing}} value="{{titleText}}" on-input="_onEditingTitle" on-change="_onEndEditingTitle" on-keypress="_onMaybeEndEditingTitle"/>
+      <span arc-title style="flex: 1; display: none; min-height: 0.6em;" style%={{titleStatic}} on-click="_onStartEditingTitle" unsafe-html="{{title}}"></span>
+      <input arc-title-edit style="flex: 1; display: none;" style%={{titleEditing}} value="{{titleText}}" on-input="_onEditingTitle" on-change="_onEndEditingTitle" on-keypress="_onMaybeEndEditingTitle"/>
       <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
         <!--<i class="material-icons">person</i>-->
         <select on-change="_onUserSelected">{{usersOptions}}</select>
