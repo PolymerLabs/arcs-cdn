@@ -19,7 +19,7 @@ UserTools = {
     let users = await this.loadUsers();
     //
     if (config.user && !this.findUser(config.user)) {
-      if (!this.createUser(config.user)) {
+      if (config.user === 'null' || !this.createUser(config.user)) {
         config.user = '';
       }
     }
