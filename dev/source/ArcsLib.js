@@ -15,6 +15,7 @@ let Arcs = {
   SlotComposer: require(`../../../arcs/runtime/slot-composer.js`),
   Planner: require(`../../../arcs/runtime/planner.js`),
   Type: require('../../../arcs/runtime/type.js'),
+  Description: require('../../../arcs/runtime/description.js'),
   BrowserLoader: require(`./browser-cdn-loader.js`)
 };
 
