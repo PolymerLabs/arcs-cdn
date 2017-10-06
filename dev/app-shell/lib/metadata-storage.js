@@ -230,7 +230,13 @@
       // Currently, only one tag per view is supported. If a view has multiple
       // tags then one will be picked (at random). Views that have a tag will
       // only be synced with other views that have tags.
-      this._arc._viewTags.forEach((tags, localView) => {
+      let viewTags = new Map();
+      this._arc._context._imports.map(
+          manifest => manifest._viewTags).concat(this._arc._viewTags).forEach(
+              map => map.forEach( (value, key) => viewTags.set(key, value)));
+      // hopefully this'll work again after moving the views into the profile
+      //let viewTags = this._arc._viewTags;
+      viewTags.forEach((tags, localView) => {
         let viewId = this._getViewId(localView, tags);
         // Make sure we only synchronize each view at most once.
         if (this._syncedViews.has(viewId)) {
