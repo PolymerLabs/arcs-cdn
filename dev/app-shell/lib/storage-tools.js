@@ -62,7 +62,7 @@ StorageTools = {
   },
   syncDescription(callback) {
     if (this.initialized) {
-      db.child(`arc/${this._amkey}/metadata/description`).on('value', snap => {
+      db.child(`arcs/${this._amkey}/metadata/description`).on('value', snap => {
         let description = snap.val();
         if (description) {
           callback(description.computed, description.user_generated);
@@ -72,13 +72,36 @@ StorageTools = {
   },
   saveComputedDescription(description) {
     if (this.initialized) {
-      db.child(`arc/${this._amkey}/metadata/description/computed`).set(description);
+      db.child(`arcs/${this._amkey}/metadata/description/computed`).set(description);
     }
   },
   saveUserGeneratedDescription(description) {
     if (this.initialized) {
-      db.child(`arc/${this._amkey}/metadata/description/user_generated`).set(description);
+      db.child(`arcs/${this._amkey}/metadata/description/user_generated`).set(description);
     }
+  },
+  makeDescriptionWatcher(callback) {
+    return {
+      callback,
+      watch: function(amkeys) {
+        if (this._watchedDescriptions) {
+          this._watchedDescriptions.forEach(r => r.off());
+        }
+        this._watchedDescriptions = [];
+
+        if (amkeys) {
+          amkeys.forEach(amkey => {
+            this._watchedDescriptions.push(
+              db.child(`arcs/${amkey}/metadata/description`).on('value', r => {
+                let description = r.val();
+
+                this.callback(amkey, description || { computed: '(untitled)' });
+              })
+            );
+          });
+        }
+      }
+    };
   },
   saveSharedState(shared) {
     let user = UserTools.currentUser;
