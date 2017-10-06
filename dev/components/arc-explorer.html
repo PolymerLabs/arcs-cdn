@@ -17,96 +17,102 @@
   <div banner>Views in Profile Data</div>
   <div style="padding: 8px;">{{profiles}}</div>
   <hr>
-  <button on-click="dumpDb">Dump Database</button>
+  <!--<button on-click="dumpDb">Dump Database</button>-->
   <data-explorer style="font-size: 0.6em;" object="{{data}}"></data-explorer>
 </template>
 
 <template arc>
-  <arc-item key="{{key}}"></arc-item><br>
+  <arc-item key="{{key}}" data="{{data}}"></arc-item><br>
 </template>
 
 <template profile>
-  <div>{{views}}</div>
-  <hr>
-  <!--<pre style="margin: 0; font-size: 0.8em;">{{info}}</pre>
-  <hr>-->
+  <div style="margin-bottom: 8px;">
+    <span>{{name}}</span>
+    <a href="{{href}}" target="_blank"><i class="material-icons" style="font-size: 0.8em; vertical-align: middle;">open_in_new</i></a>
+  </div>
   <data-explorer style="font-size: 0.6em;" object="{{data}}"></data-explorer>
-</template>
-
-<template view>
-  <div style="line-height:1.4em;"><b>{{name}}</b></div>
 </template>
 
 <script>
   class ArcExplorer extends XenBase {
     static get observedAttributes() { return ['username']; }
-    _getInitialState() {
-      let arc_t = ArcExplorer.module.querySelector('[arc]');
-      return {
-        profileArcs: {
-          template: arc_t
-        },
-        sharedArcs: {
-          template: arc_t
-        }
-      }
-    }
-    dumpDb() {
-      db.child('arcs').once('value').then(s => {
-        this._setState({data: s.val()});
-      });
+    _wouldChangeProp() {
+      return true;
     }
     _willReceiveProps(props, state) {
       let user = UserTools.findUser(props.username);
-      if (!user || !user.profile) {
-        this._setState({profiles: null});
-      }
-      else {
-        let keys = Object.keys(user.profile);
-        let profiles = keys.map(async key => {
-          let snap = await db.child(`arcs/${key}`).once('value');
-          let data = snap.val();
-          return {
-            key: key,
-            data: snap.val()
-          }
-        });
-        Promise.all(profiles).then(profiles => this._setState({profiles}));
+      this._setState({profiles: null, shared: null});
+      if (user) {
+        this._queryProfileArcs(user.profile);
+        this._querySharedArcs(user.shared);
       }
     }
+    _queryProfileArcs(profiles) {
+      // get a map of async function invocations,
+      // when all functions complete, update profiles state
+      Promise.all(this._arcPromises(profiles)).then(profiles => this._setState({profiles}));
+    }
+    _querySharedArcs(shared) {
+      // get a map of async function invocations,
+      // when all functions complete, update profiles state
+      Promise.all(this._arcPromises(shared)).then(shared => this._setState({shared}));
+    }
+    _arcPromises(keys) {
+      // creates a map of async function invocations
+      return Object.keys(keys || 0).map(async key => {
+        let snap = await db.child(`arcs/${key}`).once('value');
+        return {
+          key: key,
+          data: snap.val()
+        };
+      });
+    }
     _render(props, state) {
-      let profiles = state.profiles || [];
-      state.profileArcs.models = profiles;
-      state.sharedArcs.models = profiles;
+      let list = (template, models) => { return {template,models}; };
+      let arc_t = ArcExplorer.module.querySelector('template[arc]');
+      let profile_t = ArcExplorer.module.querySelector('template[profile]');
       return {
-        profileArcs: state.profileArcs,
-        sharedARcs: state.sharedArcs,
+        profileArcs: list(arc_t, state.profiles),
+        sharedArcs: list(arc_t, state.shared),
         data: state.data,
-        profiles: {
-          template: ArcExplorer.module.querySelector('[profile]'),
-          models: this._renderProfileArcs(profiles)
-        }
+        profiles: list(profile_t, this._renderProfileArcs(state.profiles))
       };
     }
     _renderProfileArcs(profiles) {
-      return profiles.map(({key, data}) => {
+      let result = [];
+      profiles && profiles.forEach(({key, data}) => {
+        let href = `${location.origin}/${location.pathname}?amkey=${key}`;
         let views = data.views;
-        let info = Object.keys(views || {}).map(name => { return { name } });
+        Object.keys(views || {}).forEach(name => {
+          let data = views[name];
+          if (data.metadata) {
+            data.metadata.type = '<redacted>';
+            }
+          result.push({name, data, href});
+        });
+      });
+      return result;
+/*
+      let view_t = ArcExplorer.module.querySelector('template[view]');
+      let list = (template, models) => { return {template,models}; };
+      return profiles && profiles.map(({key, data}) => {
+        let views = data.views;
         Object.keys(views || {}).forEach(name => {
           let view = views[name];
           if (view.metadata) {
             view.metadata.type = '<redacted>';
-            //delete view.metadata.type;
           }
         });
         return {
-          data: data,
-          info: JSON.stringify(data, null, '  '),
-          views: {
-            template: ArcExplorer.module.querySelector('[view]'),
-            models: info
-          }
+          data: views,
+          views: list(view_t, Object.keys(views || {}).map(name => { return { name } }))
         };
+      });
+*/
+    }
+    dumpDb() {
+      db.child('arcs').once('value').then(s => {
+        this._setState({data: s.val()});
       });
     }
   }
