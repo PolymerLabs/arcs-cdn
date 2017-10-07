@@ -124,19 +124,21 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       })
     };
 
-    let scrape = urls => {
+    let scrape = async urls => {
       let ismd = url => url.toLowerCase().endsWith('.md');
-      return new DocScraper().addUrls(urls.filter(f => !ismd(f)))
-        .then(classes => {
-          return Promise.all(urls.filter(f => ismd(f)).map(f => {
-            return fetch(f)
-              .then(response => response.text())
-              .then(text => { return {
-                name: toCamel(f),
-                chapter: f.startsWith('docs') ? 'Background' : 'Reference',
-                description: buildMdRenderer(f).render(text)}});
-          })).then(values => classes.concat([...values]));
-        });
+      let mds = urls.filter(f => ismd(f));
+      let others = urls.filter(f => !ismd(f));
+      let classes = await new DocScraper().addUrls(others);
+      let values = await Promise.all(mds.map(async f => {
+        let response = await fetch(f);
+        let text = await response.text();
+        return {
+          name: toCamel(f),
+          chapter: f.startsWith('docs') ? 'Background' : 'Reference',
+          description: buildMdRenderer(f).render(text)
+        };
+      }));
+      return classes.concat(values);
     };
 
     let renderTopic = topic => {
@@ -194,7 +196,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let name = location.hash.slice(1) || `Manifest`;
       let topic = corpus.classes.find(c => c.name === name);
       doc.innerHTML = topic ? renderTopic(topic) : 'n/a';
-    }
+    };
+
     window.onhashchange = e => {
       updateTopic();
     };
