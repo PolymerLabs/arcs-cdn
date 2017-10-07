@@ -59,9 +59,10 @@
       let viewId = this._getContextViewId(type, metadata.tags, key, isProfile);
       // only watch each viewId once
       if (this._watchedViews.has(viewId)) {
-        warn(`View id already watched in Arc: ${viewId}`);
+        //warn(`Already watching view id: ${viewId}`);
         return;
       }
+      //log(`starting watch on view id: ${viewId}`);
       this._watchedViews.add(viewId);
       // calculate description
       let viewDescription = this._getViewDescription(metadata.name, metadata.tags, user, owner);
@@ -183,7 +184,7 @@
         // Apply remote changes to local view.
         remoteView.on('child_added', function (data) {
           if (data.val().id.startsWith(arcId)) {
-            log('Skip remote entity because it was created in this Arc', data.val(), arcId);
+            //log('Skip remote entity because it was created in this Arc', data.val(), arcId);
             return;
           }
           localView.store(data.val());
