@@ -231,6 +231,11 @@
       // tags then one will be picked (at random). Views that have a tag will
       // only be synced with other views that have tags.
       this._arc._viewTags.forEach((tags, localView) => {
+        // Local views that are tagged #nosync are not synced with their remote
+        // counterpart. Even if they exist remotely.
+        if (tags && tags.has('#nosync')) {
+          return;
+        }
         let viewId = this._getViewId(localView, tags);
         // Make sure we only synchronize each view at most once.
         if (this._syncedViews.has(viewId)) {
