@@ -49,6 +49,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     [method] > [desc] {
       margin: 0.4em 0 1em;
     }
+    [chapter] {
+      margin-bottom: 20px;
+    }
+    [chapter] > [name] {
+      font-weight: bold;
+    }
     [end] {
       /*
       border-bottom: 2px dashed silver;
@@ -91,8 +97,46 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
     let strcmp = (a,b)=>(a<b)?-1:((a>b)?1:0);
 
+    var buildMdRenderer = (file) => {
+      let md = new Remarkable({
+        highlight: function (str, lang) {
+          if (lang && hljs.getLanguage(lang)) {
+            try {
+              return hljs.highlight(lang, str).value;
+            } catch (err) {}
+          }
+          return ''; // use external default escaping
+        }
+      });
+      let pathPrefix = file.replace(/(.*\/)[^/]+/, "$1");
+      let imgRule = md.renderer.rules.image;
+      md.renderer.rules.image = (tokens, idx, options) => {
+        tokens[idx].src = pathPrefix + tokens[idx].src;
+        return imgRule(tokens, idx, options);
+      };
+      return md;
+    };
+
+    // Convert this-type-of_variables ToCamelNotation.
+    let toCamel = fn => {
+      return fn.replace(/.*\/([^/.]+)\.\w+/, "$1").replace(/^[a-z]|(-[a-z])|(_[a-z])/g, v => {
+        return v.length < 2 ? v.toUpperCase() : " " + v[1].toLowerCase();
+      })
+    };
+
     let scrape = urls => {
-      return new DocScraper().addUrls(urls);
+      let ismd = url => url.toLowerCase().endsWith('.md');
+      return new DocScraper().addUrls(urls.filter(f => !ismd(f)))
+        .then(classes => {
+          return Promise.all(urls.filter(f => ismd(f)).map(f => {
+            return fetch(f)
+              .then(response => response.text())
+              .then(text => { return {
+                name: toCamel(f),
+                chapter: f.startsWith('docs') ? 'Background' : 'Reference',
+                description: buildMdRenderer(f).render(text)}});
+          })).then(values => classes.concat([...values]));
+        });
     };
 
     let renderTopic = topic => {
@@ -125,38 +169,21 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
 
     let renderToc = data => {
-      let topics = data.classes.map(c => c.name);
-      let html = topics.map(t => `<div><a href="#${t}" title="${t}">${t}</a></div>`);
+      // TODO: add @chapter pragma to the source code.
+      let chapter = cls => cls.chapter || 'Reference';
+      let html = []
+      new Set(data.classes.map(cls => chapter(cls))).forEach(c => {
+        let topics = data.classes.filter(cls => chapter(cls) == c).map(c => c.name);
+        html.push(`<div chapter><span name>${c}</span>`);
+        Array.prototype.push.apply(html, topics.map(t => `<div><a href="#${t}" title="${t}">${t}</a></div>`));
+        html.push('</div>');
+      });
       toc.innerHTML = html.join('');
     };
-
-    var md = new Remarkable({
-      highlight: function (str, lang) {
-        if (lang && hljs.getLanguage(lang)) {
-          try {
-            return hljs.highlight(lang, str).value;
-          } catch (err) {}
-        }
-        //try {
-        //  return hljs.highlightAuto(str).value;
-        //} catch (err) {}
-        return ''; // use external default escaping
-      }
-    });
 
     let corpus;
 
     scrape(window.docUrls).then(classes => {
-      return fetch(`lib/manifest.md`)
-        .then(response => response.text())
-        .then(text => {
-          //classes.push({name: 'Manifest', description: `<div pre>${text}</div>`});
-          classes.push({name: 'Manifest', description: md.render(text)});
-          //classes.push({name: 'Manifest', description: marked(text)});
-          return classes;
-        })
-        ;
-    }).then(classes => {
       console.log(classes);
       corpus = {classes};
       renderToc(corpus);
