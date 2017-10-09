@@ -55,12 +55,12 @@
 
       async _fetchManifestList() {
         let manifests = await super._fetchManifestList();
-        manifests.remotes.push(...this._config.additionalManifests);
+        manifests.push(...this._config.additionalManifests);
         return manifests;
       }
 
       async _start(config) {
-        super._start(config);
+        await super._start(config);
 
         // always take the browser arc public
         StorageTools.saveProfileState(true);
