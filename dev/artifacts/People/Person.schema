@@ -13,3 +13,4 @@ schema Person extends Thing
     Text friends
     Text foods
     Text avatar
+    Text active

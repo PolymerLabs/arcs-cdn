@@ -117,6 +117,62 @@ UserTools = {
   },
   async userDataChanged() {
     await this.usersDb.set(this.users);
+  },
+  /**
+   * "Who is Looking at this Arc" tracking
+   * 
+   * `enableTracking` turns on tracking at some interval (e.g. 30s), can be called multiple times.
+   *  Each invocation will force an update.
+   *  `_updateTracking` creates a timestamp entry in FB for currentUser and amkey at
+   *  `/arcs/<amkey>/<currentUser>` using Firebase server clock.
+   *  Then each user is checked for a timestamp (for this amkey) that is not older than
+   *  some interval (e.g. 60s), and the `UserTools.users` records `active` field is set accordingly
+   *  Lastly, the `identities` view (which is synthesized from `UserTools.users`) is recreated,
+   *  triggering updates in any particles that use `identities`.
+   */
+  enableTracking() {
+    let period = 30; // seconds
+    clearInterval(this._trackingInterval);
+    this._trackingInterval = setInterval(this._updateTracking.bind(this), period*1000);
+    this._updateTracking();
+  },
+  async _updateTracking() {
+    let user = UserTools.currentUser;
+    let amkey = StorageTools._amkey;
+    let self = this;
+    if (user && amkey) {
+      let tdb = db.child(`arcs/${amkey}/users`);
+      tdb.child(`${user}`).set(firebase.database.ServerValue.TIMESTAMP);
+      this._lastTimestamp = (await tdb.child(`${user}`).once('value')).val();
+      //log('usage timestamp:', this._lastTimestamp);
+      let changed = false;
+      let users = (await tdb.once('value')).val();
+      this.users.forEach(user => {
+        let record = this.findUser(user.name);
+        let active = false;
+        let stamp = users[user.name];
+        if (stamp) {
+          //log(`${user} t = `, this._lastTimestamp - users[user]);
+          active = (self._lastTimestamp - stamp) < 60*1000;
+        }
+        if (record.active !== active) {
+          record.active = active;
+          changed = true;
+        }
+      });
+      if (changed) {
+        self._updateIdentities();
+      }
+    }
+  },
+  _updateIdentities() {
+    let ids = this.identities;
+    ids.toList().forEach(identity => {
+      ids.remove(identity.id);
+    });
+    this.users.forEach(u => {
+      ids.store({id: this.id(), rawData: u});
+    });
   }
 };
 

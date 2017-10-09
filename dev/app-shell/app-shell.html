@@ -347,6 +347,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({user: UserTools.currentUser, users: UserTools.users});
       // update sharing
       this.watchSharedArcs();
+      UserTools.enableTracking();
     }
     async loadManifest() {
       let manifests = await this._fetchManifestList();
