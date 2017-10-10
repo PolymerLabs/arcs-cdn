@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+  <title>Arcs</title>
+  <link rel="shortcut icon" href="favicon.ico">
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+</head>
+<body>
+
+  <style>
+    extension-app-shell {
+      display: block;
+      overflow: hidden;
+      padding-top: 32px;
+      padding-bottom: 64px;
+      background-color: white;
+    }
+
+    extension-app-shell {
+      min-width: 320px;
+    }
+    /* wider-than-mobile */
+    @media (min-width: 500px) {
+      extension-app-shell {
+        box-sizing: border-box;
+        margin: 0 auto;
+        max-width: 700px;
+      }
+      extension-app-shell[expanded] {
+        margin: 0;
+        width: 414px;
+        max-width: 414px;
+      }
+  </style>
+
+  <link rel="import" href="../../app-shell/app-shell.html">
+
+  <extension-app-shell></extension-app-shell>
+
+  <script>
+    class ExtensionAppShell extends AppShell {
+
+      _configure(obj) {
+        let config = super._configure(obj);
+
+        let manifests = (new URL(document.location)).searchParams.getAll('manifest');
+        config.additionalManifests = manifests.filter(elem => elem!=config.manifestPath);
+
+        return config;
+      }
+
+      async _fetchManifestList() {
+        let manifests = await super._fetchManifestList();
+        manifests.push(...this._config.additionalManifests);
+        return manifests;
+      }
+
+      async _start(config) {
+        await super._start(config);
+
+        // always take the browser arc public
+        StorageTools.saveProfileState(true);
+      }
+      
+    }
+
+    customElements.define('extension-app-shell', ExtensionAppShell);
+  </script>
+
+</body>
+</html>
