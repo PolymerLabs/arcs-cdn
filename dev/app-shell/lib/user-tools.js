@@ -78,20 +78,16 @@ UserTools = {
   async privatize() {
     if (confirm("Privatize removes sharing information that cannot be retrieved. Privatize anyway?")) {
       log('privatizing...');
-      let usersSnap = await this.usersDb.once('value');
       let promises = [];
+      let usersSnap = await this.usersDb.once('value');
       usersSnap.forEach(snap => {
         let user = snap.val();
-        console.log(user);
+        log(user);
         let shared = snap.ref.child('shared');
         promises.push(shared.remove());
         let profile = snap.ref.child('profile');
         promises.push(profile.remove());
       });
-      /*
-      usersSnap.forEach(snap => promises.push(snap.ref.child('shared').remove()));
-      usersSnap.forEach(snap => promises.push(snap.ref.child('profile').remove()));
-      */
       await Promise.all(promises);
       this.users = (await this.usersDb.once('value')).val();
       log(`privatize: users`, this.users);

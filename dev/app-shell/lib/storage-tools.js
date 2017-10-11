@@ -158,7 +158,7 @@ StorageTools = {
           description: description && (description.user_generated || description.computed) || k,
           icon: icons[Math.floor(Math.random()*icons.length)],
           key: k,
-          href: `${location.origin}/${location.pathname}?amkey=${k}`
+          href: `${location.origin}${location.pathname}?amkey=${k}`
         };
       });
       log('updateArcsView: arcs', arcs);
