@@ -6,10 +6,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import '../../entities/Person.manifest'
+import 'Product.schema'
 
-particle GiftList in 'GiftList.js'
-  GiftList(in Person person)
-  affordance dom
-  consume preamble
-  description `buy gifts for ${person}`
+particle ManufacturerInfo in 'source/ManufacturerInfo.js'
+  ManufacturerInfo(in [Product] list)
+  consume set of annotation
+  description `Check manufacturer information for ${list}`

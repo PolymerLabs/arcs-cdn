@@ -6,12 +6,10 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import '../../entities/Product.manifest'
+import '../People/Person.schema'
 
-particle Chooser in 'Chooser.js'
-  Chooser(in [Product] choices, inout [Product] resultList)
+particle GiftList in 'source/GiftList.js'
+  GiftList(in Person person)
   affordance dom
-  consume action
-  # annotation slot will be provided, as soon as SlotComposer and MapRemoteSlots strategy support it.
-  #  provide set of annotation
-  description `choose from ${choices}`
+  consume preamble
+  description `buy gifts for ${person}`
