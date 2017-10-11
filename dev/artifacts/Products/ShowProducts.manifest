@@ -6,9 +6,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import '../Product.schema'
+import 'Product.schema'
 
-particle ShowProducts in 'ShowProducts.js'
+particle ShowProducts in 'source/ShowProducts.js'
   ShowProducts(in [Product] list)
   affordance dom
   affordance dom-touch

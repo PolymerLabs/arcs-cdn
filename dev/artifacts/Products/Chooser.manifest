@@ -6,9 +6,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import '../../entities/Product.manifest'
+import 'Product.schema'
 
-particle Arrivinator in 'Arrivinator.js'
-  Arrivinator(in [Product] list)
-  consume set of annotation
-  description `estimate arrival dates`
+particle Chooser in 'source/Chooser.js'
+  Chooser(in [Product] choices, inout [Product] resultList)
+  consume action
+  description `choose from ${choices}`

@@ -6,9 +6,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import '../../entities/Product.manifest'
+import 'Product.schema'
 
-particle Recommend in 'Recommend.js'
-  Recommend(in [Product] known, in [Product] population, out [Product] recommendations)
-  description `Recommend Products from ${known} and ${population}`
-    recommendations `Products recommended based on ${known} and ${population}`
+particle Arrivinator in 'source/Arrivinator.js'
+  Arrivinator(in [Product] list)
+  consume set of annotation
+  description `estimate arrival dates`

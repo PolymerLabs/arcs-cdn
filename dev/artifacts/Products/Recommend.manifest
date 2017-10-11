@@ -6,9 +6,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import '../../entities/Product.manifest'
+import 'Product.schema'
 
-particle ManufacturerInfo in 'ManufacturerInfo.js'
-  ManufacturerInfo(in [Product] list)
-  consume set of annotation
-  description `Check manufacturer information for ${list}`
+particle Recommend in 'source/Recommend.js'
+  Recommend(in [Product] known, in [Product] population, out [Product] recommendations)
+  description `Recommend Products from ${known} and ${population}`
+    recommendations `Products recommended based on ${known} and ${population}`
