@@ -24,9 +24,7 @@ UserTools = {
       }
     }
     //
-    this.id = () => arc.generateID();
-    //
-    let manifest = await Arcs.Manifest.load(`${config.root}/app-shell/types.manifest`, loader);
+    let manifest = await Arcs.Manifest.load(`${config.root}/app-shell/artifacts/user-types.manifest`, loader);
     let personSchema = manifest.findSchemaByName('Person');
     //
     // view in arc suitable for `use`, `?`
@@ -37,7 +35,7 @@ UserTools = {
     //
     let identities = manifest.newView(personSchema.type.viewOf(), 'Identities', arc.generateID(), ['#identities']);
     users.forEach(u => {
-      identities.store({id: this.id(), rawData: u});
+      identities.store({id:arc.generateID(), rawData: u});
     });
     //
     let identity = manifest.newView(personSchema.type, 'Identity', arc.generateID(), ['#identity']);
@@ -75,7 +73,7 @@ UserTools = {
     if (!user) {
       user = this.users[0];
     }
-    this.identity.set({id: this.id(), rawData: user});
+    this.identity.set({id: arc.generateID(), rawData: user});
   },
   async privatize() {
     if (confirm("Privatize removes sharing information that cannot be retrieved. Privatize anyway?")) {
@@ -100,7 +98,7 @@ UserTools = {
     }
   },
   async createUser(name) {
-    if (name && confirm(`Create new user "${name}"?`)) {
+    if (name && name !== '(none)' && confirm(`Create new user "${name}"?`)) {
       if (this.findUser(name)) {
         log(`createUser: user ${name} already exists`);
       } else {
@@ -120,7 +118,7 @@ UserTools = {
   },
   /**
    * "Who is Looking at this Arc" tracking
-   * 
+   *
    * `enableTracking` turns on tracking at some interval (e.g. 30s), can be called multiple times.
    *  Each invocation will force an update.
    *  `_updateTracking` creates a timestamp entry in FB for currentUser and amkey at
@@ -171,7 +169,7 @@ UserTools = {
       ids.remove(identity.id);
     });
     this.users.forEach(u => {
-      ids.store({id: this.id(), rawData: u});
+      ids.store({id: arc.generateID(), rawData: u});
     });
   }
 };

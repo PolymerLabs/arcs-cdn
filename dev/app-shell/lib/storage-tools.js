@@ -15,7 +15,7 @@ const log = console.log.bind(console, ...pre);
 const warn = console.warn.bind(console, ...pre);
 
 StorageTools = {
-  async init(arc, config) {
+  async init(arc, config, loader) {
     let storage = this.storage = new ArcMetadataStorage({arc});
     let shared = this.shared = new SharedArcs({arc});
     // Create an amkey=id if it doesn't already exist.
@@ -34,6 +34,8 @@ StorageTools = {
     storage.store('creator', {user: config.user});
     // Store the manifest file path for the Arc to test out metadata storage
     storage.store('manifest', {url: new URL(config.manifestPath, location.href).href});
+    // setup arcs View
+    await this.createArcsView(config, loader);
   },
   get initialized() {
     return this._amkey !== undefined;
@@ -130,13 +132,7 @@ StorageTools = {
     }
   },
   _userDataForCurrentUser() {
-    let user = UserTools.currentUser;
-    if (!user) return null;
-
-    let userData = UserTools.findUser(user);
-    if (!userData) return null;
-
-    return userData;
+    return UserTools.findUser(UserTools.currentUser);
   },
   loadSharedState() {
     let userData = this._userDataForCurrentUser();
@@ -145,6 +141,35 @@ StorageTools = {
   loadProfileState() {
     let userData = this._userDataForCurrentUser();
     return !!Object.keys(userData && userData.profile || {}).includes(this._amkey);
+  },
+  async createArcsView(config, loader) {
+    let manifest = await Arcs.Manifest.load(`${config.root}/app-shell/artifacts/arc-types.manifest`, loader);
+    let arcSchema = manifest.findSchemaByName('ArcMetadata');
+    this.arcsView = arc.context.newView(arcSchema.type.viewOf(), 'ArcMetadata', arc.generateID(), ['#arcmetadata']);
+  },
+  async updateArcsView() {
+    if (this.arcsView) {
+      let icons= ['settings','movie','new_releases','high_quality','room_service','casino','child_care','spa','kitchen'];
+      let arcs = (await db.child(`arcs`).once('value')).val();
+      let keys = Object.keys(arcs).filter(k => arcs[k].users && arcs[k].users[UserTools.currentUser]);
+      arcs = keys.map(k => {
+        let description = arcs[k].metadata.description;
+        return {
+          description: description && (description.user_generated || description.computed) || k,
+          icon: icons[Math.floor(Math.random()*icons.length)],
+          key: k,
+          href: `${location.origin}/${location.pathname}?amkey=${k}`
+        };
+      });
+      log('updateArcsView: arcs', arcs);
+      let av = this.arcsView;
+      av.toList().forEach(arc => {
+        av.remove(arc.id);
+      });
+      arcs.forEach(a => {
+        av.store({id: arc.generateID(), rawData: a});
+      });
+    }
   }
 };
 

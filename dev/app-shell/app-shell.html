@@ -273,6 +273,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     async _start(config) {
       this._config = config;
+      // TODO(sjmiles): misuing this semaphore to block planning (fix!)
+      this.planning = true;
       // UI config
       if (config.arcsDevTools === 'open') {
         this.setAttribute('expanded', '');
@@ -295,7 +297,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // configure sharing
         SharingTools.init(this);
         // configure storage
-        await StorageTools.init(arc, config);
+        await StorageTools.init(arc, config, this._loader);
         // configure (chrome)-casting
         CastTools.init();
         this._setState({castIcon: 'cast'});
@@ -304,11 +306,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       await UserTools.init(config, arc, this._loader);
       manifest.imports.push(UserTools.identityManifest);
       // configure current user
-      this._setCurrentUser(config.user);
+      await this._setCurrentUser(config.user);
       // done for now, syncSteps() will trigger planner
       this._setState({dotsDisabled: true});
       // configure search
       this.search = config.search;
+      // stop blocking planning
+      this.planning = false;
       if (!config.nokey) {
         // set initial title and watch for updates of description
         StorageTools.syncDescription((computed, userGenerated) => this._onNewDescription(computed, userGenerated));
@@ -333,7 +337,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       config.urlMap = urlMap;
       return loader;
     }
-    _setCurrentUser(user) {
+    async _setCurrentUser(user) {
       UserTools.currentUser = user;
       if (user) {
         //Arcs.utils.setUrlParam('user', user);
@@ -346,6 +350,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._updateProfileStateIcon();
       this._setState({user: UserTools.currentUser, users: UserTools.users});
       // update sharing
+      await StorageTools.updateArcsView();
       this.watchSharedArcs();
       UserTools.enableTracking();
     }
