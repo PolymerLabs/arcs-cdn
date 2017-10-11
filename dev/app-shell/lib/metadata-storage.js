@@ -172,7 +172,7 @@
             change.remove.forEach((r) => {
               remoteView.orderByChild('id').equalTo(r.id).on("value", function (snapshot) {
                 snapshot.forEach(function (data) {
-                  remoteView.child(data.key()).remove();
+                  remoteView.child(data.key).remove();
                 });
               });
             });
