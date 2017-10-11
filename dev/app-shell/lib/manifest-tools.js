@@ -44,7 +44,7 @@ this.ManifestTools = {
     let exclusions = this._readExclusions();
     let manifests = remotes.filter(m => exclusions.indexOf(m) < 0);
     manifests.remotes = remotes;
-    manifests.exlusions = exclusions;
+    manifests.exclusions = exclusions;
     return manifests;
   },
   _readExclusions() {

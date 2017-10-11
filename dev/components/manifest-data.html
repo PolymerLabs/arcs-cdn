@@ -83,8 +83,8 @@
     }
     _onCheckInput(e) {
       let {key, checked} = e.currentTarget;
-      let m = this._manifests[key], x = this._exclusions;
-      this.exclusions = checked ? x.filter(e => e != m) : x.concat([m]);
+      let m = this._manifests[key];
+      this._exclusions = checked ? this._exclusions.filter(e => e != m) : this._exclusions.concat([m]);
       this.dirty = true;
     }
     _onApply(e) {
