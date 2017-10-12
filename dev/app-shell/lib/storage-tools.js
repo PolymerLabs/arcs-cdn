@@ -145,7 +145,11 @@ StorageTools = {
   async createArcsView(config, loader) {
     let manifest = await Arcs.Manifest.load(`${config.root}/app-shell/artifacts/arc-types.manifest`, loader);
     let arcSchema = manifest.findSchemaByName('ArcMetadata');
-    this.arcsView = arc.context.newView(arcSchema.type.viewOf(), 'ArcMetadata', arc.generateID(), ['#arcmetadata']);
+    this.arcsView = arc.createView(arcSchema.type.viewOf(), 'ArcMetadata', arc.generateID(), ['#arcmetadata']);
+    this.arcsView.on('change', change => {
+      log('arcsView change detected', change);
+    }, {});
+    //this.arcsView = arc.context.newView(arcSchema.type.viewOf(), 'ArcMetadata', arc.generateID(), ['#arcmetadata']);
   },
   async updateArcsView() {
     if (this.arcsView) {

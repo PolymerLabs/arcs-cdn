@@ -160,18 +160,18 @@
 
         // Apply local changes to remote view.
         // TODO: support modifications too.
-        localView.on('change', (change) => {
+        localView.on('change', change => {
           if (change.add) {
-            change.add.forEach((a) => {
+            change.add.forEach(a => {
               // Only store changes that were made locally.
               if (a.id.startsWith(arcId)) {
                 remoteView.push(removeUndefined(a));
               }
             });
           } else if (change.remove) {
-            change.remove.forEach((r) => {
-              remoteView.orderByChild('id').equalTo(r.id).on("value", function (snapshot) {
-                snapshot.forEach(function (data) {
+            change.remove.forEach(r => {
+              remoteView.orderByChild('id').equalTo(r.id).on("value", snapshot => {
+                snapshot.forEach(data => {
                   remoteView.child(data.key).remove();
                 });
               });
