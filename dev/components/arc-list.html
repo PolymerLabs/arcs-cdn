@@ -7,7 +7,6 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
-
 <template>
     <style>
       arc-list {
@@ -56,13 +55,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <div banner2>Recent</div>
     <div>{{recent}}</div>
   </template>
-  
+
   <template arc-list-item>
     <div style="padding: 8px 0; border-top: 1px dotted silver;" style%="{{style}}">
       <div key="{{key}}" on-click="_onOpenArc">{{title}}</div>
     </div>
   </template>
-  
+
   <script>
     class ArcList extends HTMLElement {
       connectedCallback() {
@@ -132,4 +131,3 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     ArcList.module = document.currentScript.ownerDocument;
     customElements.define('arc-list', ArcList);
   </script>
-  
