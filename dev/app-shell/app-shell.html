@@ -42,13 +42,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       top: 0;
       left: 0;
       right: 0;
-      height: 32px;
+      height: 40px;
       display: flex;
       align-items: center;
       white-space: nowrap;
       padding: 0 8px;
       box-sizing: border-box;
       background-color: whitesmoke;
+      z-index: 1000;
+      transform: translate(0,0,0); /* makes it a layer, is there a better way? */
     }
     .material-icons {
       cursor: pointer;
