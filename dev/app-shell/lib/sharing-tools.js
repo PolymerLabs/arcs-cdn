@@ -104,14 +104,14 @@ SharingTools = {
     if (steps && (!this._steps || steps.length !== this._steps.length)) {
       log('newAcceptedSteps', steps);
       this._steps = steps;
-      this.applyAcceptedSteps();
+      await this.applyAcceptedSteps();
     }
     this._shell.stepsChanged();
   },
-  applyAcceptedSteps(plans) {
+  async applyAcceptedSteps(plans) {
     if (!this._steps || !plans || !this.initialized) return;
     if (!this._appliedSteps) this._appliedSteps = {};
-    plans.forEach(suggestion => {
+    let applicationFlags = await Promise.all(plans.map(async suggestion => {
       let step = this._createOriginatingStep(suggestion.plan, plans.generations);
       if (!step) {
         console.warn(...pre, "can't find first generation of", plan, "in", plans.generations);
@@ -125,13 +125,15 @@ SharingTools = {
         if (matchingStep) {
           log("Auto applying step: ", matchingStep, suggestion);
           this._appliedSteps[matchingStep.hash] = true;
-          this._shell.applySuggestion(suggestion.plan);
+          await this._shell.applySuggestion(suggestion.plan);
+          return true;
         } else {
           let nearMiss = this._steps.find(s => s.hash == step.hash);
           if (nearMiss) log("Almost auto-applied step: ", nearMiss, suggestion);
         }
       }
-    });
+    }));
+    return applicationFlags.some(v => Boolean(v));
   },
   _createOriginatingStep(plan, generations) {
     let firstGeneration = this._findFirstGeneration(plan, generations);

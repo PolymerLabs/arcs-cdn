@@ -378,14 +378,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       try {
         this.planning = true;
         this._setState({dotsActive: true, suggestions: []});
-        let plans, max_iterations = 3;
+        let plans, max_iterations = 3, didApplyStep;
         do {
           plans = await Arcs.utils.makePlans(this.arc, 5000);
           log(`plans`, plans, 'iterations left:', max_iterations);
-        } while (SharingTools.applyAcceptedSteps(plans) && --max_iterations > 0);
+          didApplyStep = await SharingTools.applyAcceptedSteps(plans);
+        } while(didApplyStep); //(SharingTools.applyAcceptedSteps(plans) && --max_iterations > 0);
         // TODO(sjmiles): we need to makePlans if SharingTools applied a step, but applyAcceptedSteps
         // never returns true. Until we fix it, we'll just plan one more time.
-        plans = await Arcs.utils.makePlans(this.arc, 5000);
+        //plans = await Arcs.utils.makePlans(this.arc, 5000);
         log(`plans`, plans, 'iterations left:', max_iterations);
         // TODO(sjmiles): ^
         document.dispatchEvent(new CustomEvent('generations', {detail: plans.generations}));
@@ -421,23 +422,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return results || [];
     }
-    applySuggestion(plan) {
+    async applySuggestion(plan) {
+      // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
+      // we need some additional signals in combination with a more robust system for invalidating
+      // suggestions. Currently, most of the asynchrony is what I'll _short-term_, such that a simple
+      // timeout here is likely to catch the vast majority of the work. This is just a temporary solution,
+      // since it's a just another race-condition in actuality (I've merely slowed one of the racers).
+      // The timeout value is a magic number.
       this.arc.instantiate(plan);
-      StorageTools.syncStorage();
-      document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
+      return new Promise((resolve, reject) => {
+        setTimeout(resolve, 200);
+      }).then(() => {
+        StorageTools.syncStorage();
+        document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
+      });
     }
-    _describeArc() {
-      let combinedSuggestion = Arcs.Description.getSuggestion(this.arc._activeRecipe, this.arc, null);
-      let tags = Object.keys(this.arc._tags);
-      return tags.join(", ") + " – " + combinedSuggestion;
-    }
-    addAcceptedStep(plan) {
-      SharingTools.addAcceptedStep(plan, this._plans.generations);
-      this._computedDescription = this._describeArc();
-      this._updateTitle();
-      StorageTools.saveComputedDescription(this._computedDescription);
-    }
-    _onPlanSelected(e) {
+    async _onPlanSelected(e) {
       let {plan} = e.detail;
       this._setState({toastOpen: false});
       // Reset search, unless it was '*'
@@ -446,9 +446,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this.search = '';
         this._setState({searchText: ''});
       }
-      this.applySuggestion(plan);
+      await this.applySuggestion(plan);
       this.addAcceptedStep(plan);
       this.findSuggestions();
+    }
+    addAcceptedStep(plan) {
+      SharingTools.addAcceptedStep(plan, this._plans.generations);
+      this._computedDescription = this._describeArc();
+      this._updateTitle();
+      StorageTools.saveComputedDescription(this._computedDescription);
+    }
+    _describeArc() {
+      let combinedSuggestion = Arcs.Description.getSuggestion(this.arc._activeRecipe, this.arc, null);
+      let tags = Object.keys(this.arc._tags);
+      return tags.join(", ") + " – " + combinedSuggestion;
     }
     viewsChanged() {
       log('viewsChanged');
