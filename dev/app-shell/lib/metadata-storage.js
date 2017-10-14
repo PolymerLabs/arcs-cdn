@@ -206,32 +206,26 @@
 
     // Synchronize a local variable with a remote variable.
     _syncVariable(localView, remoteView) {
-      let arcId = this._arc.id;
-      // If there is a remote value it wins.
-      remoteView.once('value').then(snapshot => {
-        if (snapshot.val()) {
+      var arcId = this._arc.id;
+      var initialLoad = true;
+      remoteView.on('value', snapshot => {
+        if (snapshot.val() && !snapshot.val().id.startsWith(arcId)) {
           localView.set(snapshot.val());
-        } else {
+        } else if (!snapshot.val()) {
           localView.clear();
         }
-      }).then(() => {
-        // Once the initial sync is done we start listening to all the local
-        // and remote updates.
-        remoteView.on('value', snapshot => {
-          if (snapshot.val() && !snapshot.val().id.startsWith(arcId)) {
-            localView.set(snapshot.val());
-          } else if (!snapshot.val()) {
-            localView.clear();
-          }
-        });
-        localView.on('change', change => {
-          // If the change was initiated locally then propagate it remotely.
-          if (change.data && change.data.id.startsWith(arcId)) {
-            remoteView.set(removeUndefined(change.data));
-          } else if (change.data === undefined) {
-            remoteView.remove();
-          }
-        }, {});
+        if (initialLoad) {
+          // Once the first load is complete sync starts listening to
+          // local changes and applying those to the remove view.
+          initialLoad = false;
+          localView.on('change', change => {
+            if (change.data && change.data.id.startsWith(arcId)) {
+              remoteView.set(removeUndefined(change.data));
+            } else if (change.data === undefined) {
+              remoteView.remove();
+            }
+          }, {});
+        }
       });
     }
 
