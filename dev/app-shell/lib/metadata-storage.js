@@ -147,8 +147,6 @@
       let remoteIds = new Set();
 
       // One-time sync from remote => local.
-      // TODO: simplify the code here. on('child_added') will be called for
-      // every element that is already there. No need to do once('value').
       remoteView.once('value').then(snapshot => {
         snapshot.forEach(function (e) {
           localView.store(e.val());
@@ -177,7 +175,7 @@
             });
           } else if (change.remove) {
             change.remove.forEach(r => {
-              remoteView.orderByChild('id').equalTo(r.id).on("value", snapshot => {
+              remoteView.orderByChild('id').equalTo(r.id).once('value', snapshot => {
                 snapshot.forEach(data => {
                   remoteView.child(data.key).remove();
                 });
@@ -190,11 +188,9 @@
 
         // Apply remote changes to local view.
         remoteView.on('child_added', data => {
-          if (data.val().id.startsWith(arcId)) {
-            //log('Skip remote entity because it was created in this Arc', data.val(), arcId);
-            return;
+          if (!data.val().id.startsWith(arcId)) {
+            localView.store(data.val());
           }
-          localView.store(data.val());
         });
         remoteView.on('child_removed', data => {
           // Note: element will only be removed and 'remove' event will only be
