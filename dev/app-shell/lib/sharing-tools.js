@@ -28,6 +28,33 @@ const log = console.log.bind(console, ...pre);
   App shell invalidation is cleared by re-planning after a debouncing interval.
 */
 
+ProfileWatcher = {
+  watch(user, notifier) {
+    this._profileRef = UserTools.userDb(user.name).child('profile');
+    this._profileRef.on('child_added', snapshot => {
+      StorageTools.shared.watchArc(
+        ProfileWatcher.watchForProfileArc(snapshot.key),
+        notifier);
+    });
+    this._profileRef.on('child_removed', snapshot => {
+      StorageTools.shared.unwatchArc(snapshot.key, notifier);
+    });
+  },
+  unwatch() {
+    this._profileRef && this._profileRef.off();
+    this._profileRef = undefined;
+  },
+  watchForProfileArc(key) {
+    return {
+      key,
+      user: UserTools.currentUser,
+      owner: UserTools.currentUser,
+      isProfile: true,
+      inFriendProfile: false
+    };
+  }
+};
+
 SharingTools = {
   init(shell) {
     this._shell = shell;
@@ -39,6 +66,7 @@ SharingTools = {
   watchSharedArcs() {
     if (!this.initialized) return;
     StorageTools.shared.unwatchAll();
+    ProfileWatcher.unwatch();
     let user = UserTools.findUser(UserTools.currentUser);
     if (user) {
       let watches = [];
@@ -50,7 +78,8 @@ SharingTools = {
       this._watchProfileArcs(user, watches);
       // Setup the watches
       log(`watchSharedArcs `, watches);
-      StorageTools.shared.watchAll(watches, () => this._shell.viewsChanged());
+      StorageTools.shared.watchAll(watches, () => this._shell.viewsChanged());      
+      ProfileWatcher.watch(user, () => this._shell.viewsChanged());
     }
   },
   _watchFriendsArcs(user, watches) {
@@ -69,8 +98,8 @@ SharingTools = {
       watches.push({
         key: amkey,
         user: UserTools.currentUser,
-        owner: name,
-        isProfile: name === UserTools.currentUser,
+        owner: friend.name,
+        isProfile: friend.name === UserTools.currentUser,
         inFriendProfile: Boolean((friend.profile || {})[amkey])
       });
     });
@@ -79,13 +108,7 @@ SharingTools = {
     if (user.profile) {
       Object.keys(user.profile).forEach(key => {
         log(`_watchProfileArcs: adding ${user.name}'s profile arc to watch list, amkey=`, key);
-        watches.push({
-          key,
-          user: UserTools.currentUser,
-          owner: UserTools.currentUser,
-          isProfile: true,
-          inFriendProfile: false
-        });
+        watches.push(ProfileWatcher.watchForProfileArc(key));
       });
     }
   },

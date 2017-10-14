@@ -27,28 +27,57 @@
     constructor({arc}) {
       this._arc = arc;
       this._watchedViews = new Set();
-      this._watchedRefs = [];
+      this._watchedArcs = {};  // key => [{node, views}]
     }
     // [{key, owner, isProfile, inFriendProfile}], notifier
     // `notifier` is called every time a `watch` executes
     watchAll(arcSpecs, notifier) {
-      arcSpecs.forEach(vs => this._watchArc(vs, notifier));
+      arcSpecs.forEach(vs => this.watchArc(vs, notifier));
     }
     unwatchAll() {
-      this._watchedRefs.forEach(r => r.off());
-      this._watchedRefs = [];
+      Object.keys(this._watchedArcs).forEach(key => {
+        this.unwatchArc(key);
+      });
+      console.assert(!this._watchedArcs.length);
       this._watchedViews = new Set();
     }
     // Syncs all of the views in the given shared Arc amkey to the local context.
-    _watchArc({key, user, owner, isProfile, inFriendProfile}, notifier) {
+    watchArc({key, user, owner, isProfile, inFriendProfile}, notifier) {
       log(`watching enabled for arcs/${key}/views`);
       let node = db.child(`arcs/${key}/views`);
-      this._watchedRefs.push(node);
+      var watchedArc = {node, views: []};
+      // TODO(noelutz): do we need to keep track of multiple keys if the same
+      // Arc is imported twice (e.g., both as friend and profile Arc)?
+      if (this._watchedArcs[key]) {
+        this._watchedArcs[key].push(watchedArc);  
+      } else {
+        this._watchedArcs[key] = [watchedArc];
+      }
       node.on('value', viewSnaps => {
         log(`watch triggered for arcs/${key}/views`);
-        viewSnaps.forEach(snap => this._watchView(snap, key, user, owner, isProfile, inFriendProfile));
+        viewSnaps.forEach(snap => {
+          let viewData = this._watchView(snap, key, user, owner, isProfile, inFriendProfile);
+          if (viewData) {
+            watchedArc.views.push(viewData);
+          }
+        });
         notifier && notifier();
       });
+    }
+    // Stop watching a single shared Arc. Notifier is called we stopped listening to
+    // views from the given Arc.
+    unwatchArc(key, notifier) {
+      this._watchedArcs[key].forEach(a => {
+        a.node.off();
+        a.views.forEach(viewData => {
+          viewData.node.off();
+          this._watchedViews.delete(viewData.id);
+        });
+      });
+      delete this._watchedArcs[key];
+      // TODO(noelutz): this doesn't quite do the right thing because
+      // the view still exists in the context.
+      notifier && notifier();
     }
     _watchView(snapshot, key, user, owner, isProfile, inFriendProfile) {
       // get view `metadata`
@@ -59,7 +88,6 @@
       let viewId = this._getContextViewId(type, metadata.tags, key, isProfile);
       // only watch each viewId once
       if (this._watchedViews.has(viewId)) {
-        //warn(`Already watching view id: ${viewId}`);
         return;
       }
       //log(`starting watch on view id: ${viewId}`);
@@ -71,9 +99,6 @@
       // get view `values`
       let remoteView = snapshot.child('values').ref;
       if (localView.type.isView) {
-        // TODO(sjmiles): remoteView watchers originally never went away, now they
-        // go away when `unwatchAll` is called.
-        this._watchedRefs.push(remoteView);
         // One-way syncing. Whenever a new entity is added / removed in the remote
         // view it should get reflected in the context.
         remoteView.on('child_added', function (data) {
@@ -83,7 +108,6 @@
           localView.remove(data.val().id);
         });
       } else if (localView.type.isEntity || localView.type.isVariable) {
-        this._watchedRefs.push(remoteView);
         remoteView.on('value', snapshot => {
           if (snapshot.val()) {
             localView.set(snapshot.val());
@@ -92,6 +116,7 @@
           }
         });  
       }
+      return {id: viewId, node: remoteView};
     }
     // Creates or returns a context view for the given params.
     _getContextView(type, name, viewId, tags, description) {
