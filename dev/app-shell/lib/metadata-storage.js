@@ -82,8 +82,15 @@
         remoteView.on('child_removed', function (data) {
           localView.remove(data.val().id);
         });
-      } else if (localView.type.isVariable) {
-        console.warn(...pre, 'Shared Variable syncing not implemented');
+      } else if (localView.type.isEntity || localView.type.isVariable) {
+        this._watchedRefs.push(remoteView);
+        remoteView.on('value', snapshot => {
+          if (snapshot.val()) {
+            localView.set(snapshot.val());
+          } else {
+            localView.clear();
+          }
+        });  
       }
     }
     // Creates or returns a context view for the given params.
@@ -142,7 +149,7 @@
       // One-time sync from remote => local.
       // TODO: simplify the code here. on('child_added') will be called for
       // every element that is already there. No need to do once('value').
-      remoteView.once('value').then(function (snapshot) {
+      remoteView.once('value').then(snapshot => {
         snapshot.forEach(function (e) {
           localView.store(e.val());
           remoteIds.add(e.val().id);
@@ -182,14 +189,14 @@
         }, {});
 
         // Apply remote changes to local view.
-        remoteView.on('child_added', function (data) {
+        remoteView.on('child_added', data => {
           if (data.val().id.startsWith(arcId)) {
             //log('Skip remote entity because it was created in this Arc', data.val(), arcId);
             return;
           }
           localView.store(data.val());
         });
-        remoteView.on('child_removed', function (data) {
+        remoteView.on('child_removed', data => {
           // Note: element will only be removed and 'remove' event will only be
           // fired iff the ID is present in the view.
           localView.remove(data.val().id);
@@ -199,7 +206,33 @@
 
     // Synchronize a local variable with a remote variable.
     _syncVariable(localView, remoteView) {
-      console.warn(...pre, 'Variable syncing not supported');
+      let arcId = this._arc.id;
+      // If there is a remote value it wins.
+      remoteView.once('value').then(snapshot => {
+        if (snapshot.val()) {
+          localView.set(snapshot.val());
+        } else {
+          localView.clear();
+        }
+      }).then(() => {
+        // Once the initial sync is done we start listening to all the local
+        // and remote updates.
+        remoteView.on('value', snapshot => {
+          if (snapshot.val() && !snapshot.val().id.startsWith(arcId)) {
+            localView.set(snapshot.val());
+          } else if (!snapshot.val()) {
+            localView.clear();
+          }
+        });
+        localView.on('change', change => {
+          // If the change was initiated locally then propagate it remotely.
+          if (change.data && change.data.id.startsWith(arcId)) {
+            remoteView.set(removeUndefined(change.data));
+          } else if (change.data === undefined) {
+            remoteView.remove();
+          }
+        }, {});
+      });
     }
 
     // Call initialize if you don't yet have an amkey. The method
@@ -254,7 +287,7 @@
         if (localView.type.isView) {
           this._syncView(localView, remoteView);
         }
-        if (localView.type.isVariable) {
+        if (localView.type.isEntity) {
           this._syncVariable(localView, remoteView);
         }
       });
