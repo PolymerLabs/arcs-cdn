@@ -69,6 +69,11 @@ class XenElement extends HTMLElement {
   }
   _didMount() {
   }
+  _fire(eventName, detail) {
+    let event = new CustomEvent(eventName, {detail: detail});
+    this.dispatchEvent(event);
+    return event.detail;
+  }
 }
 
 window.XenElement = XenElement;
