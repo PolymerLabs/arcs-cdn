@@ -35,21 +35,22 @@ class XenElement extends HTMLElement {
       }
     });
   }
-  __configureAccessors(outputStates) {
+  __configureAccessors() {
     // only do this once per prototype
     var p = Object.getPrototypeOf(this);
     if (!p.hasOwnProperty('__$xenPropsConfigured')) {
       p.__$xenPropsConfigured = true;
       var a = this._class.observedAttributes;
-      a && a.forEach((n)=>{
+      a && a.forEach(n => {
         Object.defineProperty(p, n, {
-          get() { return this._getProperty(n); },
-          set(value) { this._setProperty(n, value); }
-        });
-      });
-      outputStates && outputStates.forEach((n)=>{
-        Object.defineProperty(p, n, {
-          get() { return this._state[n]; }
+          get() {
+            // abstract
+            return this._getProperty(n);
+          },
+          set(value) {
+            // abstract
+            this._setProperty(n, value);
+          }
         });
       });
     }
