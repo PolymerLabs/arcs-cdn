@@ -1,0 +1,68 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!-- component dependencies -->
+<link rel="import" href="arc-host.html">
+<link rel="import" href="arc-store.html">
+<link rel="import" href="../../components/simple-tabs.html">
+
+<template>
+  <style>
+    :host {
+      display: block;
+    }
+    i {
+      font-family: 'Material Icons';
+      font-size: 24px;
+      font-style: normal;
+      -webkit-font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+      vertical-align: middle;
+    }
+  </style>
+  <arc-store key="{{key}}" on-key="_onKey"></arc-store>
+  <arc-host config="{{config}}" user="{{user}}" plan="{{plan}}" planning="{{ready}}" on-arc="_onArc" on-plans="_onPlans">
+    <slot></slot>
+  </arc-host>
+</template>
+
+<script>
+  class ArcShell extends XenBase {
+    static get observedAttributes() { return ['config', 'user', 'key', 'ready']};
+    _render(props, state) {
+      let {user, key, config, ready} = props;
+      if (config) {
+        let {plan} = state;
+        let title = 'Sample Arc';
+        return {title, user, key, config, plan, ready};
+      }
+    }
+    _onKey(e, key) {
+      ArcShell.log('created arc key', key);
+      this._setState({key: key});
+    }
+    _onArc(e, arc) {
+      this._fire('arc', arc);
+    }
+    _onPlans(e) {
+      if (!this._state.plan) {
+        let planInfo = e.detail;
+        if (planInfo && planInfo.length) {
+          let info = planInfo[0];
+          this._setState({plan: info.plan});
+        }
+      }
+    }
+  }
+  ArcShell.module = document.currentImport;
+  ArcShell.pre = [`%cArcHost`, `background: #673AB7; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
+  ArcShell.log = console.log.bind(console, ...ArcHost.pre);
+  customElements.define('arc-shell', ArcShell);
+</script>

@@ -1,0 +1,60 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<script>
+  class ArcView extends XenState(XenElement) {
+    static get observedAttributes() { return ['arc', 'options', 'data', 'manifestpath']; }
+    _update(props, state, lastProps) {
+      let {arc, options, data} = props;
+      if (arc && !state.view) {
+        if (!state.manifest && options && options.manifestPath) {
+          Arcs.Manifest.load(options.manifestPath, arc.loader).then(manifest => this._setState({manifest}));
+        }
+        if (state.manifest && options) {
+          state.view = this._createView(arc, state.manifest, options, data);
+        }
+        if (state.view) {
+          this._fire('view', state.view);
+        }
+      } else if (state.view && data != lastProps.data) {
+        // repopulate
+        this._updateView(state.view, data, arc);
+      }
+    }
+    _createView(arc, manifest, {name, tags, typeName}, data) {
+      let schema = manifest.findSchemaByName(typeName);
+      //
+      // view in manifest for `map`, `copy`, `?`
+      //let view = manifest.newView(schema.type.viewOf(), 'Identities', arc.generateID(), ['#identities']);
+      //
+      // view in arc suitable for `use`, `?`
+      let view = arc.createView(schema.type.viewOf(), name, arc.generateID(), tags);
+      // populate
+      if (data) {
+        this._updateView(view, data, arc);
+      }
+      // observe view
+      view.on('change', change => {
+        console.log('arcsView change detected', change);
+      }, {});
+      return view;
+    }
+    _updateView(view, data, arc) {
+      console.log('_updateView: arcs', data);
+      view.toList().forEach(entity => {
+        view.remove(entity.id);
+      });
+      data.forEach(datum => {
+        view.store({id: arc.generateID(), rawData: datum});
+      });
+    }
+  }
+  ArcView.module = document.currentImport;
+  customElements.define('arc-view', ArcView);
+</script>
