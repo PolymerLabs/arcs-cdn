@@ -67,14 +67,14 @@ let XenStaterMixin = Base => class extends Base {
       Object.assign(this._props, this._pendingProps);
       if (this._propsInvalid) {
         // TODO(sjmiles): should/can have different timing from rendering?
-        this._willReceiveProps(this._props, this._state);
+        this._willReceiveProps(this._props, this._state, this._lastProps);
         this._propsInvalid = false;
       }
-      //if (this._shouldUpdate(this._lastProps, this._lastState, this._props, this._state)) {
+      if (this._shouldUpdate(this._props, this._state, this._lastProps, this._lastState)) {
         // TODO(sjmiles): consider throttling render to rAF
         this._ensureMount();
-        this._update(this._props, this._state);
-      //}
+        this._update(this._props, this._state, this._lastProps);
+      }
     } catch(x) {
       console.error(x);
     }
@@ -83,7 +83,7 @@ let XenStaterMixin = Base => class extends Base {
     this._validator = null;
     // save the old props and state
     // TODO(sjmiles): don't need to create these for default _shouldUpdate
-    //this._lastProps = Object.assign(nob(), this._props);
+    this._lastProps = Object.assign(nob(), this._props);
     //this._lastState = Object.assign(nob(), this._state);
     this._didUpdate(this._props, this._state);
   }
@@ -94,10 +94,10 @@ let XenStaterMixin = Base => class extends Base {
   /*
   _willReceiveState(props, state) {
   }
-  _shouldUpdate(oldProps, oldState, props, state) {
+  */
+  _shouldUpdate(props, state, lastProps) {
     return true;
   }
-  */
   _update(props, state) {
   }
   _didUpdate(props, state) {
