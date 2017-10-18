@@ -35,6 +35,7 @@
         width: 414px;
         max-width: 414px;
       }
+    }
   </style>
 
   <link rel="import" href="../../app-shell/app-shell.html">
@@ -46,10 +47,8 @@
 
       _configure(obj) {
         let config = super._configure(obj);
-
         let manifests = (new URL(document.location)).searchParams.getAll('manifest');
         config.additionalManifests = manifests.filter(elem => elem!=config.manifestPath);
-
         return config;
       }
 
@@ -61,11 +60,10 @@
 
       async _start(config) {
         await super._start(config);
-
         // always take the browser arc public
         StorageTools.saveProfileState(true);
       }
-      
+
     }
 
     customElements.define('extension-app-shell', ExtensionAppShell);
