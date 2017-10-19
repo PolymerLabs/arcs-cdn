@@ -109,8 +109,7 @@ defineParticle(({DomParticle}) => {
         <img src="{{image}}">
       </div>
     </div>
-  <!-- annotation slot will be provided, as soon as SlotComposer and MapRemoteSlots strategy support it. ->
-  <!-- div slotid="annotation" subid$="{{subId}}" -->
+    <div slotid="annotation" subid$="{{subId}}">
   </div>
 </template>
   `;
@@ -164,5 +163,4 @@ ${productStyles}
     b.map(a => JSON.stringify(a.name)).forEach(value => result.delete(value));
     return result.values();
   }
-
 });

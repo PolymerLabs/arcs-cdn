@@ -8,9 +8,15 @@
 
 import 'Product.schema'
 
-particle Chooser in 'source/Chooser.js'
-  Chooser(in [Product] choices, inout [Product] resultList)
-  consume action
+particle ManageProducts in 'source/ManageProducts.js'
+  ManageProducts(inout [Product] list)
+  affordance dom
+  affordance dom-touch
+  consume root
+    provide action
+      view list
+    provide preamble
+    provide postamble
     provide set of annotation
-      view choices
-  description `choose from ${choices}`
+      view list
+  description `manage ${list}`
