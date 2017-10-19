@@ -7,6 +7,8 @@
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
+(scope => {
+
 class XenElement extends HTMLElement {
   constructor() {
     super();
@@ -76,4 +78,9 @@ class XenElement extends HTMLElement {
   }
 }
 
-window.XenElement = XenElement;
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
+  module.exports = XenElement;
+else
+  scope.XenElement = XenElement;
+
+})(this);
