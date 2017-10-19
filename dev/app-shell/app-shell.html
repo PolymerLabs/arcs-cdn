@@ -497,9 +497,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         usersShown: users.length > 0,
         usersOptions: {
           $template: 'users-options',
-          models: [0, ...users].map(user => {
+          models: [...users].map(user => {
             return {
-              user: user.name || "(none)",
+              user: user.name,
               selected: user.name == userName
             }
           })

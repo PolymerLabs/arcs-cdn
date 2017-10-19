@@ -23,6 +23,10 @@ UserTools = {
         config.user = '';
       }
     }
+    // Set the current user to the first user if it's not set.
+    if (!config.user || config.user === '') {
+      config.user = users[0].name;
+    }
     //
     let manifest = await Arcs.Manifest.load(`${config.root}/app-shell/artifacts/user-types.manifest`, loader);
     let personSchema = manifest.findSchemaByName('Person');
@@ -68,12 +72,11 @@ UserTools = {
   },
   set currentUser(name) {
     this.userName = name;
-    localStorage.setItem('currentUser', name);
     let user = this.findUser(name);
-    if (!user) {
-      user = this.users[0];
+    if (user) {
+      localStorage.setItem('currentUser', name);
+      this.identity.set({id: arc.generateID(), rawData: user});
     }
-    this.identity.set({id: arc.generateID(), rawData: user});
   },
   async privatize() {
     if (confirm("Privatize removes sharing information that cannot be retrieved. Privatize anyway?")) {
