@@ -1,0 +1,10 @@
+<template>
+  <x-toast app-footer open="{{toastOpen}}" suggestion-container>
+    <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
+    <div search>
+      <input value="{{searchText}}" on-input="_onSearch">
+      <i class="material-icons" on-click="_onSearchClick">search</i>
+    </div>
+    <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
+  </x-toast>
+</template>
