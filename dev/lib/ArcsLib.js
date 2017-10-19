@@ -19863,9 +19863,11 @@ module.exports = { PECOuterPort, PECInnerPort };
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
+(scope => {
+
 let nob = () => Object.create(null);
 
-let XenStaterMixin = Base => class extends Base {
+let StaterMixin = Base => class extends Base {
   constructor() {
     super();
     this._pendingProps = nob();
@@ -19911,6 +19913,8 @@ let XenStaterMixin = Base => class extends Base {
   }
   _invalidate() {
     if (!this._validator) {
+      //this._log('register _async validate');
+      //console.log(this.localName + (this.id ? '#' + this.id : '') + ': invalidated');
       this._validator = this._async(this._validate);
     }
   }
@@ -19921,14 +19925,14 @@ let XenStaterMixin = Base => class extends Base {
       Object.assign(this._props, this._pendingProps);
       if (this._propsInvalid) {
         // TODO(sjmiles): should/can have different timing from rendering?
-        this._willReceiveProps(this._props, this._state);
+        this._willReceiveProps(this._props, this._state, this._lastProps);
         this._propsInvalid = false;
       }
-      //if (this._shouldUpdate(this._lastProps, this._lastState, this._props, this._state)) {
+      if (this._shouldUpdate(this._props, this._state, this._lastProps, this._lastState)) {
         // TODO(sjmiles): consider throttling render to rAF
         this._ensureMount();
-        this._update(this._props, this._state);
-      //}
+        this._update(this._props, this._state, this._lastProps);
+      }
     } catch(x) {
       console.error(x);
     }
@@ -19937,7 +19941,7 @@ let XenStaterMixin = Base => class extends Base {
     this._validator = null;
     // save the old props and state
     // TODO(sjmiles): don't need to create these for default _shouldUpdate
-    //this._lastProps = Object.assign(nob(), this._props);
+    this._lastProps = Object.assign(nob(), this._props);
     //this._lastState = Object.assign(nob(), this._state);
     this._didUpdate(this._props, this._state);
   }
@@ -19948,23 +19952,28 @@ let XenStaterMixin = Base => class extends Base {
   /*
   _willReceiveState(props, state) {
   }
-  _shouldUpdate(oldProps, oldState, props, state) {
+  */
+  _shouldUpdate(props, state, lastProps) {
     return true;
   }
-  */
   _update(props, state) {
   }
   _didUpdate(props, state) {
   }
 };
 
-module.exports = XenStaterMixin;
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
+  module.exports = StaterMixin;
+else
+  scope.XenState = StaterMixin;
+
+})(this);
+
 
 /***/ }),
 /* 111 */
-/***/ (function(module, exports, __webpack_require__) {
+/***/ (function(module, exports) {
 
-"use strict";
 /*
 @license
 Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
@@ -19974,7 +19983,17 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
+(scope => {
 
+'use strict';
+
+if (typeof document !== 'undefined' && !('currentImport' in document)) {
+  Object.defineProperty(document, 'currentImport', {
+    get() {
+      return (document._currentScript || document.currentScript || document).ownerDocument;
+    }
+  });
+}
 
 /* Annotator */
 // tree walker that generates arbitrary data using visitor function `cb`
@@ -20122,7 +20141,7 @@ let annotateEvent = function(node, key, notes, name, value) {
     if (value.slice(0, 2) === '{{') {
       value = value.slice(2, -2);
       console.warn(
-        `Xen: event handler for '{$name}' expressed as a mustache, which is not supported. Using literal value '${value}' instead.`
+        `Xen: event handler for '${name}' expressed as a mustache, which is not supported. Using literal value '${value}' instead.`
       );
     }
     takeNote(notes, key, 'events', name.slice(3), value);
@@ -20158,26 +20177,28 @@ let mapEvents = function(notes, map, mapper) {
   }
 };
 
-let listen = function(handlers, node, eventName, handlerName) {
+let listen = function(controller, node, eventName, handlerName) {
   node.addEventListener(eventName, function(e) {
-    if (handlers[handlerName]) {
-      return handlers[handlerName](e, e.detail);
+    if (controller[handlerName]) {
+      return controller[handlerName](e, e.detail);
     }
   });
 };
 
 let set = function(notes, map, scope, controller) {
-  for (let key in notes) {
-    let node = map[key];
-    if (node) {
-      // everybody gets a scope
-      node.scope = scope;
-      // now get your regularly scheduled bindings
-      let mustaches = notes[key].mustaches;
-      for (let name in mustaches) {
-        let property = mustaches[name];
-        if (property in scope) {
-          _set(node, name, scope[property], controller);
+  if (scope) {
+    for (let key in notes) {
+      let node = map[key];
+      if (node) {
+        // everybody gets a scope
+        node.scope = scope;
+        // now get your regularly scheduled bindings
+        let mustaches = notes[key].mustaches;
+        for (let name in mustaches) {
+          let property = mustaches[name];
+          if (property in scope) {
+            _set(node, name, scope[property], controller);
+          }
         }
       }
     }
@@ -20223,7 +20244,7 @@ let _setSubTemplate = function(node, value, controller) {
     template = container.querySelector(`template[${value.$template}]`);
   }
   node.textContent = '';
-  if (template) {
+  if (template && value.models) {
     for (let m of value.models) {
       stamp(template).events(controller).set(m).appendTo(node);
     }
@@ -20262,6 +20283,14 @@ let stamp = function(template, opts) {
       return this;
     },
     events: function(controller) {
+      // TODO(sjmiles): originally `controller` was expected to be an Object with event handler
+      // methods on it (typically a custom-element stamping a template).
+      // In Arcs, we want to attach a generic handler (Function) for any event on this node.
+      // Subtemplate stamping gets involved because they need to reuse whichever controller.
+      // I suspect this can be simplified, but right now I'm just making it go.
+      if (controller && typeof controller !== 'function') {
+        controller = listen.bind(this, controller);
+      }
       this.controller = controller;
       if (controller) {
         mapEvents(notes, map, controller);
@@ -20278,19 +20307,22 @@ let stamp = function(template, opts) {
       // TODO(sjmiles): this.root is no longer a fragment
       this.root = node;
       return this;
-    },
-    mapEvents: function(mapper) {
-      return this.events(mapper);
     }
   };
   return dom;
 };
 
-module.exports = {
+let Xen = {
   setBoolAttribute,
   stamp
 };
 
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
+  module.exports = Xen;
+else
+  scope.Xen = Xen;
+
+})(this);
 
 /***/ }),
 /* 112 */
@@ -20363,9 +20395,7 @@ class DomParticle extends XenStateMixin(Particle) {
   get config() {
     // TODO(sjmiles): getter that does work is a bad idea, this is temporary
     return {
-      // TODO(sjmiles): output views shouldn't be included here, but afaict, `inout`
-      // doesn't work yet in manifest, so we are using `out` views for `inout` views
-      views: this.spec.inputs.map(i => i.name).concat(this.spec.outputs.map(o => o.name)),
+      views: this.spec.inputs.map(i => i.name),
       // TODO(mmandlis): this.spec needs to be replace with a particle-spec loaded from
       // .manifest files, instead of .ptcl ones.
       slotNames: [...this.spec.slots.values()].map(s => s.name)
@@ -20377,14 +20407,15 @@ class DomParticle extends XenStateMixin(Particle) {
   async setViews(views) {
     this._views = views;
     let config = this.config;
-    let readableViews = config.views.filter(name => views.get(name).canRead);
-    this.when([new ViewChanges(views, readableViews, 'change')], async () => {
-      //log(`${this.info()}: invalidated by [ViewChanges]`);
+    //let readableViews = config.views.filter(name => views.get(name).canRead);
+    //this.when([new ViewChanges(views, readableViews, 'change')], async () => {
+    this.when([new ViewChanges(views, config.views, 'change')], async () => {
       // acquire (async) list data from views
-      let data = await Promise.all(config.views
-          .map(name => views.get(name))
-          //.filter(view => view.canRead)
-          .map(view => view.toList ? view.toList() : view.get()));
+      let data = await Promise.all(
+        config.views
+        .map(name => views.get(name))
+        .map(view => view.toList ? view.toList() : view.get())
+      );
       // convert view data (array) into props (dictionary)
       let props = Object.create(null);
       config.views.forEach((name, i) => {
@@ -20392,6 +20423,7 @@ class DomParticle extends XenStateMixin(Particle) {
       });
       this._setProps(props);
     });
+    // make sure we invalidate once, even if there are no incoming views
     this._setState({});
   }
   _update(props, state) {
@@ -38977,7 +39009,7 @@ class XList extends XState(XElement) {
       if (!child) {
         try {
           // TODO(sjmiles): install event handlers explicitly now
-          var dom = XTemplate.stamp(template).mapEvents(props.eventMapper);
+          var dom = XTemplate.stamp(template).events(props.eventMapper);
         } catch(x) {
           console.warn('x-list: if `listen` is undefined, you need to provide a `handler` property for `on-*` events');
           throw x;
@@ -39038,6 +39070,8 @@ customElements.define('x-list', XList);
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
+(scope => {
+
 class XenElement extends HTMLElement {
   constructor() {
     super();
@@ -39066,21 +39100,22 @@ class XenElement extends HTMLElement {
       }
     });
   }
-  __configureAccessors(outputStates) {
+  __configureAccessors() {
     // only do this once per prototype
     var p = Object.getPrototypeOf(this);
     if (!p.hasOwnProperty('__$xenPropsConfigured')) {
       p.__$xenPropsConfigured = true;
       var a = this._class.observedAttributes;
-      a && a.forEach((n)=>{
+      a && a.forEach(n => {
         Object.defineProperty(p, n, {
-          get() { return this._getProperty(n); },
-          set(value) { this._setProperty(n, value); }
-        });
-      });
-      outputStates && outputStates.forEach((n)=>{
-        Object.defineProperty(p, n, {
-          get() { return this._state[n]; }
+          get() {
+            // abstract
+            return this._getProperty(n);
+          },
+          set(value) {
+            // abstract
+            this._setProperty(n, value);
+          }
         });
       });
     }
@@ -39099,9 +39134,20 @@ class XenElement extends HTMLElement {
   }
   _didMount() {
   }
+  _fire(eventName, detail) {
+    let event = new CustomEvent(eventName, {detail: detail});
+    this.dispatchEvent(event);
+    return event.detail;
+  }
 }
 
-module.exports = XenElement;
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
+  module.exports = XenElement;
+else
+  scope.XenElement = XenElement;
+
+})(this);
+
 
 /***/ }),
 /* 227 */
@@ -39487,7 +39533,7 @@ module.exports = (function() {
         peg$c131 = function(id, name) {
             return {
               kind: 'slot',
-              id: optional(id, id => id[2], null),
+              id: optional(id, id => id[1], null),
               name: optional(name, name => name[1], '')
             }
           },
@@ -43852,8 +43898,9 @@ class DomContext {
     if (!this._liveDom) {
       // TODO(sjmiles): hack to allow subtree elements (e.g. x-list) to marshal events
       this._context._eventMapper = this._eventMapper.bind(this, eventHandler);
-      this._liveDom = Template.stamp(template, eventHandler)
-          .mapEvents(this._context._eventMapper)
+      this._liveDom = Template
+          .stamp(template)
+          .events(this._context._eventMapper)
           .appendTo(this._context);
     }
   }
@@ -44072,6 +44119,9 @@ class DomSlot extends Slot {
     return templates.get(this._templateName);
   }
 
+  // TODO(sjmiles): triggered when innerPEC sends Render message to outerPEC,
+  // (usually by request of DomParticle::render())
+  // `handler` is generated by caller (slot-composer::renderSlot())
   setContent(content, handler) {
     if (!content || Object.keys(content).length == 0) {
       if (this.context) {
@@ -44083,7 +44133,6 @@ class DomSlot extends Slot {
     if (!this.context) {
       return;
     }
-
     if (content.template) {
       if (this.getTemplate()) {
         // Template is being replaced.

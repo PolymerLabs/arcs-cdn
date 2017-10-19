@@ -9119,9 +9119,7 @@ class DomParticle extends XenStateMixin(Particle) {
   get config() {
     // TODO(sjmiles): getter that does work is a bad idea, this is temporary
     return {
-      // TODO(sjmiles): output views shouldn't be included here, but afaict, `inout`
-      // doesn't work yet in manifest, so we are using `out` views for `inout` views
-      views: this.spec.inputs.map(i => i.name).concat(this.spec.outputs.map(o => o.name)),
+      views: this.spec.inputs.map(i => i.name),
       // TODO(mmandlis): this.spec needs to be replace with a particle-spec loaded from
       // .manifest files, instead of .ptcl ones.
       slotNames: [...this.spec.slots.values()].map(s => s.name)
@@ -9133,14 +9131,15 @@ class DomParticle extends XenStateMixin(Particle) {
   async setViews(views) {
     this._views = views;
     let config = this.config;
-    let readableViews = config.views.filter(name => views.get(name).canRead);
-    this.when([new ViewChanges(views, readableViews, 'change')], async () => {
-      //log(`${this.info()}: invalidated by [ViewChanges]`);
+    //let readableViews = config.views.filter(name => views.get(name).canRead);
+    //this.when([new ViewChanges(views, readableViews, 'change')], async () => {
+    this.when([new ViewChanges(views, config.views, 'change')], async () => {
       // acquire (async) list data from views
-      let data = await Promise.all(config.views
-          .map(name => views.get(name))
-          //.filter(view => view.canRead)
-          .map(view => view.toList ? view.toList() : view.get()));
+      let data = await Promise.all(
+        config.views
+        .map(name => views.get(name))
+        .map(view => view.toList ? view.toList() : view.get())
+      );
       // convert view data (array) into props (dictionary)
       let props = Object.create(null);
       config.views.forEach((name, i) => {
@@ -9148,6 +9147,7 @@ class DomParticle extends XenStateMixin(Particle) {
       });
       this._setProps(props);
     });
+    // make sure we invalidate once, even if there are no incoming views
     this._setState({});
   }
   _update(props, state) {
@@ -18916,9 +18916,11 @@ module.exports = { PECOuterPort, PECInnerPort };
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
+(scope => {
+
 let nob = () => Object.create(null);
 
-let XenStaterMixin = Base => class extends Base {
+let StaterMixin = Base => class extends Base {
   constructor() {
     super();
     this._pendingProps = nob();
@@ -18964,6 +18966,8 @@ let XenStaterMixin = Base => class extends Base {
   }
   _invalidate() {
     if (!this._validator) {
+      //this._log('register _async validate');
+      //console.log(this.localName + (this.id ? '#' + this.id : '') + ': invalidated');
       this._validator = this._async(this._validate);
     }
   }
@@ -18974,14 +18978,14 @@ let XenStaterMixin = Base => class extends Base {
       Object.assign(this._props, this._pendingProps);
       if (this._propsInvalid) {
         // TODO(sjmiles): should/can have different timing from rendering?
-        this._willReceiveProps(this._props, this._state);
+        this._willReceiveProps(this._props, this._state, this._lastProps);
         this._propsInvalid = false;
       }
-      //if (this._shouldUpdate(this._lastProps, this._lastState, this._props, this._state)) {
+      if (this._shouldUpdate(this._props, this._state, this._lastProps, this._lastState)) {
         // TODO(sjmiles): consider throttling render to rAF
         this._ensureMount();
-        this._update(this._props, this._state);
-      //}
+        this._update(this._props, this._state, this._lastProps);
+      }
     } catch(x) {
       console.error(x);
     }
@@ -18990,7 +18994,7 @@ let XenStaterMixin = Base => class extends Base {
     this._validator = null;
     // save the old props and state
     // TODO(sjmiles): don't need to create these for default _shouldUpdate
-    //this._lastProps = Object.assign(nob(), this._props);
+    this._lastProps = Object.assign(nob(), this._props);
     //this._lastState = Object.assign(nob(), this._state);
     this._didUpdate(this._props, this._state);
   }
@@ -19001,17 +19005,23 @@ let XenStaterMixin = Base => class extends Base {
   /*
   _willReceiveState(props, state) {
   }
-  _shouldUpdate(oldProps, oldState, props, state) {
+  */
+  _shouldUpdate(props, state, lastProps) {
     return true;
   }
-  */
   _update(props, state) {
   }
   _didUpdate(props, state) {
   }
 };
 
-module.exports = XenStaterMixin;
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
+  module.exports = StaterMixin;
+else
+  scope.XenState = StaterMixin;
+
+})(this);
+
 
 /***/ }),
 /* 88 */
