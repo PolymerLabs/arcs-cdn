@@ -76,8 +76,11 @@ class SuggestionsElement extends HTMLElement {
   }
 
   set suggestions(suggestions) {
-    this.container.textContent = "";
-    this.add(suggestions);
+    if (this._suggestions !== suggestions) {
+      this._suggestions = suggestions;
+      this.container.textContent = "";
+      suggestions && this.add(suggestions);
+    }
   }
 
   _choose(plan) {
