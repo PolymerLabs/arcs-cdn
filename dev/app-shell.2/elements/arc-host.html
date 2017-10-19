@@ -27,9 +27,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     static get observedAttributes() {
       return ['config','plan','user','planning'];
     }
-    get template() {
-      return ArcHost.module.querySelector(`template`);
-    }
     _willReceiveProps(props, state, lastProps) {
       if (!lastProps.config && props.config) {
         this._applyConfig(props.config)

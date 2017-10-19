@@ -41,12 +41,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       // observe view
       view.on('change', change => {
-        console.log('arcsView change detected', change);
+        ArcView.log('arcsView change detected', change);
       }, {});
       return view;
     }
     _updateView(view, data, arc) {
-      console.log('_updateView: arcs', data);
+      ArcView.log('updateView: arcs', data);
       view.toList().forEach(entity => {
         view.remove(entity.id);
       });
@@ -56,5 +56,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
   }
   ArcView.module = document.currentImport;
+  ArcView.log = XenBase.logFactory('ArcView', '#b4004e');
   customElements.define('arc-view', ArcView);
 </script>

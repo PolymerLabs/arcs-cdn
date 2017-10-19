@@ -13,10 +13,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <link rel="import" href="arc-config.html">
 <link rel="import" href="arc-shell.html">
 <link rel="import" href="arc-view.html">
+<link rel="import" href="arc-footer.html">
+<link rel="import" href="arc-metadata.html">
 
 <template>
   <style>
-    :host {
+    arc-app, [arc-app] {
       display: block;
     }
     i {
@@ -56,6 +58,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       min-height: 0.6em;
       padding-top: 0.1em;
     }
+    arc-footer {
+      height: 40px;
+    }
   </style>
 
   <toolbar>
@@ -70,17 +75,28 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </app-toolbar>
   </toolbar>
 
+  <arc-store key="{{key}}" on-key="_onKey"></arc-store>
   <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
   <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
-  <arc-shell user="{{user}}" config="{{config}}" ready="{{ready}}" on-arc="_onArc">
+
+  <arc-shell user="{{user}}" config="{{config}}" ready="{{ready}}" on-arc="_onArc" on-plans="_onPlans">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-shell>
+
+  <arc-footer suggestions="{{suggestions}}"></arc-footer>
 
 </template>
 
 <script>
   class ArcApp extends XenBase {
+    get host() {
+      // TODO(sjmiles): override shadow-root generation so that
+      // old-timey systems (e.g. TradingView widgets) can find
+      // various bits in `document` when used in Particles.
+      // Using light-dom opens up style leakage concerns.
+      return this;
+    }
     _getInitialState() {
       let cdnPath = ArcApp.module.URL.split('/').slice(0, -3).join('/');
       return {
@@ -101,6 +117,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         launcher: true
       }
     }
+    _didMount() {
+      this._meta = document.createElement('arc-metadata');
+      this._store = this.host.querySelector('arc-store');
+    }
     _render(props, state) {
       return [
         state.icons,
@@ -115,10 +135,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (!config.key && !config.soloPath) {
         config.soloPath = 'launcher.manifest';
       }
-      this._setState({config: config});
+      this._setState({config: config, key: config.key});
     }
     async _onArc(e, arc) {
       this._setState({arc: arc});
+    }
+    _onKey(e, key) {
+      this._setState({key: key});
     }
     _onArcsView(e, view) {
       ArcApp.log('ArcsView', view);
@@ -129,8 +152,25 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onNewClick(e, view) {
       open(`${location.origin}${location.pathname}`, `_blank`);
     }
+    _onPlans(e, plans) {
+      this._setState({suggestions: plans});
+      /*
+      */
+      if (!this._state.plan) {
+        let planInfo = e.detail;
+        if (planInfo && planInfo.length) {
+          let {plan} = planInfo[0];
+          this._setState({plan});
+          let steps = this._meta.createStep(plan, plans.generations);
+          this._store.store('steps', steps);
+          this._store.dump();
+        }
+      }
+      /*
+      */
+    }
     _synthesizeArcsViewData() {
-      let icons= ['settings','movie','new_releases','high_quality','room_service','casino','child_care','spa','kitchen'];
+      let icons = ['settings','movie','new_releases','high_quality','room_service','casino','child_care','spa','kitchen'];
       let colors = ['darkred','darkblue','darkgreen','darkorange','black'];
       let arcs = {
         a: {description: 'Alpha'},

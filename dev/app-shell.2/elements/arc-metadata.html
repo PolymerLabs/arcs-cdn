@@ -7,48 +7,64 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
-
-<!-- firebase -->
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-database.js"></script>
-<!--
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/4.2.0/firebase-messaging.js"></script>
--->
-
 <script>
-((scope) => {
-  //let version = typeof Arcs === 'undefined' || !Arcs.version ? '/' : Arcs.version.replace(/\./g, '_');
-  let db_version = '0_2_1';
-
-  let firebaseConfig = {
-    apiKey: "AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8",
-    authDomain: "arcs-storage.firebaseapp.com",
-    databaseURL: "https://arcs-storage.firebaseio.com",
-    projectId: "arcs-storage",
-    storageBucket: "arcs-storage.appspot.com",
-    messagingSenderId: "779656349412"
-  };
-
-  let db = firebase.initializeApp(firebaseConfig, 'arcs-storage').database().ref(db_version);
-
-  class ArcStore extends XenState(XenElement) {
-    static get observedAttributes() { return ['key']; }
-    _update(props, state, lastProps) {
-      if ('key' in props && props.key === null) {
-        let key = this._createKey();
-        this.dispatchEvent(new CustomEvent('key', {detail: key}));
+  class ArcMetadata extends XenState(XenElement) {
+    static get observedAttributes() { return []; }
+    constructor() {
+      super();
+      this._steps = [];
+      this.store = document.createElement('arc-store');
+    }
+    createStep(plan, generations) {
+      let step = this._createOriginatingStep(plan, generations);
+      if (step) {
+        ArcMetadata.log("createStep", step);
+        this._steps.push(step);
+        this._setState({steps: this._steps});
+      }
+      return this._state.steps;
+    }
+    _createOriginatingStep(plan, generations) {
+      let origin = this._findFirstGeneration(plan, generations);
+      if (origin) {
+        // Really, we should only store the string and upon loading normalize it
+        // again and create a new hash. But really, really we should probably
+        // do something smarter than literal matching anyway...
+        // Find all mapped views to be remembered.
+        // Store as string, as we'll only use it to find exact matches later. (String is easier to compare)
+        let mappedViews = plan.views
+          .filter(v => (v.fate == "map") && (v.id.substr(0, 7) == "shared:"))
+          .map(v => v.id)
+          .sort()
+          .toString()
+          ;
+        return {
+          //recipe: origin.result.toString(),
+          hash: origin.hash,
+          mappedViews
+        };
       }
     }
-    get _db() {
-      return db;
-    }
-    _createKey() {
-      return this._db.child('arcs').push().key;
+    _findFirstGeneration(plan, generations) {
+      // Search generations in reverse order for the accepted plan
+      let last_generation;
+      generations.reverse().find(
+        generation => last_generation = generation.find(member => member.result == plan)
+      );
+      if (!last_generation) {
+        ArcMetadata.log("no originating generation found for", plan);
+        return null;
+      }
+      // Walk derivation tree up to root. All paths will lead to the same root,
+      // hence we can always take the first branch.
+      let origin = last_generation;
+      while (origin.derivation[0].parent) {
+        origin = origin.derivation[0].parent;
+      }
+      return origin;
     }
   }
-
-  ArcStore.module = document.currentImport;
-  customElements.define('arc-store', ArcStore);
-})(this);
+  ArcMetadata.module = document.currentImport;
+  ArcMetadata.log = XenBase.logFactory('ArcMetadata', '#260e04');
+  customElements.define('arc-metadata', ArcMetadata);
 </script>

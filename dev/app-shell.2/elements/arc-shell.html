@@ -37,9 +37,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   class ArcShell extends XenBase {
     static get observedAttributes() { return ['config', 'user', 'key', 'ready']};
     _render(props, state) {
-      let {user, key, config, ready} = props;
+      let {user, key, config, ready, plan} = props;
       if (config) {
-        let {plan} = state;
         let title = 'Sample Arc';
         return {title, user, key, config, plan, ready};
       }
@@ -51,14 +50,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onArc(e, arc) {
       this._fire('arc', arc);
     }
-    _onPlans(e) {
-      if (!this._state.plan) {
-        let planInfo = e.detail;
-        if (planInfo && planInfo.length) {
-          let info = planInfo[0];
-          this._setState({plan: info.plan});
-        }
-      }
+    _onPlans(e, plans) {
+      this._fire('plans', plans);
     }
   }
   ArcShell.module = document.currentImport;
