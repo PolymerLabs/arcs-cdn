@@ -567,7 +567,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     async _onShareClick() {
       this._shared = !this._shared;
       this._updateSharedStateIcon();
-      StorageTools.saveSharedState(this._shared);
+      await StorageTools.saveSharedState(this._shared);
       await UserTools.loadUsers();
       this._setState({user: UserTools.currentUser, users: UserTools.users});
     }

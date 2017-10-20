@@ -105,7 +105,7 @@ StorageTools = {
       }
     };
   },
-  saveSharedState(shared) {
+  async saveSharedState(shared) {
     let user = UserTools.currentUser;
     if (!user || !this.initialized) {
       warn("attempt to save shared state without selected user failed");
@@ -113,9 +113,9 @@ StorageTools = {
     }
     let node = UserTools.userDb(user).child(`shared/${this._amkey}`);
     if (shared) {
-      node.set({when: Date.now()});
+      await node.set({when: Date.now()});
     } else {
-      node.remove();
+      await node.remove();
     }
   },
   saveProfileState(profile) {
