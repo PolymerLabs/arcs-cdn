@@ -83,7 +83,7 @@
 
 var base64 = __webpack_require__(134)
 var ieee754 = __webpack_require__(183)
-var isArray = __webpack_require__(85)
+var isArray = __webpack_require__(86)
 
 exports.Buffer = Buffer
 exports.SlowBuffer = SlowBuffer
@@ -2421,6 +2421,435 @@ module.exports = g;
 /* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+var assert = __webpack_require__(1);
+var Strategizer = __webpack_require__(6).Strategizer;
+var ConnectionConstraint = __webpack_require__(264);
+var Particle = __webpack_require__(265);
+var Search = __webpack_require__(117);
+var Slot = __webpack_require__(267);
+var View = __webpack_require__(270);
+var util = __webpack_require__(12);
+
+class Recipe {
+  constructor() {
+    this._particles = [];
+    this._views = [];
+    this._slots = [];
+
+    // TODO: Recipes should be collections of records that are tagged
+    // with a type. Strategies should register the record types they
+    // can handle. ConnectionConstraints should be a different record
+    // type to particles/views.
+    this._connectionConstraints = [];
+
+    // TODO: Change to array, if needed for search strings of merged recipes.
+    this._search = null;
+  }
+
+  newConnectionConstraint(from, fromConnection, to, toConnection) {
+    this._connectionConstraints.push(new ConnectionConstraint(from, fromConnection, to, toConnection));
+  }
+
+  removeConstraint(constraint) {
+    var idx = this._connectionConstraints.indexOf(constraint);
+    assert(idx >= 0);
+    this._connectionConstraints.splice(idx, 1);
+  }
+
+  clearConnectionConstraints() {
+    this._connectionConstraints = [];
+  }
+
+  newParticle(name) {
+    var particle = new Particle(this, name);
+    this._particles.push(particle);
+    return particle;
+  }
+
+  newView() {
+    var view = new View(this);
+    this._views.push(view);
+    return view;
+  }
+
+  newSlot(name) {
+    var slot = new Slot(this, name);
+    this._slots.push(slot);
+    return slot;
+  }
+
+  isResolved() {
+    assert(Object.isFrozen(this), 'Recipe must be normalized to be resolved.');
+    return this._connectionConstraints.length == 0
+        && (this._search === null || this._search.isResolved())
+        && this._views.every(view => view.isResolved())
+        && this._particles.every(particle => particle.isResolved())
+        && this._slots.every(slot => slot.isResolved())
+        && this.viewConnections.every(connection => connection.isResolved())
+        && this.slotConnections.every(connection => connection.isResolved());
+  }
+
+  _findDuplicateView() {
+    let seenViews = new Set();
+    return this._views.find(view => {
+      if (view.id) {
+        if (seenViews.has(view.id)) {
+          return view;
+        }
+        seenViews.add(view.id);
+      }
+    });
+  }
+
+  _isValid() {
+    return !this._findDuplicateView() && this._views.every(view => view._isValid())
+        && this._particles.every(particle => particle._isValid())
+        && this._slots.every(slot => slot._isValid())
+        && this.viewConnections.every(connection => connection._isValid())
+        && this.slotConnections.every(connection => connection._isValid())
+        && (!this.search || this.search.isValid());
+  }
+
+  get localName() { return this._localName; }
+  set localName(name) { this._localName = name; }
+  get particles() { return this._particles; } // Particle*
+  set particles(particles) { this._particles = particles; }
+  get views() { return this._views; } // View*
+  set views(views) { this._views = views; }
+  get slots() { return this._slots; } // Slot*
+  set slots(slots) { this._slots = slots; }
+  get connectionConstraints() { return this._connectionConstraints; }
+  get search() { return this._search; }
+  set search(search) {
+    this._search = search;
+  }
+  setSearchPhrase(phrase) {
+    assert(!this._search, 'Cannot override search phrase');
+    if (phrase) {
+      this._search = new Search(phrase);
+    }
+  }
+
+  get slotConnections() {  // SlotConnection*
+    var slotConnections = [];
+    this._particles.forEach(particle => {
+      slotConnections.push(...Object.values(particle.consumedSlotConnections));
+    });
+    return slotConnections;
+  }
+
+  get viewConnections() {
+    var viewConnections = [];
+    this._particles.forEach(particle => {
+      viewConnections.push(...Object.values(particle.connections));
+      viewConnections.push(...particle._unnamedConnections);
+    });
+    return viewConnections;
+  }
+
+  isEmpty() {
+    return this.particles.length == 0 &&
+           this.views.length == 0 &&
+           this.slots.length == 0 &&
+           this._connectionConstraints.length == 0;
+  }
+
+  findView(id) {
+    for (var view of this.views) {
+      if (view.id == id)
+        return view;
+    }
+  }
+
+  findSlot(id) {
+    for (var slot of this.slots) {
+      if (slot.id == id)
+        return slot;
+    }
+  }
+
+  async digest() {
+    if (typeof(crypto) != 'undefined' && crypto.subtle) {
+      // browser
+      let buffer = new TextEncoder('utf-8').encode(this.toString());
+      let digest = await crypto.subtle.digest('SHA-1', buffer)
+      return Array.from(new Uint8Array(digest)).map(x => ('00' + x.toString(16)).slice(-2)).join('');
+    } else {
+      // nodejs
+      let crypto = __webpack_require__(151);
+      let sha = crypto.createHash('sha1');
+      sha.update(this.toString());
+      return sha.digest('hex');
+    }
+  }
+
+  normalize() {
+    if (Object.isFrozen(this)) {
+      return;
+    }
+    if (!this._isValid()) {
+      var duplicateView = this._findDuplicateView();
+      if (duplicateView)
+        console.log(`Has Duplicate View ${duplicateView.id}`);
+
+      let checkForInvalid = (name, list, f) => {
+        var invalids = list.filter(item => !item._isValid());
+        if (invalids.length > 0)
+          console.log(`Has Invalid ${name} ${invalids.map(f)}`)
+      }
+      checkForInvalid('Views', this._views, view => view.id);
+      checkForInvalid('Particles', this._particles, particle => particle.name);
+      checkForInvalid('Slots', this._slots, slot => slot.name);
+      checkForInvalid('ViewConnections', this.viewConnections, viewConnection => `${viewConnection.particle.name}::${viewConnection.name}`);
+      checkForInvalid('SlotConnections', this.slotConnections, slotConnection => slotConnection.name);
+      return false;
+    }
+    // Get views and particles ready to sort connections.
+    for (let particle of this._particles) {
+      particle._startNormalize();
+    }
+    for (let view of this._views) {
+      view._startNormalize();
+    }
+    for (let slot of this._slots) {
+      slot._startNormalize();
+    }
+
+    // Sort and normalize view connections.
+    let connections = this.viewConnections;
+    for (let connection of connections) {
+      connection._normalize();
+    }
+    connections.sort(util.compareComparables);
+
+    // Sort and normalize slot connections.
+    let slotConnections = this.slotConnections;
+    for (let slotConnection of slotConnections) {
+      slotConnection._normalize();
+    }
+    slotConnections.sort(util.compareComparables);
+
+    if (this.search) {
+      this.search._normalize();
+    }
+
+    // Finish normalizing particles and views with sorted connections.
+    for (let particle of this._particles) {
+      particle._finishNormalize();
+    }
+    for (let view of this._views) {
+      view._finishNormalize();
+    }
+    for (let slot of this._slots) {
+      slot._finishNormalize();
+    }
+
+    let seenViews = new Set();
+    let seenParticles = new Set();
+    let particles = [];
+    let views = [];
+    for (let connection of connections) {
+      if (!seenParticles.has(connection.particle)) {
+        particles.push(connection.particle);
+        seenParticles.add(connection.particle);
+      }
+      if (connection.view && !seenViews.has(connection.view)) {
+        views.push(connection.view);
+        seenViews.add(connection.view);
+      }
+    }
+
+    let orphanedViews = this._views.filter(view => !seenViews.has(view));
+    orphanedViews.sort(util.compareComparables);
+    views.push(...orphanedViews);
+
+    let orphanedParticles = this._particles.filter(particle => !seenParticles.has(particle));
+    orphanedParticles.sort(util.compareComparables);
+    particles.push(...orphanedParticles);
+
+    // TODO: redo slots as above.
+    let seenSlots = new Set();
+    let slots = [];
+    for (let slotConnection of slotConnections) {
+      if (slotConnection.targetSlot && !seenSlots.has(slotConnection.targetSlot)) {
+        slots.push(slotConnection.targetSlot);
+        seenSlots.add(slotConnection.targetSlot);
+      }
+      Object.values(slotConnection.providedSlots).forEach(ps => {
+        if (!seenSlots.has(ps)) {
+          slots.push(ps);
+          seenSlots.add(ps);
+        }
+      })
+    }
+
+    // Put particles and views in their final ordering.
+    this._particles = particles;
+    this._views = views;
+    this._slots = slots;
+    this._connectionConstraints.sort(util.compareComparables);
+
+    Object.freeze(this._particles);
+    Object.freeze(this._views);
+    Object.freeze(this._slots);
+    Object.freeze(this._connectionConstraints);
+    Object.freeze(this);
+
+    return true;
+  }
+
+  clone(cloneMap) {
+    // for now, just copy everything
+
+    var recipe = new Recipe();
+
+    if (cloneMap == undefined)
+      cloneMap = new Map();
+
+    this._copyInto(recipe, cloneMap);
+
+    // TODO: figure out a better approach than stashing the cloneMap permanently
+    // on the recipe
+    recipe._cloneMap = cloneMap;
+
+    return recipe;
+  }
+
+  mergeInto(recipe) {
+    var cloneMap = new Map();
+    var numViews = recipe._views.length;
+    var numParticles = recipe._particles.length;
+    var numSlots = recipe._slots.length;
+    this._copyInto(recipe, cloneMap);
+    return {
+      views: recipe._views.slice(numViews),
+      particles: recipe._particles.slice(numParticles),
+      slots: recipe._slots.slice(numSlots)
+    };
+  }
+
+  _copyInto(recipe, cloneMap) {
+    function cloneTheThing(object) {
+      var clonedObject = object._copyInto(recipe, cloneMap);
+      cloneMap.set(object, clonedObject);
+    }
+
+    this._views.forEach(cloneTheThing);
+    this._particles.forEach(cloneTheThing);
+    this._slots.forEach(cloneTheThing);
+    this._connectionConstraints.forEach(cloneTheThing);
+    if (this.search) {
+      this.search._copyInto(recipe);
+    }
+  }
+
+  updateToClone(dict) {
+    var result = {};
+    Object.keys(dict).forEach(key => result[key] = this._cloneMap.get(dict[key]));
+    return result;
+  }
+
+  static over(results, walker, strategy) {
+    return Strategizer.over(results, walker, strategy);
+  }
+
+  _makeLocalNameMap() {
+    let names = new Set();
+    for (let particle of this.particles) {
+      names.add(particle.localName);
+    }
+    for (let view of this.views) {
+      names.add(view.localName);
+    }
+    for (let slot of this.slots) {
+      names.add(slot.localName);
+    }
+
+    let nameMap = new Map();
+    let i = 0;
+    for (let particle of this.particles) {
+      let localName = particle.localName;
+      if (!localName) {
+        do {
+          localName = `particle${i++}`;
+        } while (names.has(localName));
+      }
+      nameMap.set(particle, localName);
+    }
+
+    i = 0;
+    for (let view of this.views) {
+      let localName = view.localName;
+      if (!localName) {
+        do {
+          localName = `view${i++}`;
+        } while (names.has(localName));
+      }
+      nameMap.set(view, localName);
+    }
+
+    i = 0;
+    for (let slot of this.slots) {
+      let localName = slot.localName;
+      if (!localName) {
+        do {
+          localName = `slot${i++}`;
+        } while (names.has(localName));
+      }
+      nameMap.set(slot, localName);
+    }
+
+    return nameMap;
+  }
+
+  // TODO: Add a normalize() which strips local names and puts and nested
+  //       lists into a normal ordering.
+
+  toString(options) {
+    let nameMap = this._makeLocalNameMap();
+    let result = [];
+    // TODO: figure out where recipe names come from
+    result.push(`recipe`);
+    if (this.search) {
+      result.push(this.search.toString(options).replace(/^|(\n)/g, '$1  '));
+    }
+    for (let constraint of this._connectionConstraints) {
+      let constraintStr = constraint.toString().replace(/^|(\n)/g, '$1  ');
+      if (options && options.showUnresolved) {
+        constraintStr = constraintStr.concat(' # unresolved connection-constraint');
+      }
+      result.push(constraintStr);
+    }
+    for (let view of this.views) {
+      result.push(view.toString(nameMap, options).replace(/^|(\n)/g, '$1  '));
+    }
+    for (let slot of this.slots) {
+      let slotString = slot.toString(nameMap, options);
+      if (slotString) {
+        result.push(slotString.replace(/^|(\n)/g, '$1  '));
+      }
+    }
+    for (let particle of this.particles) {
+      result.push(particle.toString(nameMap, options).replace(/^|(\n)/g, '$1  '));
+    }
+    return result.join('\n');
+  }
+}
+
+module.exports = Recipe;
+
+
+/***/ }),
+/* 5 */
+/***/ (function(module, exports, __webpack_require__) {
+
 /* WEBPACK VAR INJECTION */(function(module) {(function (module, exports) {
   'use strict';
 
@@ -2473,7 +2902,7 @@ module.exports = g;
 
   var Buffer;
   try {
-    Buffer = __webpack_require__(286).Buffer;
+    Buffer = __webpack_require__(289).Buffer;
   } catch (e) {
   }
 
@@ -5849,10 +6278,299 @@ module.exports = g;
   };
 })(typeof module === 'undefined' || module, this);
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(108)(module)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(109)(module)))
 
 /***/ }),
-/* 5 */
+/* 6 */
+/***/ (function(module, exports, __webpack_require__) {
+
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+const assert = __webpack_require__(1);
+
+class Strategizer {
+  constructor(strategies, evaluators, {maxPopulation, generationSize, discardSize}) {
+    this._strategies = strategies;
+    this._evaluators = evaluators;
+    this._generation = 0;
+    this._internalPopulation = [];
+    this._population = [];
+    this._generated = [];
+    this._terminal = [];
+    this._options = {
+      maxPopulation,
+      generationSize,
+      discardSize,
+    };
+    this.populationHash = new Map();
+  }
+  // Latest generation number.
+  get generation() {
+    return this._generation;
+  }
+  // All individuals in the current population.
+  get population() {
+    return this._population;
+  }
+  // Individuals of the latest generation.
+  get generated() {
+    return this._generated;
+  }
+  // Individuals that were discarded in the latest generation.
+  get discarded() {
+    return this._discarded;
+    // TODO: Do we need this?
+  }
+  // Individuals from the previous generation that were not decended from in the
+  // current generation.
+  get terminal() {
+    assert(this._terminal);
+    return this._terminal;
+  }
+  async generate() {
+    // Generate
+    let generation = this.generation + 1;
+    let individualsPerStrategy = Math.floor(this._options.generationSize / this._strategies.length);
+    let generated = await Promise.all(this._strategies.map(strategy => {
+      return strategy.generate(this, individualsPerStrategy);
+    }));
+
+    var record = {};
+    record.generation = generation;
+    record.sizeOfLastGeneration = this.generated.length;
+    record.outputSizesOfStrategies = {};
+    for (var i = 0; i < this._strategies.length; i++) {
+      record.outputSizesOfStrategies[this._strategies[i].constructor.name] = generated[i].results.length;
+    }
+
+    generated = generated.map(({results}) => results);
+    generated = [].concat(...generated);
+
+    // TODO: get rid of this additional asynchrony
+    generated = await Promise.all(generated.map(async result => {
+      if (result.hash) result.hash = await result.hash;
+      return result;
+    }));
+
+    record.rawGenerated = generated.length;
+    record.nullDerivations = 0;
+    record.invalidDerivations = 0;
+    record.duplicateDerivations = 0;
+    record.nullDerivationsByStrategy = {};
+    record.duplicateDerivationsByStrategy = {};
+    record.invalidDerivationsByStrategy = {};
+
+    generated = generated.filter(result => {
+      if (result.hash) {
+        var existingResult = this.populationHash.get(result.hash);
+        var strategy = result.derivation[0].strategy.constructor.name;
+        if (existingResult) {
+          if (result.derivation[0].parent == existingResult) {
+            record.nullDerivations += 1;
+            if (record.nullDerivationsByStrategy[strategy] == undefined)
+              record.nullDerivationsByStrategy[strategy] = 0;
+            record.nullDerivationsByStrategy[strategy]++;
+          } else if (existingResult.derivation.map(a => a.parent).indexOf(result.derivation[0].parent) != -1) {
+            record.duplicateDerivations += 1;
+            if (record.duplicateDerivationsByStrategy[strategy] == undefined)
+              record.duplicateDerivationsByStrategy[strategy] = 0;
+            record.duplicateDerivationsByStrategy[strategy]++;
+          } else {
+            this.populationHash.get(result.hash).derivation.push(result.derivation[0]);
+          }
+          return false;
+        }
+        this.populationHash.set(result.hash, result);
+      }
+      if (result.valid === false) {
+        record.invalidDerivations++;
+        record.invalidDerivationsByStrategy[strategy] = (record.duplicateDerivationsByStrategy[strategy] || 0) + 1;
+        return false;
+      }
+      return true;
+    });
+
+    let terminal = new Map();
+    for (let candidate of this.generated) {
+      terminal.set(candidate.result, candidate);
+    }
+    for (let result of generated) {
+      for (let {parent} of result.derivation) {
+        if (parent && terminal.has(parent.result)) {
+          terminal.delete(parent.result);
+        }
+      }
+    }
+    terminal = [...terminal.values()];
+
+    record.totalGenerated = generated.length;
+
+    generated.sort((a,b) => {
+      if (a.score > b.score)
+        return -1;
+      if (a.score < b.score)
+        return 1;
+      return 0;
+    });
+
+    // Evalute
+    let evaluations = await Promise.all(this._evaluators.map(strategy => {
+      return strategy.evaluate(this, generated);
+    }));
+    let fitness = Strategizer._mergeEvaluations(evaluations, generated);
+    assert(fitness.length == generated.length);
+
+
+    // Merge + Discard
+    let discarded = [];
+    let newGeneration = [];
+
+    for (let i = 0; i < fitness.length; i++) {
+      newGeneration.push({
+        fitness: fitness[i],
+        individual: generated[i],
+      });
+    }
+
+    while (this._internalPopulation.length > (this._options.maxPopulation - this._options.discardSize)) {
+      discarded.push(this._internalPopulation.pop().individual);
+    }
+
+    newGeneration.sort((x, y) => y.fitness - x.fitness);
+
+    for (let i = 0; i < newGeneration.length && i < this._options.discardSize; i++) {
+      if (i < this._options.discardSize) {
+        this._internalPopulation.push(newGeneration[i]);
+      } else {
+        discarded.push(newGeneration[i].individual);
+      }
+    }
+
+    // TODO: Instead of push+sort, merge `internalPopulation` with `generated`.
+    this._internalPopulation.sort((x, y) => y.fitness - x.fitness);
+
+    for (let strategy of this._strategies) {
+      strategy.discard(discarded);
+    }
+
+    // Publish
+    this._terminal = terminal;
+    this._generation = generation;
+    this._generated = generated;
+    this._population = this._internalPopulation.map(x => x.individual);
+
+    return record;
+  }
+
+  static _mergeEvaluations(evaluations, generated) {
+    let n = generated.length;
+    let mergedEvaluations = [];
+    for (let i = 0; i < n; i++) {
+      let merged = NaN;
+      for (let evaluation of evaluations) {
+        let fitness = evaluation[i];
+        if (isNaN(fitness)) {
+          continue;
+        }
+        if (isNaN(merged)) {
+          merged = fitness;
+        } else {
+          // TODO: how should evaluations be combined?
+          merged = (merged * i + fitness) / (i + 1);
+        }
+      }
+      if (isNaN(merged)) {
+        // TODO: What should happen when there was no evaluation?
+        merged = 0.5;
+      }
+      mergedEvaluations.push(merged);
+    }
+    return mergedEvaluations;
+  }
+
+  static over(results, walker, strategy) {
+    walker.onStrategy(strategy);
+    results.forEach(result => {
+      walker.onResult(result);
+      walker.onResultDone();
+    });
+    walker.onStrategyDone();
+    return walker.descendants;
+  }
+}
+
+class Walker {
+  constructor() {
+    this.descendants = [];
+  }
+
+  onStrategy(strategy) {
+    this.currentStrategy = strategy;
+  }
+
+  onResult(result) {
+    this.currentResult = result;
+  }
+
+  createDescendant(result, score, hash, valid) {
+    assert(this.currentResult, "no current result");
+    assert(this.currentStrategy, "no current strategy");
+    if (this.currentResult.score)
+      score += this.currentResult.score;
+    this.descendants.push({
+      result,
+      score,
+      derivation: [{parent: this.currentResult, strategy: this.currentStrategy}],
+      hash,
+      valid,
+    });
+  }
+
+  onResultDone() {
+    this.currentResult = undefined;
+  }
+
+  onStrategyDone() {
+    this.currentStrategy = undefined;
+  }
+}
+
+Strategizer.Walker = Walker;
+
+// TODO: Doc call convention, incl strategies are stateful.
+class Strategy {
+  async activate(strategizer) {
+    // Returns estimated ability to generate/evaluate.
+    // TODO: What do these numbers mean? Some sort of indication of the accuracy of the
+    // generated individuals and evaluations.
+    return {generate: 0, evaluate: 0};
+  }
+  getResults(strategizer) {
+    return strategizer.generated;
+  }
+  async generate(strategizer, n) {
+    return [];
+  }
+  discard(individuals) {
+  }
+  async evaluate(strategizer, individuals) {
+    return individuals.map(() => NaN);
+  }
+}
+
+Object.assign(module.exports, {
+  Strategizer,
+  Strategy,
+});
+
+
+/***/ }),
+/* 7 */
 /***/ (function(module, exports) {
 
 // shim for using process in browser
@@ -6042,749 +6760,9 @@ process.umask = function() { return 0; };
 
 
 /***/ }),
-/* 6 */
-/***/ (function(module, exports, __webpack_require__) {
-
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-
-var assert = __webpack_require__(1);
-var Strategizer = __webpack_require__(7).Strategizer;
-var ConnectionConstraint = __webpack_require__(264);
-var Particle = __webpack_require__(265);
-var Search = __webpack_require__(117);
-var Slot = __webpack_require__(267);
-var View = __webpack_require__(270);
-var util = __webpack_require__(12);
-
-class Recipe {
-  constructor() {
-    this._particles = [];
-    this._views = [];
-    this._slots = [];
-
-    // TODO: Recipes should be collections of records that are tagged
-    // with a type. Strategies should register the record types they
-    // can handle. ConnectionConstraints should be a different record
-    // type to particles/views.
-    this._connectionConstraints = [];
-
-    // TODO: Change to array, if needed for search strings of merged recipes.
-    this._search = null;
-  }
-
-  newConnectionConstraint(from, fromConnection, to, toConnection) {
-    this._connectionConstraints.push(new ConnectionConstraint(from, fromConnection, to, toConnection));
-  }
-
-  removeConstraint(constraint) {
-    var idx = this._connectionConstraints.indexOf(constraint);
-    assert(idx >= 0);
-    this._connectionConstraints.splice(idx, 1);
-  }
-
-  clearConnectionConstraints() {
-    this._connectionConstraints = [];
-  }
-
-  newParticle(name) {
-    var particle = new Particle(this, name);
-    this._particles.push(particle);
-    return particle;
-  }
-
-  newView() {
-    var view = new View(this);
-    this._views.push(view);
-    return view;
-  }
-
-  newSlot(name) {
-    var slot = new Slot(this, name);
-    this._slots.push(slot);
-    return slot;
-  }
-
-  isResolved() {
-    assert(Object.isFrozen(this), 'Recipe must be frozen to be resolved.');
-    return this._connectionConstraints.length == 0
-        && (this._search === null || this._search.isResolved())
-        && this._views.every(view => view.isResolved())
-        && this._particles.every(particle => particle.isResolved())
-        && this._slots.every(slot => slot.isResolved())
-        && this.viewConnections.every(connection => connection.isResolved())
-        && this.slotConnections.every(connection => connection.isResolved());
-  }
-
-  _findDuplicateView() {
-    let seenViews = new Set();
-    return this._views.find(view => {
-      if (view.id) {
-        if (seenViews.has(view.id)) {
-          return view;
-        }
-        seenViews.add(view.id);
-      }
-    });
-  }
-
-  _isValid() {
-    return !this._findDuplicateView() && this._views.every(view => view._isValid())
-        && this._particles.every(particle => particle._isValid())
-        && this._slots.every(slot => slot._isValid())
-        && this.viewConnections.every(connection => connection._isValid())
-        && this.slotConnections.every(connection => connection._isValid())
-        && (!this.search || this.search.isValid());
-  }
-
-  get localName() { return this._localName; }
-  set localName(name) { this._localName = name; }
-  get particles() { return this._particles; } // Particle*
-  set particles(particles) { this._particles = particles; }
-  get views() { return this._views; } // View*
-  set views(views) { this._views = views; }
-  get slots() { return this._slots; } // Slot*
-  set slots(slots) { this._slots = slots; }
-  get connectionConstraints() { return this._connectionConstraints; }
-  get search() { return this._search; }
-  set search(search) {
-    this._search = search;
-  }
-  setSearchPhrase(phrase) {
-    assert(!this._search, 'Cannot override search phrase');
-    if (phrase) {
-      this._search = new Search(phrase);
-    }
-  }
-
-  get slotConnections() {  // SlotConnection*
-    var slotConnections = [];
-    this._particles.forEach(particle => {
-      slotConnections.push(...Object.values(particle.consumedSlotConnections));
-    });
-    return slotConnections;
-  }
-
-  get viewConnections() {
-    var viewConnections = [];
-    this._particles.forEach(particle => {
-      viewConnections.push(...Object.values(particle.connections));
-      viewConnections.push(...particle._unnamedConnections);
-    });
-    return viewConnections;
-  }
-
-  isEmpty() {
-    return this.particles.length == 0 &&
-           this.views.length == 0 &&
-           this.slots.length == 0 &&
-           this._connectionConstraints.length == 0;
-  }
-
-  findView(id) {
-    for (var view of this.views) {
-      if (view.id == id)
-        return view;
-    }
-  }
-
-  findSlot(id) {
-    for (var slot of this.slots) {
-      if (slot.id == id)
-        return slot;
-    }
-  }
-
-  async digest() {
-    if (typeof(crypto) != 'undefined' && crypto.subtle) {
-      // browser
-      let buffer = new TextEncoder('utf-8').encode(this.toString());
-      let digest = await crypto.subtle.digest('SHA-1', buffer)
-      return Array.from(new Uint8Array(digest)).map(x => ('00' + x.toString(16)).slice(-2)).join('');
-    } else {
-      // nodejs
-      let crypto = __webpack_require__(151);
-      let sha = crypto.createHash('sha1');
-      sha.update(this.toString());
-      return sha.digest('hex');
-    }
-  }
-
-  normalize() {
-    if (Object.isFrozen(this)) {
-      return;
-    }
-    if (!this._isValid()) {
-      var duplicateView = this._findDuplicateView();
-      if (duplicateView)
-        console.log(`Has Duplicate View ${duplicateView.id}`);
-
-      let checkForInvalid = (name, list, f) => {
-        var invalids = list.filter(item => !item._isValid());
-        if (invalids.length > 0)
-          console.log(`Has Invalid ${name} ${invalids.map(f)}`)
-      }
-      checkForInvalid('Views', this._views, view => view.id);
-      checkForInvalid('Particles', this._particles, particle => particle.name);
-      checkForInvalid('Slots', this._slots, slot => slot.name);
-      checkForInvalid('ViewConnections', this.viewConnections, viewConnection => `${viewConnection.particle.name}::${viewConnection.name}`);
-      checkForInvalid('SlotConnections', this.slotConnections, slotConnection => slotConnection.name);
-      return false;
-    }
-    // Get views and particles ready to sort connections.
-    for (let particle of this._particles) {
-      particle._startNormalize();
-    }
-    for (let view of this._views) {
-      view._startNormalize();
-    }
-    for (let slot of this._slots) {
-      slot._startNormalize();
-    }
-
-    // Sort and normalize view connections.
-    let connections = this.viewConnections;
-    for (let connection of connections) {
-      connection._normalize();
-    }
-    connections.sort(util.compareComparables);
-
-    // Sort and normalize slot connections.
-    let slotConnections = this.slotConnections;
-    for (let slotConnection of slotConnections) {
-      slotConnection._normalize();
-    }
-    slotConnections.sort(util.compareComparables);
-
-    if (this.search) {
-      this.search._normalize();
-    }
-
-    // Finish normalizing particles and views with sorted connections.
-    for (let particle of this._particles) {
-      particle._finishNormalize();
-    }
-    for (let view of this._views) {
-      view._finishNormalize();
-    }
-    for (let slot of this._slots) {
-      slot._finishNormalize();
-    }
-
-    let seenViews = new Set();
-    let seenParticles = new Set();
-    let particles = [];
-    let views = [];
-    for (let connection of connections) {
-      if (!seenParticles.has(connection.particle)) {
-        particles.push(connection.particle);
-        seenParticles.add(connection.particle);
-      }
-      if (connection.view && !seenViews.has(connection.view)) {
-        views.push(connection.view);
-        seenViews.add(connection.view);
-      }
-    }
-
-    let orphanedViews = this._views.filter(view => !seenViews.has(view));
-    orphanedViews.sort(util.compareComparables);
-    views.push(...orphanedViews);
-
-    let orphanedParticles = this._particles.filter(particle => !seenParticles.has(particle));
-    orphanedParticles.sort(util.compareComparables);
-    particles.push(...orphanedParticles);
-
-    // TODO: redo slots as above.
-    let seenSlots = new Set();
-    let slots = [];
-    for (let slotConnection of slotConnections) {
-      if (slotConnection.targetSlot && !seenSlots.has(slotConnection.targetSlot)) {
-        slots.push(slotConnection.targetSlot);
-        seenSlots.add(slotConnection.targetSlot);
-      }
-      Object.values(slotConnection.providedSlots).forEach(ps => {
-        if (!seenSlots.has(ps)) {
-          slots.push(ps);
-          seenSlots.add(ps);
-        }
-      })
-    }
-
-    // Put particles and views in their final ordering.
-    this._particles = particles;
-    this._views = views;
-    this._slots = slots;
-    this._connectionConstraints.sort(util.compareComparables);
-
-    Object.freeze(this._particles);
-    Object.freeze(this._views);
-    Object.freeze(this._slots);
-    Object.freeze(this._connectionConstraints);
-    Object.freeze(this);
-
-    return true;
-  }
-
-  clone(cloneMap) {
-    // for now, just copy everything
-
-    var recipe = new Recipe();
-
-    if (cloneMap == undefined)
-      cloneMap = new Map();
-
-    this._copyInto(recipe, cloneMap);
-
-    // TODO: figure out a better approach than stashing the cloneMap permanently
-    // on the recipe
-    recipe._cloneMap = cloneMap;
-
-    return recipe;
-  }
-
-  mergeInto(recipe) {
-    var cloneMap = new Map();
-    var numViews = recipe._views.length;
-    var numParticles = recipe._particles.length;
-    var numSlots = recipe._slots.length;
-    this._copyInto(recipe, cloneMap);
-    return {
-      views: recipe._views.slice(numViews),
-      particles: recipe._particles.slice(numParticles),
-      slots: recipe._slots.slice(numSlots)
-    };
-  }
-
-  _copyInto(recipe, cloneMap) {
-    function cloneTheThing(object) {
-      var clonedObject = object._copyInto(recipe, cloneMap);
-      cloneMap.set(object, clonedObject);
-    }
-
-    this._views.forEach(cloneTheThing);
-    this._particles.forEach(cloneTheThing);
-    this._slots.forEach(cloneTheThing);
-    this._connectionConstraints.forEach(cloneTheThing);
-    if (this.search) {
-      this.search._copyInto(recipe);
-    }
-  }
-
-  updateToClone(dict) {
-    var result = {};
-    Object.keys(dict).forEach(key => result[key] = this._cloneMap.get(dict[key]));
-    return result;
-  }
-
-  static over(results, walker, strategy) {
-    return Strategizer.over(results, walker, strategy);
-  }
-
-  _makeLocalNameMap() {
-    let names = new Set();
-    for (let particle of this.particles) {
-      names.add(particle.localName);
-    }
-    for (let view of this.views) {
-      names.add(view.localName);
-    }
-    for (let slot of this.slots) {
-      names.add(slot.localName);
-    }
-
-    let nameMap = new Map();
-    let i = 0;
-    for (let particle of this.particles) {
-      let localName = particle.localName;
-      if (!localName) {
-        do {
-          localName = `particle${i++}`;
-        } while (names.has(localName));
-      }
-      nameMap.set(particle, localName);
-    }
-
-    i = 0;
-    for (let view of this.views) {
-      let localName = view.localName;
-      if (!localName) {
-        do {
-          localName = `view${i++}`;
-        } while (names.has(localName));
-      }
-      nameMap.set(view, localName);
-    }
-
-    i = 0;
-    for (let slot of this.slots) {
-      let localName = slot.localName;
-      if (!localName) {
-        do {
-          localName = `slot${i++}`;
-        } while (names.has(localName));
-      }
-      nameMap.set(slot, localName);
-    }
-
-    return nameMap;
-  }
-
-  // TODO: Add a normalize() which strips local names and puts and nested
-  //       lists into a normal ordering.
-
-  toString(options) {
-    let nameMap = this._makeLocalNameMap();
-    let result = [];
-    // TODO: figure out where recipe names come from
-    result.push(`recipe`);
-    if (this.search) {
-      result.push(this.search.toString(options).replace(/^|(\n)/g, '$1  '));
-    }
-    for (let constraint of this._connectionConstraints) {
-      let constraintStr = constraint.toString().replace(/^|(\n)/g, '$1  ');
-      if (options && options.showUnresolved) {
-        constraintStr = constraintStr.concat(' # unresolved connection-constraint');
-      }
-      result.push(constraintStr);
-    }
-    for (let view of this.views) {
-      result.push(view.toString(nameMap, options).replace(/^|(\n)/g, '$1  '));
-    }
-    for (let slot of this.slots) {
-      let slotString = slot.toString(nameMap, options);
-      if (slotString) {
-        result.push(slotString.replace(/^|(\n)/g, '$1  '));
-      }
-    }
-    for (let particle of this.particles) {
-      result.push(particle.toString(nameMap, options).replace(/^|(\n)/g, '$1  '));
-    }
-    return result.join('\n');
-  }
-}
-
-module.exports = Recipe;
-
-
-/***/ }),
-/* 7 */
-/***/ (function(module, exports, __webpack_require__) {
-
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-
-const assert = __webpack_require__(1);
-
-class Strategizer {
-  constructor(strategies, evaluators, {maxPopulation, generationSize, discardSize}) {
-    this._strategies = strategies;
-    this._evaluators = evaluators;
-    this._generation = 0;
-    this._internalPopulation = [];
-    this._population = [];
-    this._generated = [];
-    this._terminal = [];
-    this._options = {
-      maxPopulation,
-      generationSize,
-      discardSize,
-    };
-    this.populationHash = new Map();
-  }
-  // Latest generation number.
-  get generation() {
-    return this._generation;
-  }
-  // All individuals in the current population.
-  get population() {
-    return this._population;
-  }
-  // Individuals of the latest generation.
-  get generated() {
-    return this._generated;
-  }
-  // Individuals that were discarded in the latest generation.
-  get discarded() {
-    return this._discarded;
-    // TODO: Do we need this?
-  }
-  // Individuals from the previous generation that were not decended from in the
-  // current generation.
-  get terminal() {
-    assert(this._terminal);
-    return this._terminal;
-  }
-  async generate() {
-    // Generate
-    let generation = this.generation + 1;
-    let individualsPerStrategy = Math.floor(this._options.generationSize / this._strategies.length);
-    let generated = await Promise.all(this._strategies.map(strategy => {
-      return strategy.generate(this, individualsPerStrategy);
-    }));
-
-    var record = {};
-    record.generation = generation;
-    record.sizeOfLastGeneration = this.generated.length;
-    record.outputSizesOfStrategies = {};
-    for (var i = 0; i < this._strategies.length; i++) {
-      record.outputSizesOfStrategies[this._strategies[i].constructor.name] = generated[i].results.length;
-    }
-
-    generated = generated.map(({results}) => results);
-    generated = [].concat(...generated);
-
-    // TODO: get rid of this additional asynchrony
-    generated = await Promise.all(generated.map(async result => {
-      if (result.hash) result.hash = await result.hash;
-      return result;
-    }));
-
-    record.rawGenerated = generated.length;
-    record.nullDerivations = 0;
-    record.invalidDerivations = 0;
-    record.duplicateDerivations = 0;
-    record.nullDerivationsByStrategy = {};
-    record.duplicateDerivationsByStrategy = {};
-    record.invalidDerivationsByStrategy = {};
-
-    generated = generated.filter(result => {
-      if (result.hash) {
-        var existingResult = this.populationHash.get(result.hash);
-        var strategy = result.derivation[0].strategy.constructor.name;
-        if (existingResult) {
-          if (result.derivation[0].parent == existingResult) {
-            record.nullDerivations += 1;
-            if (record.nullDerivationsByStrategy[strategy] == undefined)
-              record.nullDerivationsByStrategy[strategy] = 0;
-            record.nullDerivationsByStrategy[strategy]++;
-          } else if (existingResult.derivation.map(a => a.parent).indexOf(result.derivation[0].parent) != -1) {
-            record.duplicateDerivations += 1;
-            if (record.duplicateDerivationsByStrategy[strategy] == undefined)
-              record.duplicateDerivationsByStrategy[strategy] = 0;
-            record.duplicateDerivationsByStrategy[strategy]++;
-          } else {
-            this.populationHash.get(result.hash).derivation.push(result.derivation[0]);
-          }
-          return false;
-        }
-        this.populationHash.set(result.hash, result);
-      }
-      if (result.valid === false) {
-        record.invalidDerivations++;
-        record.invalidDerivationsByStrategy[strategy] = (record.duplicateDerivationsByStrategy[strategy] || 0) + 1;
-        return false;
-      }
-      return true;
-    });
-
-    let terminal = new Map();
-    for (let candidate of this.generated) {
-      terminal.set(candidate.result, candidate);
-    }
-    for (let result of generated) {
-      for (let {parent} of result.derivation) {
-        if (parent && terminal.has(parent.result)) {
-          terminal.delete(parent.result);
-        }
-      }
-    }
-    terminal = [...terminal.values()];
-
-    record.totalGenerated = generated.length;
-
-    generated.sort((a,b) => {
-      if (a.score > b.score)
-        return -1;
-      if (a.score < b.score)
-        return 1;
-      return 0;
-    });
-
-    // Evalute
-    if (generated.length > 0 && this._evaluators.length == 0) {
-      console.warn('No evaluators');
-    }
-    let evaluations = await Promise.all(this._evaluators.map(strategy => {
-      return strategy.evaluate(this, generated);
-    }));
-    let fitness = Strategizer._mergeEvaluations(evaluations, generated);
-    assert(fitness.length == generated.length);
-
-
-    // Merge + Discard
-    let discarded = [];
-    let newGeneration = [];
-
-    for (let i = 0; i < fitness.length; i++) {
-      newGeneration.push({
-        fitness: fitness[i],
-        individual: generated[i],
-      });
-    }
-
-    while (this._internalPopulation.length > (this._options.maxPopulation - this._options.discardSize)) {
-      discarded.push(this._internalPopulation.pop().individual);
-    }
-
-    newGeneration.sort((x, y) => y.fitness - x.fitness);
-
-    for (let i = 0; i < newGeneration.length && i < this._options.discardSize; i++) {
-      if (i < this._options.discardSize) {
-        this._internalPopulation.push(newGeneration[i]);
-      } else {
-        discarded.push(newGeneration[i].individual);
-      }
-    }
-
-    // TODO: Instead of push+sort, merge `internalPopulation` with `generated`.
-    this._internalPopulation.sort((x, y) => y.fitness - x.fitness);
-
-    for (let strategy of this._strategies) {
-      strategy.discard(discarded);
-    }
-
-    // Publish
-    this._terminal = terminal;
-    this._generation = generation;
-    this._generated = generated;
-    this._population = this._internalPopulation.map(x => x.individual);
-
-    return record;
-  }
-
-  static _mergeEvaluations(evaluations, generated) {
-    let n = generated.length;
-    let mergedEvaluations = [];
-    for (let i = 0; i < n; i++) {
-      let merged = NaN;
-      for (let evaluation of evaluations) {
-        let fitness = evaluation[i];
-        if (isNaN(fitness)) {
-          continue;
-        }
-        if (isNaN(merged)) {
-          merged = fitness;
-        } else {
-          // TODO: how should evaluations be combined?
-          merged = (merged * i + fitness) / (i + 1);
-        }
-      }
-      if (isNaN(merged)) {
-        // TODO: What should happen when there was no evaluation?
-        merged = 0.5;
-      }
-      mergedEvaluations.push(merged);
-    }
-    return mergedEvaluations;
-  }
-
-  static over(results, walker, strategy) {
-    walker.onStrategy(strategy);
-    results.forEach(result => {
-      walker.onResult(result);
-      walker.onResultDone();
-    });
-    walker.onStrategyDone();
-    return walker.descendants;
-  }
-}
-
-class Walker {
-  constructor() {
-    this.descendants = [];
-  }
-
-  onStrategy(strategy) {
-    this.currentStrategy = strategy;
-  }
-
-  onResult(result) {
-    this.currentResult = result;
-  }
-
-  createDescendant(result, score, hash, valid) {
-    assert(this.currentResult, "no current result");
-    assert(this.currentStrategy, "no current strategy");
-    if (this.currentResult.score)
-      score += this.currentResult.score;
-    this.descendants.push({
-      result,
-      score,
-      derivation: [{parent: this.currentResult, strategy: this.currentStrategy}],
-      hash,
-      valid,
-    });
-  }
-
-  onResultDone() {
-    this.currentResult = undefined;
-  }
-
-  onStrategyDone() {
-    this.currentStrategy = undefined;
-  }
-}
-
-Strategizer.Walker = Walker;
-
-// TODO: Doc call convention, incl strategies are stateful.
-class Strategy {
-  async activate(strategizer) {
-    // Returns estimated ability to generate/evaluate.
-    // TODO: What do these numbers mean? Some sort of indication of the accuracy of the
-    // generated individuals and evaluations.
-    return {generate: 0, evaluate: 0};
-  }
-  async generate(strategizer, n) {
-    return [];
-  }
-  discard(individuals) {
-  }
-  async evaluate(strategizer, individuals) {
-    return individuals.map(() => NaN);
-  }
-}
-
-Object.assign(module.exports, {
-  Strategizer,
-  Strategy,
-});
-
-
-/***/ }),
 /* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
-"use strict";
-
-
-var elliptic = exports;
-
-elliptic.version = __webpack_require__(173).version;
-elliptic.utils = __webpack_require__(172);
-elliptic.rand = __webpack_require__(69);
-elliptic.curve = __webpack_require__(35);
-elliptic.curves = __webpack_require__(164);
-
-// Protocols
-elliptic.ec = __webpack_require__(165);
-elliptic.eddsa = __webpack_require__(168);
-
-
-/***/ }),
-/* 9 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-// @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
 // http://polymer.github.io/LICENSE.txt
@@ -6792,195 +6770,7 @@ elliptic.eddsa = __webpack_require__(168);
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-
-const assert = __webpack_require__(1);
-
-let nextVariableId = 0;
-
-function addType(name, tag, args) {
-  var lowerName = name[0].toLowerCase() + name.substring(1);
-  if (args.length == 1) {
-    Object.defineProperty(Type, `new${name}`, {
-      value: function() {
-        return new Type(tag, arguments[0]);
-      }});
-    var upperArg = args[0][0].toUpperCase() + args[0].substring(1);
-    Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
-      get: function() {
-        assert(this[`is${name}`]);
-        return this.data;
-      }});
-  } else {
-    Object.defineProperty(Type, `new${name}`, {
-      value: function() {
-        var data = {};
-        for (var i = 0; i < args.length; i++)
-          data[args[i]] = arguments[i];
-        return new Type(tag, data);
-      }});
-    for (var arg of args) {
-      var upperArg = arg[0].toUpperCase() + arg.substring(1);
-      Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
-        get: function() {
-          assert(this[`is${name}`]);
-          return this.data[arg];
-        }});
-    }
-  }
-  Object.defineProperty(Type.prototype, `is${name}`, {
-    get: function() {
-      return this.tag == tag;
-    }});
-}
-
-class Type {
-  constructor(tag, data) {
-    assert(typeof tag == 'string');
-    assert(data);
-    if (tag == 'entity')
-      assert(data.tag == undefined);
-    if (tag == 'list') {
-      if (!(data instanceof Type) && data.tag && data.data) {
-        data = new Type(data.tag, data.data);
-      }
-    }
-    this.tag = tag;
-    this.data = data;
-  }
-
-  // TODO: Replace these static functions with operations on Types directly.
-  // Replaces 'prevariable' types with 'variable'+id types .
-  assignVariableIds(variableMap) {
-    if (this.isVariableReference) {
-      var name = this.data.name;
-      var id = variableMap.get(name);
-      if (id == undefined) {
-        id = nextVariableId++;
-        variableMap.set(name, id);
-      }
-      return Type.newVariable(name, id);
-    }
-
-    if (this.isView) {
-      return this.primitiveType().assignVariableIds(variableMap).viewOf();
-    }
-
-    return this;
-  }
-
-  // Replaces raw strings with resolved schemas.
-  resolveSchemas(resolveSchema) {
-    if (this.isEntityReference) {
-      // TODO: This should probably all happen during type construction so that
-      //       we can cache the schema objet.
-      return Type.newEntity(resolveSchema(this.data).toLiteral());
-    }
-
-    if (this.isView) {
-      return this.primitiveType().resolveSchemas(resolveSchema).viewOf();
-    }
-
-    return this;
-  }
-
-  equals(type) {
-    if (this.tag !== type.tag)
-      return false;
-    if (this.tag == 'entity') {
-      // TODO: Remove this hack that allows the old resolver to match
-      //       types by schema name.
-      return this.data.name == type.data.name;
-    }
-    if (this.isView) {
-      return this.data.equals(type.data);
-    }
-    return JSON.stringify(this.data) == JSON.stringify(type.data);
-  }
-
-  get isValid() {
-    return !this.variableReference;
-  }
-
-  primitiveType() {
-    var type = this.viewType;
-    return new Type(type.tag, type.data);
-  }
-
-  toLiteral() {
-    return this;
-  }
-
-  static fromLiteral(literal) {
-    return new Type(literal.tag, literal.data);
-  }
-
-  viewOf() {
-    return Type.newView(this);
-  }
-
-  toString() {
-    if (this.isView)
-      return `[${this.primitiveType().toString()}]`;
-    if (this.isEntity)
-      return this.entitySchema.name;
-    assert('Add support to serializing type:', type);
-  }
-
-  toPrettyString() {
-    if (this.isRelation)
-      return JSON.stringify(this.data);
-    if (this.isView)
-      return `${this.primitiveType().toString()} List`;
-    if (this.isVariable)
-      return `[${this.variableName}]`;
-    if (this.isVariableReference)
-      return `[${this.variableReferenceName}]`;
-    if (this.isEntity)
-      return this.entitySchema.name;
-    if (this.isEntityReference)
-      return this.entityReferenceName;
-  }
-}
-
-addType('EntityReference', 'entityReference', ['name']);
-addType('Entity', 'entity', ['schema']);
-addType('VariableReference', 'variableReference', ['name']);
-addType('Variable', 'variable', ['name', 'id']);
-addType('View', 'list', ['type']);
-addType('Relation', 'relation', ['entities']);
-
-module.exports = Type;
-
-
-/***/ }),
-/* 10 */
-/***/ (function(module, exports) {
-
-module.exports = assert;
-
-function assert(val, msg) {
-  if (!val)
-    throw new Error(msg || 'Assertion failed');
-}
-
-assert.equal = function assertEqual(l, r, msg) {
-  if (l != r)
-    throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
-};
-
-
-/***/ }),
-/* 11 */
-/***/ (function(module, exports, __webpack_require__) {
-
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-
-var Recipe = __webpack_require__(6);
+var Recipe = __webpack_require__(4);
 let WalkerBase = __webpack_require__(271);
 
 class Walker extends WalkerBase {
@@ -7041,6 +6831,237 @@ Walker.Permuted = WalkerBase.Permuted;
 Walker.Independent = WalkerBase.Independent;
 
 module.exports = Walker;
+
+
+/***/ }),
+/* 9 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var elliptic = exports;
+
+elliptic.version = __webpack_require__(173).version;
+elliptic.utils = __webpack_require__(172);
+elliptic.rand = __webpack_require__(70);
+elliptic.curve = __webpack_require__(36);
+elliptic.curves = __webpack_require__(164);
+
+// Protocols
+elliptic.ec = __webpack_require__(165);
+elliptic.eddsa = __webpack_require__(168);
+
+
+/***/ }),
+/* 10 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+// @license
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+
+const assert = __webpack_require__(1);
+
+let nextVariableId = 0;
+
+function addType(name, tag, args) {
+  var lowerName = name[0].toLowerCase() + name.substring(1);
+  if (args.length == 1) {
+    Object.defineProperty(Type, `new${name}`, {
+      value: function() {
+        return new Type(tag, arguments[0]);
+      }});
+    var upperArg = args[0][0].toUpperCase() + args[0].substring(1);
+    Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
+      get: function() {
+        assert(this[`is${name}`]);
+        return this.data;
+      }});
+  } else {
+    Object.defineProperty(Type, `new${name}`, {
+      value: function() {
+        var data = {};
+        for (var i = 0; i < args.length; i++)
+          data[args[i]] = arguments[i];
+        return new Type(tag, data);
+      }});
+    for (let arg of args) {
+      var upperArg = arg[0].toUpperCase() + arg.substring(1);
+      Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
+        get: function() {
+          assert(this[`is${name}`]);
+          return this.data[arg];
+        }});
+    }
+  }
+  Object.defineProperty(Type.prototype, `is${name}`, {
+    get: function() {
+      return this.tag == tag;
+    }});
+}
+
+class Type {
+  constructor(tag, data) {
+    assert(typeof tag == 'string');
+    assert(data);
+    if (tag == 'entity')
+      assert(data.tag == undefined);
+    if (tag == 'list') {
+      if (!(data instanceof Type) && data.tag && data.data) {
+        data = new Type(data.tag, data.data);
+      }
+    }
+    this.tag = tag;
+    this.data = data;
+  }
+
+  // Replaces variableReference types with variable types .
+  assignVariableIds(variableMap) {
+    if (this.isVariableReference) {
+      var name = this.data;
+      var id = variableMap.get(name);
+      if (id == undefined) {
+        id = nextVariableId++;
+        variableMap.set(name, id);
+      }
+      return Type.newVariable(name, id);
+    }
+
+    if (this.isView) {
+      return this.primitiveType().assignVariableIds(variableMap).viewOf();
+    }
+
+    if (this.isShape) {
+      var shape = this.shapeShape.clone();
+      shape._typeVars.map(({object, field}) => object[field] = object[field].assignVariableIds(variableMap));
+      return Type.newShape(shape, this.shapeDisambiguation);
+    }
+
+    return this;
+  }
+
+  // Replaces entityReference types with resolved schemas.
+  resolveSchemas(resolveSchema) {
+    if (this.isEntityReference) {
+      // TODO: This should probably all happen during type construction so that
+      //       we can cache the schema objet.
+      return Type.newEntity(resolveSchema(this.data).toLiteral());
+    }
+
+    if (this.isView) {
+      return this.primitiveType().resolveSchemas(resolveSchema).viewOf();
+    }
+
+    return this;
+  }
+
+  equals(type) {
+    if (this.tag !== type.tag)
+      return false;
+    if (this.tag == 'entity') {
+      // TODO: Remove this hack that allows the old resolver to match
+      //       types by schema name.
+      return this.data.name == type.data.name;
+    }
+    if (this.isView) {
+      return this.data.equals(type.data);
+    }
+    return JSON.stringify(this.data) == JSON.stringify(type.data);
+  }
+
+  get isValid() {
+    return !this.variableReference;
+  }
+
+  primitiveType() {
+    var type = this.viewType;
+    return new Type(type.tag, type.data);
+  }
+
+  toLiteral() {
+    return this;
+  }
+
+  static fromLiteral(literal) {
+    return new Type(literal.tag, literal.data);
+  }
+
+  viewOf() {
+    return Type.newView(this);
+  }
+
+  hasProperty(property) {
+    if (property(this))
+      return true;
+    if (this.isView)
+      return this.viewType.hasProperty(property);
+    return false;
+  }
+
+  toString() {
+    if (this.isView)
+      return `[${this.primitiveType().toString()}]`;
+    if (this.isEntity)
+      return this.entitySchema.name;
+    assert('Add support to serializing type:', type);
+  }
+
+  toPrettyString() {
+    if (this.isRelation)
+      return JSON.stringify(this.data);
+    if (this.isView) {
+      return `${this.primitiveType().toPrettyString()} List`;
+    }
+    if (this.isVariable)
+      return `[${this.variableName}]`;
+    if (this.isVariableReference)
+      return `[${this.variableReferenceName}]`;
+    if (this.isEntity)
+      // Spit MyTypeFOO to My Type FOO
+      return this.entitySchema.name.replace(/([^A-Z])([A-Z])/g, "$1 $2").replace(/([A-Z][^A-Z])/g, " $1").trim();
+    if (this.isEntityReference)
+      return this.entityReferenceName;
+    if (this.isShapeReference)
+      return this.shapeReferenceName;
+    if (this.isShape)
+      return this.shapeShape.toPrettyString();
+  }
+}
+
+addType('EntityReference', 'entityReference', ['name']);
+addType('Entity', 'entity', ['schema']);
+addType('VariableReference', 'variableReference', ['name']);
+addType('Variable', 'variable', ['name', 'id']);
+addType('View', 'list', ['type']);
+addType('Relation', 'relation', ['entities']);
+addType('ShapeReference', 'shapeReference', ['name']);
+addType('Shape', 'shape', ['shape', 'disambiguation'])
+
+module.exports = Type;
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, exports) {
+
+module.exports = assert;
+
+function assert(val, msg) {
+  if (!val)
+    throw new Error(msg || 'Assertion failed');
+}
+
+assert.equal = function assertEqual(l, r, msg) {
+  if (l != r)
+    throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
+};
 
 
 /***/ }),
@@ -7112,7 +7133,7 @@ exports.compareComparables = compareComparables;
 "use strict";
 
 
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 var inherits = __webpack_require__(2);
 
 exports.inherits = inherits;
@@ -7439,7 +7460,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
 
 var Buffer = __webpack_require__(14).Buffer
 var Transform = __webpack_require__(16).Transform
-var StringDecoder = __webpack_require__(37).StringDecoder
+var StringDecoder = __webpack_require__(38).StringDecoder
 var inherits = __webpack_require__(2)
 
 function CipherBase (hashMode) {
@@ -7572,7 +7593,7 @@ inherits(Stream, EE);
 Stream.Readable = __webpack_require__(29);
 Stream.Writable = __webpack_require__(208);
 Stream.Duplex = __webpack_require__(204);
-Stream.Transform = __webpack_require__(103);
+Stream.Transform = __webpack_require__(104);
 Stream.PassThrough = __webpack_require__(207);
 
 // Backwards-compat with node 0.4.x
@@ -7682,7 +7703,7 @@ Stream.prototype.pipe = function(dest, options) {
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let Recipe = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
 let assert = __webpack_require__(1);
 
 class Shape {
@@ -7961,7 +7982,7 @@ module.exports = RecipeUtil;
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(40);
+var processNextTick = __webpack_require__(41);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -7980,7 +8001,7 @@ var util = __webpack_require__(25);
 util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
-var Readable = __webpack_require__(99);
+var Readable = __webpack_require__(100);
 var Writable = __webpack_require__(54);
 
 util.inherits(Duplex, Readable);
@@ -8151,7 +8172,7 @@ module.exports = Hash
 
 var fs = __webpack_require__(53);
 var mkdirp = __webpack_require__(257);
-var path = __webpack_require__(91);
+var path = __webpack_require__(92);
 var options = __webpack_require__(261);
 
 var events = [];
@@ -8379,7 +8400,7 @@ function init() {
 
 init();
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
 /* 21 */
@@ -8395,15 +8416,15 @@ init();
  * http://polymer.github.io/PATENTS.txt
  */
 
-const Entity = __webpack_require__(42);
+const Entity = __webpack_require__(43);
 const assert = __webpack_require__(1);
-const Type = __webpack_require__(9);
+const Type = __webpack_require__(10);
 
 class Schema {
   constructor(model) {
     this._model = model;
     this.name = model.name;
-    this.parent = model.parent ? new Schema(model.parent) : null;
+    this.parents = (model.parents || []).map(parent => new Schema(parent));
     this._normative = {};
     this._optional = {};
     assert(model.sections);
@@ -8425,15 +8446,19 @@ class Schema {
   }
 
   get normative() {
-    var dict = this.parent ? this.parent.normative : {};
-    Object.assign(dict, this._normative);
-    return dict;
+    var normative = {};
+    for (var parent of this.parents)
+      Object.assign(normative, parent.normative);
+    Object.assign(normative, this._normative);
+    return normative;
   }
 
   get optional() {
-    var dict = this.parent ? this.parent.optional : {};
-    Object.assign(dict, this._optional);
-    return dict;
+    var optional = {};
+    for (var parent of this.parents)
+      Object.assign(optional, parent.optional);
+    Object.assign(optional, this._optional);
+    return optional;
   }
 
   entityClass() {
@@ -8537,11 +8562,11 @@ module.exports = Schema;
 
 var asn1 = exports;
 
-asn1.bignum = __webpack_require__(4);
+asn1.bignum = __webpack_require__(5);
 
 asn1.define = __webpack_require__(126).define;
 asn1.base = __webpack_require__(23);
-asn1.constants = __webpack_require__(66);
+asn1.constants = __webpack_require__(67);
 asn1.decoders = __webpack_require__(130);
 asn1.encoders = __webpack_require__(132);
 
@@ -8553,8 +8578,8 @@ asn1.encoders = __webpack_require__(132);
 var base = exports;
 
 base.Reporter = __webpack_require__(128).Reporter;
-base.DecoderBuffer = __webpack_require__(65).DecoderBuffer;
-base.EncoderBuffer = __webpack_require__(65).EncoderBuffer;
+base.DecoderBuffer = __webpack_require__(66).DecoderBuffer;
+base.EncoderBuffer = __webpack_require__(66).EncoderBuffer;
 base.Node = __webpack_require__(127);
 
 
@@ -8696,7 +8721,7 @@ function objectToString(o) {
 "use strict";
 /* WEBPACK VAR INJECTION */(function(Buffer) {
 var inherits = __webpack_require__(2)
-var md5 = __webpack_require__(34)
+var md5 = __webpack_require__(35)
 var RIPEMD160 = __webpack_require__(55)
 var sha = __webpack_require__(56)
 
@@ -8757,7 +8782,7 @@ module.exports = function createHash (alg) {
 
 
 var utils = __webpack_require__(13);
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 
 function BlockHash() {
   this.pending = null;
@@ -8892,18 +8917,18 @@ function randomBytes (size, cb) {
   return bytes
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
 /* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
-exports = module.exports = __webpack_require__(99);
+exports = module.exports = __webpack_require__(100);
 exports.Stream = exports;
 exports.Readable = exports;
 exports.Writable = __webpack_require__(54);
 exports.Duplex = __webpack_require__(18);
-exports.Transform = __webpack_require__(100);
+exports.Transform = __webpack_require__(101);
 exports.PassThrough = __webpack_require__(205);
 
 
@@ -8924,7 +8949,7 @@ exports.PassThrough = __webpack_require__(205);
 
 
 var assert = __webpack_require__(1);
-var Type = __webpack_require__(9);
+var Type = __webpack_require__(10);
 
 function getSuggestion(recipe, arc, relevance) {
   let options = createSuggestionsOptions({arc, relevance});
@@ -8956,7 +8981,7 @@ function joinSuggestions(recipe, suggestions) {
   return desc;
 }
 
-function getViewDescription(view   /* Connection*/, arc, relevance) {
+function getViewDescription(view, arc, relevance) {
   assert(view);
   let options = createViewDescriptionOptions({arc, relevance});
   let viewConnection = _selectViewConnection(view, options) || view.connections[0];
@@ -9013,9 +9038,9 @@ class Description {
   }
   _initTokens(pattern) {
     while (pattern.length  > 0) {
-      let tokens = pattern.match(/\${[a-zA-Z0-9::~\.\[\]]+}/g);
+      let tokens = pattern.match(/\${[a-zA-Z0-9::~\.\[\]_]+}/g);
       if (tokens) {
-        var firstToken = pattern.match(/\${[a-zA-Z0-9::~\.\[\]]+}/g)[0];
+        var firstToken = pattern.match(/\${[a-zA-Z0-9::~\.\[\]_]+}/g)[0];
         var tokenIndex = pattern.indexOf(firstToken);
       } else {
         var firstToken = "";
@@ -9049,11 +9074,14 @@ class ValueToken {
     let parts = this._token.split(".");
     this._viewName = parts[0];
     switch(parts[1]) {
-      case "type":
+      case "_type_":
         this._useType = true;
         break;
-      case "values":
+      case "_values_":
         this._values = true;
+        break;
+      case "_name_":
+        this._excludeValues = true;
         break;
       default:
         this._property = parts;
@@ -9070,7 +9098,7 @@ class ValueToken {
     } else if (this._values) {  // view values
       // Use view values (eg "How to draw book, Hockey stick")
       result.push(this._formatViewValue(view));
-    } else if (this._property.length > 0) {
+    } else if (this._property && this._property.length > 0) {
       assert(!view.type.isView, `Cannot return property ${this._property.join(",")} for set-view`);
       // Use singleton value's property (eg. "09/15" for person's birthday)
       let viewVar = view.get();
@@ -9111,7 +9139,7 @@ class ValueToken {
         result.push(chosenConnection.type.toPrettyString().toLowerCase());
       }
 
-      if (options.includeViewValues !== false) {
+      if (options.includeViewValues !== false && !this._excludeValues) {
         let viewValues = this._formatViewValue(view);
         if (viewValues) {
           if (!view.type.isView && !chosenConnectionSpec.description.hasPattern()) {
@@ -9139,16 +9167,20 @@ class ValueToken {
     }
     if (view.type.isView) {
       let viewList = view.toList();
-      if (viewList) {
-        if (viewList.length > 2) {
-          // TODO: configurable view display format.
-          return `<b>${viewList[0].rawData.name}</b> plus <b>${viewList.length-1}</b> other items`;
+      if (viewList && viewList.length > 0) {
+        if (viewList[0].rawData.name) {
+          if (viewList.length > 2) {
+            // TODO: configurable view display format.
+            return `<b>${viewList[0].rawData.name}</b> plus <b>${viewList.length-1}</b> other items`;
+          }
+          return viewList.map(v => `<b>${v.rawData.name}</b>`).join(", ");
+        } else {
+          return `<b>${viewList.length}</b> items`;
         }
-        return viewList.map(v => `<b>${v.rawData.name}</b>`).join(", ");
       }
     } else {
       let viewVar = view.get();
-      if (viewVar) {
+      if (viewVar && viewVar.rawData.name) {
         return `<b>${viewVar.rawData.name}</b>`;  // TODO: use type's Entity instead
       }
     }
@@ -9220,6 +9252,531 @@ Object.assign(module.exports, {
 
 /***/ }),
 /* 31 */
+/***/ (function(module, exports, __webpack_require__) {
+
+/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+const assert = __webpack_require__(1);
+const parser = __webpack_require__(227);
+const Recipe = __webpack_require__(4);
+const ParticleSpec = __webpack_require__(44);
+const Schema = __webpack_require__(21);
+const Search = __webpack_require__(117);
+const {View, Variable} = __webpack_require__(47);
+const util = __webpack_require__(12);
+
+class Manifest {
+  constructor() {
+    this._recipes = [];
+    this._imports = [];
+    // TODO: These should be lists, possibly with a separate flattened map.
+    this._particles = {};
+    this._schemas = {};
+    this._views = [];
+    this._viewTags = new Map();
+    this._fileName = null;
+    this._nextLocalID = 0;
+    this._id = null;
+  }
+  get id() {
+    return this._id;
+  }
+  get recipes() {
+    return [...new Set(this._findAll(manifest => manifest._recipes))];
+  }
+  get particles() {
+    return [...new Set(this._findAll(manifest => Object.values(manifest._particles)))];
+  }
+  get imports() {
+    return this._imports;
+  }
+  get schemas() {
+    return this._schemas;
+  }
+  get fileName() {
+    return this._fileName;
+  }
+  get views() {
+    return this._views;
+  }
+  // TODO: newParticle, Schema, etc.
+  // TODO: simplify() / isValid().
+  newView(type, name, id, tags) {
+    let view;
+    if (type.isView) {
+      view = new View(type, this, name, id);
+    } else {
+      view = new Variable(type, this, name, id);
+    }
+    this._views.push(view);
+    this._viewTags.set(view, tags ? tags : []);
+    return view;
+  }
+  _find(manifestFinder) {
+    let result = manifestFinder(this);
+    if (!result) {
+      for (let importedManifest of this._imports) {
+        result = importedManifest._find(manifestFinder);
+        if (result) {
+          break;
+        }
+      }
+    }
+    return result;
+  }
+  *_findAll(manifestFinder) {
+    yield* manifestFinder(this);
+    for (let importedManifest of this._imports) {
+      yield* importedManifest._findAll(manifestFinder);
+    }
+  }
+  findSchemaByName(name) {
+    return this._find(manifest => manifest._schemas[name]);
+  }
+  findParticleByName(name) {
+    return this._find(manifest => manifest._particles[name]);
+  }
+  findParticlesByVerb(verb) {
+    return [...this._findAll(manifest => Object.values(manifest._particles).filter(particle => particle.primaryVerb == verb))];
+  }
+  findViewByName(name) {
+    return this._find(manifest => manifest._views.find(view => view.name == name));
+  }
+  findViewById(id) {
+    return this._find(manifest => manifest._views.find(view => view.id == id));
+  }
+  findViewsByType(type, options) {
+    var tags = options && options.tags ? options.tags : [];
+    return [...this._findAll(manifest => manifest._views.filter(view => view.type.equals(type) && tags.filter(tag => !manifest._viewTags.get(view).includes(tag)).length == 0))];
+  }
+  generateID() {
+    return `${this.id}:${this._nextLocalID++}`;
+  }
+  static async load(fileName, loader, options) {
+    options = options || {};
+    let {registry, id} = options;
+    if (registry && registry[fileName]) {
+      return registry[fileName];
+    }
+    let content = await loader.loadResource(fileName);
+    assert(content !== undefined, `${fileName} unable to be loaded by Manifest parser`);
+    let manifest = await Manifest.parse(content, {
+      id,
+      fileName,
+      loader,
+      registry,
+      position: {line: 1, column: 0}
+    });
+    if (manifest && registry) {
+      registry[fileName] = manifest;
+    }
+    return manifest;
+  }
+  static async parse(content, options) {
+    options = options || {};
+    let {id, fileName, position, loader, registry} = options;
+    registry = registry || {};
+    position = position || {line: 1, column: 0};
+    id = `manifest:${fileName}:`;
+
+    function processError(e) {
+      if (!e.location) {
+        return e;
+      }
+      let lines = content.split('\n');
+      let line = lines[e.location.start.line - 1];
+      let span = 1;
+      if (e.location.end.line == e.location.start.line) {
+        span = e.location.end.column - e.location.start.column;
+      } else {
+        span = line.length - e.location.start.column;
+      }
+      span = Math.max(1, span);
+      let highlight = '';
+      for (let i = 0; i < e.location.start.column - 1; i++) {
+        highlight += ' ';
+      }
+      for (let i = 0; i < span; i++) {
+        highlight += '^';
+      }
+      let message = `Parse error in '${fileName}' line ${e.location.start.line}.
+${e.message}
+  ${line}
+  ${highlight}`;
+      return new Error(message);
+    }
+
+    let items = [];
+    try{
+      items = parser.parse(content);
+    } catch (e) {
+      throw processError(e);
+    }
+    let manifest = new Manifest();
+    manifest._fileName = fileName;
+    manifest._id = id;
+
+    // TODO: This should be written to process in dependency order.
+    // 1. imports
+    // 2. schemas
+    // 3. particles, TODO: entities => views
+    // 4. recipes
+    for (let item of items.filter(item => item.kind == 'import')) {
+      let path = loader.path(manifest.fileName);
+      let target = loader.join(path, item.path);
+      manifest._imports.push(await Manifest.load(target, loader, {registry}));
+    }
+
+    try {
+      for (let item of items.filter(item => item.kind == 'schema')) {
+        this._processSchema(manifest, item);
+      }
+      for (let item of items.filter(item => item.kind == 'particle')) {
+        this._processParticle(manifest, item, loader);
+      }
+      for (let item of items.filter(item => item.kind == 'view')) {
+        await this._processView(manifest, item, loader);
+      }
+      for (let item of items.filter(item => item.kind == 'recipe')) {
+        this._processRecipe(manifest, item);
+      }
+    } catch (e) {
+      throw processError(e);
+    }
+    return manifest;
+  }
+  static _processSchema(manifest, schemaItem) {
+    var parents = [];
+    for (let parent of schemaItem.parents) {
+      parent = manifest.findSchemaByName(parent);
+      assert(parent);
+      parents.push(parent.toLiteral());
+    }
+    schemaItem.parents = parents;
+    manifest._schemas[schemaItem.name] = new Schema(schemaItem);
+  }
+  static _processParticle(manifest, particleItem, loader) {
+    assert(particleItem.implFile == null || particleItem.args !== null, "no valid body defined for this particle");
+    // TODO: loader should not be optional.
+    if (particleItem.implFile && loader) {
+      particleItem.implFile = loader.join(manifest.fileName, particleItem.implFile);
+    }
+
+    let resolveSchema = name => {
+      let schema = manifest.findSchemaByName(name);
+      if (!schema) {
+        throw new Error(`Schema '${name}' was not declared or imported`);
+      }
+      return schema;
+    };
+    let particleSpec = new ParticleSpec(particleItem, resolveSchema);
+    manifest._particles[particleItem.name] = particleSpec;
+  }
+  static _processRecipe(manifest, recipeItem) {
+    let recipe = manifest._newRecipe(recipeItem.name);
+    let items = {
+      views: recipeItem.items.filter(item => item.kind == 'view'),
+      byView: new Map(),
+      particles: recipeItem.items.filter(item => item.kind == 'particle'),
+      byParticle: new Map(),
+      slots: recipeItem.items.filter(item => item.kind == 'slot'),
+      bySlot: new Map(),
+      byName: new Map(),
+      connections: recipeItem.items.filter(item => item.kind == 'connection'),
+      search: recipeItem.items.find(item => item.kind == 'search')
+    };
+
+    for (let connection of items.connections) {
+      var fromParticle = manifest.findParticleByName(connection.from.particle);
+      var toParticle = manifest.findParticleByName(connection.to.particle);
+      assert(fromParticle, `could not find particle ${fromParticle}`);
+      assert(toParticle, `could not find particle ${toParticle}`);
+      recipe.newConnectionConstraint(fromParticle, connection.from.param,
+                                     toParticle, connection.to.param);
+    }
+
+    if (items.search) {
+      recipe.search = new Search(items.search.phrase, items.search.tokens);
+    }
+
+    for (let item of items.views) {
+      let view = recipe.newView();
+      if (item.ref.id) {
+        view.id = item.ref.id;
+      } else if (item.ref.name) {
+        let targetView = manifest.findViewByName(item.ref.name);
+        // TODO: Error handling.
+        assert(targetView, `Could not find view ${item.ref.name}`);
+        view.mapToView(targetView);
+      }
+      view.tags = item.ref.tags;
+      if (item.name) {
+        assert(!items.byName.has(item.name));
+        view.localName = item.name;
+        items.byName.set(item.name, {item: item, view: view});
+      }
+      view.fate = item.fate;
+      items.byView.set(view, item);
+    }
+
+    for (let item of items.slots) {
+      let slot = recipe.newSlot();
+      if (item.id) {
+        slot.id = item.id;
+      }
+      if (item.name) {
+        assert(!items.byName.has(item.name), `Duplicate slot local name ${item.name}`);
+        slot.localName = item.name;
+        items.byName.set(item.name, slot);
+      }
+      items.bySlot.set(slot, item);
+    }
+
+    // TODO: disambiguate.
+    let particlesByName = {};
+    for (let item of items.particles) {
+      let particle = recipe.newParticle(item.ref.name);
+      particle.tags = item.ref.tags;
+      particle.verbs = item.ref.verbs;
+      if (item.ref.name) {
+        var spec = manifest.findParticleByName(item.ref.name);
+        assert(spec, `could not find particle ${item.ref.name}`);
+        particle.spec = spec;
+        particlesByName[item.ref.name] = particle;
+      }
+      if (item.name) {
+        // TODO: errors.
+        assert(!items.byName.has(item.name));
+        particle.localName = item.name;
+        items.byName.set(item.name, {item: item, particle: particle});
+      }
+      items.byParticle.set(particle, item);
+
+      for (let slotConnectionItem of item.slotConnections) {
+        let slotConn = particle.consumedSlotConnections[slotConnectionItem.param];
+        if (!slotConn) {
+          slotConn = particle.addSlotConnection(slotConnectionItem.param);
+        }
+        if (slotConnectionItem.name) {
+          slotConnectionItem.providedSlots.forEach(ps => {
+            let providedSlot = slotConn.providedSlots[ps.param];
+            if (providedSlot) {
+              items.byName.set(ps.name, providedSlot);
+              items.bySlot.set(providedSlot, ps);
+            } else
+              providedSlot = items.byName.get(ps.name);
+            if (!providedSlot) {
+              providedSlot = recipe.newSlot(ps.param);
+              providedSlot.localName = ps.name;
+              assert(!items.byName.has(ps.name));
+              items.byName.set(ps.name, providedSlot);
+              items.bySlot.set(providedSlot, ps);
+            }
+            if (!slotConn.providedSlots[ps.param]) {
+              slotConn.providedSlots[ps.param] = providedSlot;
+            }
+          });
+        }
+      }
+    }
+
+    for (let [particle, item] of items.byParticle) {
+      for (let connectionItem of item.connections) {
+        let connection;
+        if (connectionItem.param == '*') {
+          connection = particle.addUnnamedConnection();
+        } else {
+          connection = particle.connections[connectionItem.param];
+          if (!connection) {
+            connection = particle.addConnectionName(connectionItem.param);
+          }
+          // TODO: else, merge tags? merge directions?
+        }
+        connection.tags = connectionItem.target ? connectionItem.target.tags : [];
+        let direction = {'->': 'out', '<-': 'in', '=': 'inout'}[connectionItem.dir];
+        if (connection.direction) {
+          if (connection.direction != direction && direction != 'inout') {
+            let error = new Error(`'${connectionItem.dir}' not compatible with '${connection.direction}' param of '${particle.name}'`);
+            error.location = connectionItem.location;
+            throw error;
+          }
+        } else {
+          if (connectionItem.param != '*') {
+            let error = new Error(`param '${connectionItem.param}' is not defined by '${particle.name}'`);
+            error.location = connectionItem.location;
+            throw error;
+          }
+          connection.direction = direction;
+        }
+
+        let targetView;
+        let targetParticle;
+
+        if (connectionItem.target && connectionItem.target.name) {
+          let entry = items.byName.get(connectionItem.target.name);
+          assert(entry, `could not find ${connectionItem.target.name}`);
+          if (entry.item.kind == 'view') {
+            targetView = entry.view;
+          } else if (entry.item.kind == 'particle') {
+            targetParticle = entry.particle;
+          } else {
+            assert(false, `did not expect ${entry.item.kind}`);
+          }
+        }
+
+        if (connectionItem.target && connectionItem.target.particle) {
+          targetParticle = particlesByName[connectionItem.target.particle];
+          // TODO: error reporting
+          assert(targetParticle);
+        }
+
+        if (targetParticle) {
+          let targetConnection;
+          if (connectionItem.target.param) {
+            targetConnection = targetParticle.connections[connectionItem.target.param];
+            if (!targetConnection) {
+              targetConnection = targetParticle.addConnectionName(connectionItem.target.param);
+              // TODO: direction?
+            }
+          } else {
+            targetConnection = targetParticle.addUnnamedConnection();
+            // TODO: direction?
+          }
+
+          targetView = targetConnection.view;
+          if (!targetView) {
+            // TODO: tags?
+            targetView = recipe.newView();
+            targetConnection.connectToView(targetView)
+          }
+        }
+
+        if (targetView) {
+          connection.connectToView(targetView);
+        }
+      }
+
+      for (let slotConnectionItem of item.slotConnections) {
+        let targetSlot = items.byName.get(slotConnectionItem.name);
+        if (targetSlot) {
+          assert(items.bySlot.has(targetSlot));
+          if (!targetSlot.name) {
+            targetSlot.name = slotConnectionItem.param;
+          }
+          assert(targetSlot.name == slotConnectionItem.param,
+                 `Target slot name ${targetSlot.name} doesn't match slot connection name ${slotConnectionItem.param}`);
+        } else {
+          targetSlot = recipe.newSlot(slotConnectionItem.param);
+          targetSlot.localName = slotConnectionItem.name;
+          items.byName.set(slotConnectionItem.name, targetSlot);
+          items.bySlot.set(targetSlot, slotConnectionItem);
+        }
+        particle.consumedSlotConnections[slotConnectionItem.param].connectToSlot(targetSlot);
+      }
+    }
+  }
+  static async _processView(manifest, item, loader) {
+    let name = item.name;
+    let id = item.id;
+    let type = item.type;
+    if (id == null) {
+      id = `${manifest._id}view${manifest._views.length}`
+    }
+    let tags = item.tags;
+    if (tags == null)
+      tags = [];
+
+    // TODO: make this a util?
+    let resolveSchema = name => {
+      let schema = manifest.findSchemaByName(name);
+      if (!schema) {
+        throw new Error(`Schema '${name}' was not declared or imported`);
+      }
+      return schema;
+    };
+    type = type.resolveSchemas(resolveSchema);
+
+    let view = manifest.newView(type, name, id, tags);
+    view.source = item.source;
+    view.description = item.description;
+    // TODO: How to set the version?
+    // view.version = item.version;
+    let source = loader.join(manifest.fileName, item.source);
+    // TODO: json5?
+    let json = await loader.loadResource(source);
+    let entities = JSON.parse(json);
+    for (let entity of entities) {
+      let id = entity.$id || manifest.generateID();
+      delete entity.$id;
+      if (type.isView) {
+        view.store({
+          id,
+          rawData: entity,
+        });
+      } else {
+        view.set({
+          id,
+          rawData: entity,
+        })
+      }
+    }
+  }
+  _newRecipe(name) {
+    // TODO: use name
+    let recipe = new Recipe();
+    this._recipes.push(recipe);
+    return recipe;
+  }
+
+  toString(options) {
+    // TODO: sort?
+    options = options || {};
+    let results = [];
+
+    this._imports.forEach(i => {
+      if (options.recursive) {
+        results.push(`# import '${i.fileName}'`);
+        let importStr = i.toString(options);
+        results.push(`${i.toString(options)}`);
+      } else {
+        results.push(`import '${i.fileName}'`);
+      }
+    });
+
+    Object.values(this._schemas).forEach(s => {
+      results.push(s.toString());
+    });
+
+    Object.values(this._particles).forEach(p => {
+      results.push(p.toString());
+    });
+
+    this._recipes.forEach(r => {
+      results.push(r.toString(options));
+    });
+
+    let views = [...this.views].sort(util.compareComparables);
+    views.forEach(v => {
+      results.push(v.toString(this._viewTags.get(v)));
+    });
+
+    return results.join('\n');
+  }
+}
+
+module.exports = Manifest;
+
+
+/***/ }),
+/* 32 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// based on the aes implimentation in triple sec
@@ -9403,7 +9960,7 @@ exports.AES = AES
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, exports) {
 
 exports['aes-128-ecb'] = {
@@ -9580,7 +10137,7 @@ exports['aes-256-gcm'] = {
 
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(24)
@@ -9618,7 +10175,7 @@ exports.encrypt = function (self, chunk) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 34 */
+/* 35 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9776,7 +10333,7 @@ module.exports = function md5 (buf) {
 
 
 /***/ }),
-/* 35 */
+/* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9791,10 +10348,10 @@ curve.edwards = __webpack_require__(161);
 
 
 /***/ }),
-/* 36 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var md5 = __webpack_require__(34)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var md5 = __webpack_require__(35)
 module.exports = EVP_BytesToKey
 function EVP_BytesToKey (password, salt, keyLen, ivLen) {
   if (!Buffer.isBuffer(password)) {
@@ -9866,7 +10423,7 @@ function EVP_BytesToKey (password, salt, keyLen, ivLen) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 37 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright Joyent, Inc. and other Node contributors.
@@ -10093,7 +10650,7 @@ function base64DetectIncompleteChar(buffer) {
 
 
 /***/ }),
-/* 38 */
+/* 39 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -10202,14 +10759,14 @@ exports.setTyped(TYPED_OK);
 
 
 /***/ }),
-/* 39 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var asn1 = __webpack_require__(193)
 var aesid = __webpack_require__(192)
 var fixProc = __webpack_require__(195)
 var ciphers = __webpack_require__(48)
-var compat = __webpack_require__(92)
+var compat = __webpack_require__(93)
 module.exports = parseKeys
 
 function parseKeys (buffer) {
@@ -10315,7 +10872,7 @@ function decrypt (data, password) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 40 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -10363,10 +10920,10 @@ function nextTick(fn, arg1, arg2, arg3) {
   }
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
 
 /***/ }),
-/* 41 */
+/* 42 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11105,7 +11662,7 @@ Url.prototype.parseHost = function() {
 
 
 /***/ }),
-/* 42 */
+/* 43 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11119,8 +11676,8 @@ Url.prototype.parseHost = function() {
 
 
 const assert = __webpack_require__(1);
-const Symbols = __webpack_require__(45);
-const Type = __webpack_require__(9);
+const Symbols = __webpack_require__(46);
+const Type = __webpack_require__(10);
 
 class Entity {
   constructor() {
@@ -11156,7 +11713,7 @@ module.exports = Entity;
 
 
 /***/ }),
-/* 43 */
+/* 44 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11171,9 +11728,9 @@ module.exports = Entity;
  */
 
 
-const runtime = __webpack_require__(63);
+const runtime = __webpack_require__(64);
 const {ParticleDescription, ConnectionDescription} = __webpack_require__(30);
-const Type = __webpack_require__(9);
+const Type = __webpack_require__(10);
 const assert = __webpack_require__(1);
 
 class ConnectionSpec {
@@ -11329,7 +11886,7 @@ module.exports = ParticleSpec;
 
 
 /***/ }),
-/* 44 */
+/* 45 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11344,8 +11901,8 @@ module.exports = ParticleSpec;
  */
 
 
-var runtime = __webpack_require__(63);
-var ParticleSpec = __webpack_require__(43);
+var runtime = __webpack_require__(64);
+var ParticleSpec = __webpack_require__(44);
 var tracing = __webpack_require__(20);
 var assert = __webpack_require__(1);
 const Schema = __webpack_require__(21);
@@ -11538,7 +12095,7 @@ exports.StateChanges = StateChanges;
 
 
 /***/ }),
-/* 45 */
+/* 46 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11555,7 +12112,7 @@ exports.identifier = Symbol('id');
 
 
 /***/ }),
-/* 46 */
+/* 47 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11813,499 +12370,6 @@ Object.assign(module.exports, {
 
 
 /***/ }),
-/* 47 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/**
- * @license
- * Copyright (c) 2017 Google Inc. All rights reserved.
- * This code may only be used under the BSD style license found at
- * http://polymer.github.io/LICENSE.txt
- * Code distributed by Google as part of this project is also
- * subject to an additional IP rights grant found at
- * http://polymer.github.io/PATENTS.txt
- */
-
-const assert = __webpack_require__(1);
-const parser = __webpack_require__(227);
-const Recipe = __webpack_require__(6);
-const ParticleSpec = __webpack_require__(43);
-const Schema = __webpack_require__(21);
-const Search = __webpack_require__(117);
-const {View, Variable} = __webpack_require__(46);
-const util = __webpack_require__(12);
-
-class Manifest {
-  constructor() {
-    this._recipes = [];
-    this._imports = [];
-    // TODO: These should be lists, possibly with a separate flattened map.
-    this._particles = {};
-    this._schemas = {};
-    this._views = [];
-    this._viewTags = new Map();
-    this._fileName = null;
-    this._nextLocalID = 0;
-    this._id = null;
-  }
-  get id() {
-    return this._id;
-  }
-  get recipes() {
-    return [...new Set(this._findAll(manifest => manifest._recipes))];
-  }
-  get particles() {
-    return [...new Set(this._findAll(manifest => Object.values(manifest._particles)))];
-  }
-  get imports() {
-    return this._imports;
-  }
-  get schemas() {
-    return this._schemas;
-  }
-  get fileName() {
-    return this._fileName;
-  }
-  get views() {
-    return this._views;
-  }
-  // TODO: newParticle, Schema, etc.
-  // TODO: simplify() / isValid().
-  newView(type, name, id, tags) {
-    let view;
-    if (type.isView) {
-      view = new View(type, this, name, id);
-    } else {
-      view = new Variable(type, this, name, id);
-    }
-    this._views.push(view);
-    this._viewTags.set(view, tags);
-    return view;
-  }
-  _find(manifestFinder) {
-    let result = manifestFinder(this);
-    if (!result) {
-      for (let importedManifest of this._imports) {
-        result = importedManifest._find(manifestFinder);
-        if (result) {
-          break;
-        }
-      }
-    }
-    return result;
-  }
-  *_findAll(manifestFinder) {
-    yield* manifestFinder(this);
-    for (let importedManifest of this._imports) {
-      yield* importedManifest._findAll(manifestFinder);
-    }
-  }
-  findSchemaByName(name) {
-    return this._find(manifest => manifest._schemas[name]);
-  }
-  findParticleByName(name) {
-    return this._find(manifest => manifest._particles[name]);
-  }
-  findParticlesByVerb(verb) {
-    return [...this._findAll(manifest => Object.values(manifest._particles).filter(particle => particle.primaryVerb == verb))];
-  }
-  findViewByName(name) {
-    return this._find(manifest => manifest._views.find(view => view.name == name));
-  }
-  findViewById(id) {
-    return this._find(manifest => manifest._views.find(view => view.id == id));
-  }
-  findViewsByType(type, options) {
-    var tags = options && options.tags ? options.tags : [];
-    return [...this._findAll(manifest => manifest._views.filter(view => view.type.equals(type) && tags.filter(tag => !manifest._viewTags.get(view).includes(tag)).length == 0))];
-  }
-  generateID() {
-    return `${this.id}:${this._nextLocalID++}`;
-  }
-  static async load(fileName, loader, options) {
-    options = options || {};
-    let {registry, id} = options;
-    if (registry && registry[fileName]) {
-      return registry[fileName];
-    }
-    let content = await loader.loadResource(fileName);
-    let manifest = await Manifest.parse(content, {
-      id,
-      fileName,
-      loader,
-      registry,
-      position: {line: 1, column: 0}
-    });
-    if (manifest && registry) {
-      registry[fileName] = manifest;
-    }
-    return manifest;
-  }
-  static async parse(content, options) {
-    options = options || {};
-    let {id, fileName, position, loader, registry} = options;
-    registry = registry || {};
-    position = position || {line: 1, column: 0};
-    id = `manifest:${fileName}:`;
-
-    let items = [];
-    try{
-      items = parser.parse(content);
-    } catch (e) {
-      if (e.name == 'SyntaxError' && e.location) {
-        let lines = content.split('\n');
-        let line = lines[e.location.start.line - 1];
-        let span = 1;
-        if (e.location.end.line == e.location.start.line) {
-          span = e.location.end.column - e.location.start.column;
-        } else {
-          span = line.length - e.location.start.column;
-        }
-        span = Math.max(1, span);
-        let highlight = '';
-        for (let i = 0; i < e.location.start.column - 1; i++) {
-          highlight += ' ';
-        }
-        for (let i = 0; i < span; i++) {
-          highlight += '^';
-        }
-        let message = `Syntax error in '${fileName}' line ${e.location.start.line}.
-${e.message}
-  ${line}
-  ${highlight}`;
-        throw new SyntaxError(message);
-      }
-      throw e;
-    }
-    let manifest = new Manifest();
-    manifest._fileName = fileName;
-    manifest._id = id;
-
-    // TODO: This should be written to process in dependency order.
-    // 1. imports
-    // 2. schemas
-    // 3. particles, TODO: entities => views
-    // 4. recipes
-    for (let item of items.filter(item => item.kind == 'import')) {
-      let path = loader.path(manifest.fileName);
-      let target = loader.join(path, item.path);
-      manifest._imports.push(await Manifest.load(target, loader, {registry}));
-    }
-    for (let item of items.filter(item => item.kind == 'schema')) {
-      this._processSchema(manifest, item);
-    }
-    for (let item of items.filter(item => item.kind == 'particle')) {
-      this._processParticle(manifest, item, loader);
-    }
-    for (let item of items.filter(item => item.kind == 'view')) {
-      await this._processView(manifest, item, loader);
-    }
-    for (let item of items.filter(item => item.kind == 'recipe')) {
-      this._processRecipe(manifest, item);
-    }
-    return manifest;
-  }
-  static _processSchema(manifest, schemaItem) {
-    if (schemaItem.parent) {
-      let parent = manifest.findSchemaByName(schemaItem.parent);
-      // TODO: error handling
-      assert(parent);
-      schemaItem.parent = parent.toLiteral();
-    }
-    manifest._schemas[schemaItem.name] = new Schema(schemaItem);
-  }
-  static _processParticle(manifest, particleItem, loader) {
-    assert(particleItem.implFile == null || particleItem.args !== null, "no valid body defined for this particle");
-    // TODO: loader should not be optional.
-    if (particleItem.implFile && loader) {
-      particleItem.implFile = loader.join(manifest.fileName, particleItem.implFile);
-    }
-
-    let resolveSchema = name => {
-      let schema = manifest.findSchemaByName(name);
-      if (!schema) {
-        throw new Error(`Schema '${name}' was not declared or imported`);
-      }
-      return schema;
-    };
-    let particleSpec = new ParticleSpec(particleItem, resolveSchema);
-    manifest._particles[particleItem.name] = particleSpec;
-  }
-  static _processRecipe(manifest, recipeItem) {
-    let recipe = manifest._newRecipe(recipeItem.name);
-    let items = {
-      views: recipeItem.items.filter(item => item.kind == 'view'),
-      byView: new Map(),
-      particles: recipeItem.items.filter(item => item.kind == 'particle'),
-      byParticle: new Map(),
-      slots: recipeItem.items.filter(item => item.kind == 'slot'),
-      bySlot: new Map(),
-      byName: new Map(),
-      connections: recipeItem.items.filter(item => item.kind == 'connection'),
-      search: recipeItem.items.find(item => item.kind == 'search')
-    };
-
-    for (let connection of items.connections) {
-      var fromParticle = manifest.findParticleByName(connection.from.particle);
-      var toParticle = manifest.findParticleByName(connection.to.particle);
-      assert(fromParticle, `could not find particle ${fromParticle}`);
-      assert(toParticle, `could not find particle ${toParticle}`);
-      recipe.newConnectionConstraint(fromParticle, connection.from.param,
-                                     toParticle, connection.to.param);
-    }
-
-    if (items.search) {
-      recipe.search = new Search(items.search.phrase, items.search.tokens);
-    }
-
-    for (let item of items.views) {
-      let view = recipe.newView();
-      if (item.ref.id) {
-        view.id = item.ref.id;
-      } else if (item.ref.name) {
-        let targetView = manifest.findViewByName(item.ref.name);
-        // TODO: Error handling.
-        assert(targetView, `Could not find view ${item.ref.name}`);
-        view.mapToView(targetView);
-      }
-      view.tags = item.ref.tags;
-      if (item.name) {
-        assert(!items.byName.has(item.name));
-        view.localName = item.name;
-        items.byName.set(item.name, {item: item, view: view});
-      }
-      view.fate = item.fate;
-      items.byView.set(view, item);
-    }
-
-    for (let item of items.slots) {
-      let slot = recipe.newSlot();
-      if (item.id) {
-        slot.id = item.id;
-      }
-      if (item.name) {
-        assert(!items.byName.has(item.name), `Duplicate slot local name ${item.name}`);
-        slot.localName = item.name;
-        items.byName.set(item.name, slot);
-      }
-      items.bySlot.set(slot, item);
-    }
-
-    // TODO: disambiguate.
-    let particlesByName = {};
-    for (let item of items.particles) {
-      let particle = recipe.newParticle(item.ref.name);
-      particle.tags = item.ref.tags;
-      particle.verbs = item.ref.verbs;
-      if (item.ref.name) {
-        var spec = manifest.findParticleByName(item.ref.name);
-        assert(spec, `could not find particle ${item.ref.name}`);
-        particle.spec = spec;
-        particlesByName[item.ref.name] = particle;
-      }
-      if (item.name) {
-        // TODO: errors.
-        assert(!items.byName.has(item.name));
-        particle.localName = item.name;
-        items.byName.set(item.name, {item: item, particle: particle});
-      }
-      items.byParticle.set(particle, item);
-
-      for (let slotConnectionItem of item.slotConnections) {
-        let slotConn = particle.consumedSlotConnections[slotConnectionItem.param];
-        if (!slotConn) {
-          slotConn = particle.addSlotConnection(slotConnectionItem.param);
-        }
-        if (slotConnectionItem.name) {
-          slotConnectionItem.providedSlots.forEach(ps => {
-            let providedSlot = slotConn.providedSlots[ps.param];
-            if (providedSlot) {
-              items.byName.set(ps.name, providedSlot);
-              items.bySlot.set(providedSlot, ps);
-            } else
-              providedSlot = items.byName.get(ps.name);
-            if (!providedSlot) {
-              providedSlot = recipe.newSlot(ps.param);
-              providedSlot.localName = ps.name;
-              assert(!items.byName.has(ps.name));
-              items.byName.set(ps.name, providedSlot);
-              items.bySlot.set(providedSlot, ps);
-            }
-            if (!slotConn.providedSlots[ps.param]) {
-              slotConn.providedSlots[ps.param] = providedSlot;
-            }
-          });
-        }
-      }
-    }
-
-    for (let [particle, item] of items.byParticle) {
-      for (let connectionItem of item.connections) {
-        let connection;
-        if (connectionItem.param == '*') {
-          connection = particle.addUnnamedConnection();
-        } else {
-          connection = particle.connections[connectionItem.param];
-          if (!connection) {
-            connection = particle.addConnectionName(connectionItem.param);
-          }
-          // TODO: else, merge tags? merge directions?
-        }
-        connection.tags = connectionItem.target ? connectionItem.target.tags : [];
-        connection.direction = {'->': 'out', '<-': 'in', '=': 'inout'}[connectionItem.dir];
-
-        let targetView;
-        let targetParticle;
-
-        if (connectionItem.target && connectionItem.target.name) {
-          let entry = items.byName.get(connectionItem.target.name);
-          assert(entry, `could not find ${connectionItem.target.name}`);
-          if (entry.item.kind == 'view') {
-            targetView = entry.view;
-          } else if (entry.item.kind == 'particle') {
-            targetParticle = entry.particle;
-          } else {
-            assert(false, `did not expect ${entry.item.kind}`);
-          }
-        }
-
-        if (connectionItem.target && connectionItem.target.particle) {
-          targetParticle = particlesByName[connectionItem.target.particle];
-          // TODO: error reporting
-          assert(targetParticle);
-        }
-
-        if (targetParticle) {
-          let targetConnection;
-          if (connectionItem.target.param) {
-            targetConnection = targetParticle.connections[connectionItem.target.param];
-            if (!targetConnection) {
-              targetConnection = targetParticle.addConnectionName(connectionItem.target.param);
-              // TODO: direction?
-            }
-          } else {
-            targetConnection = targetParticle.addUnnamedConnection();
-            // TODO: direction?
-          }
-
-          targetView = targetConnection.view;
-          if (!targetView) {
-            // TODO: tags?
-            targetView = recipe.newView();
-            targetConnection.connectToView(targetView)
-          }
-        }
-
-        if (targetView) {
-          connection.connectToView(targetView);
-        }
-      }
-
-      for (let slotConnectionItem of item.slotConnections) {
-        let targetSlot = items.byName.get(slotConnectionItem.name);
-        if (targetSlot) {
-          assert(items.bySlot.has(targetSlot));
-          if (!targetSlot.name) {
-            targetSlot.name = slotConnectionItem.param;
-          }
-          assert(targetSlot.name == slotConnectionItem.param,
-                 `Target slot name ${targetSlot.name} doesn't match slot connection name ${slotConnectionItem.param}`);
-        } else {
-          targetSlot = recipe.newSlot(slotConnectionItem.param);
-          targetSlot.localName = slotConnectionItem.name;
-          items.byName.set(slotConnectionItem.name, targetSlot);
-          items.bySlot.set(targetSlot, slotConnectionItem);
-        }
-        particle.consumedSlotConnections[slotConnectionItem.param].connectToSlot(targetSlot);
-      }
-    }
-  }
-  static async _processView(manifest, item, loader) {
-    let name = item.name;
-    let id = item.id;
-    let type = item.type;
-    if (id == null) {
-      id = `${manifest._id}view${manifest._views.length}`
-    }
-    let tags = item.tags;
-    if (tags == null)
-      tags = [];
-
-    // TODO: make this a util?
-    let resolveSchema = name => {
-      let schema = manifest.findSchemaByName(name);
-      if (!schema) {
-        throw new Error(`Schema '${name}' was not declared or imported`);
-      }
-      return schema;
-    };
-    type = type.resolveSchemas(resolveSchema);
-
-    let view = manifest.newView(type, name, id, tags);
-    view.source = item.source;
-    view.description = item.description;
-    // TODO: How to set the version?
-    // view.version = item.version;
-    let source = loader.join(manifest.fileName, item.source);
-    // TODO: json5?
-    let json = await loader.loadResource(source);
-    let entities = JSON.parse(json);
-    for (let entity of entities) {
-      let id = entity.$id || manifest.generateID();
-      delete entity.$id;
-      if (type.isView) {
-        view.store({
-          id,
-          rawData: entity,
-        });
-      } else {
-        view.set({
-          id,
-          rawData: entity,
-        })
-      }
-    }
-  }
-  _newRecipe(name) {
-    // TODO: use name
-    let recipe = new Recipe();
-    this._recipes.push(recipe);
-    return recipe;
-  }
-
-  toString(options) {
-    // TODO: sort?
-    let results = []
-
-    this._imports.forEach(i => {
-      results.push(`import '${i.fileName}'`);
-    });
-
-    Object.values(this._schemas).forEach(s => {
-      results.push(s.toString());
-    });
-
-    Object.values(this._particles).forEach(p => {
-      results.push(p.toString());
-    });
-
-    this._recipes.forEach(r => {
-      results.push(r.toString(options));
-    });
-
-    let views = [...this.views].sort(util.compareComparables);
-    views.forEach(v => {
-      results.push(v.toString(this._viewTags.get(v)));
-    });
-
-    return results.join('\n');
-  }
-}
-
-module.exports = Manifest;
-
-
-/***/ }),
 /* 48 */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -12315,7 +12379,7 @@ exports.createCipheriv = exports.Cipheriv = ciphers.createCipheriv
 var deciphers = __webpack_require__(135)
 exports.createDecipher = exports.Decipher = deciphers.createDecipher
 exports.createDecipheriv = exports.Decipheriv = deciphers.createDecipheriv
-var modes = __webpack_require__(32)
+var modes = __webpack_require__(33)
 function getCiphers () {
   return Object.keys(modes)
 }
@@ -12326,7 +12390,7 @@ exports.listCiphers = exports.getCiphers = getCiphers
 /* 49 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var bn = __webpack_require__(4);
+/* WEBPACK VAR INJECTION */(function(Buffer) {var bn = __webpack_require__(5);
 var randomBytes = __webpack_require__(28);
 module.exports = crt;
 function blind(priv) {
@@ -12752,7 +12816,7 @@ hash.ripemd160 = hash.ripemd.ripemd160;
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(40);
+var processNextTick = __webpack_require__(41);
 /*</replacement>*/
 
 module.exports = Writable;
@@ -12800,7 +12864,7 @@ var internalUtil = {
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(102);
+var Stream = __webpack_require__(103);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -12814,7 +12878,7 @@ function _isUint8Array(obj) {
 }
 /*</replacement>*/
 
-var destroyImpl = __webpack_require__(101);
+var destroyImpl = __webpack_require__(102);
 
 util.inherits(Writable, Stream);
 
@@ -13387,7 +13451,7 @@ Writable.prototype._destroy = function (err, cb) {
   this.end();
   cb(err);
 };
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(216).setImmediate, __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7), __webpack_require__(216).setImmediate, __webpack_require__(3)))
 
 /***/ }),
 /* 55 */
@@ -13704,9 +13768,9 @@ var exports = module.exports = function SHA (algorithm) {
 exports.sha = __webpack_require__(210)
 exports.sha1 = __webpack_require__(211)
 exports.sha224 = __webpack_require__(212)
-exports.sha256 = __webpack_require__(104)
+exports.sha256 = __webpack_require__(105)
 exports.sha384 = __webpack_require__(213)
-exports.sha512 = __webpack_require__(105)
+exports.sha512 = __webpack_require__(106)
 
 
 /***/ }),
@@ -13716,7 +13780,7 @@ exports.sha512 = __webpack_require__(105)
 /* WEBPACK VAR INJECTION */(function(global) {var ClientRequest = __webpack_require__(214)
 var extend = __webpack_require__(222)
 var statusCodes = __webpack_require__(147)
-var url = __webpack_require__(41)
+var url = __webpack_require__(42)
 
 var http = exports
 
@@ -14385,16 +14449,118 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
 /* 59 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(global) {/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+
+var fs = __webpack_require__(53);
+var assert = __webpack_require__(1);
+const particle = __webpack_require__(45);
+const DomParticle = __webpack_require__(113);
+const vm = __webpack_require__(108);
+let JsonldToManifest = __webpack_require__(223);
+
+let fetch = global.fetch || __webpack_require__(258);
+
+function schemaLocationFor(name) {
+  return `../entities/${name}.schema`;
+}
+
+class Loader {
+  path(fileName) {
+    let path = fileName.replace(/[\/][^\/]+$/, '/')
+    return path;
+  }
+
+  join(prefix, path) {
+    if (/^https?:\/\//.test(path))
+      return path;
+    prefix = this.path(prefix);
+    return prefix + path;
+  }
+
+  loadResource(file) {
+    if (/^https?:\/\//.test(file))
+      return this._loadURL(file);
+    return this._loadFile(file);
+  }
+
+  _loadFile(file) {
+    return new Promise((resolve, reject) => {
+      fs.readFile(file, (err, data) => {
+        if (err)
+          reject(err);
+        else
+          resolve(data.toString('utf-8'));
+      });
+    });
+  }
+
+  _loadURL(url) {
+    if (/\/\/schema.org\//.test(url)) {
+      if (url.endsWith('/Thing')) {
+        return fetch("https://schema.org/Product.jsonld").then(res => res.text()).then(data => JsonldToManifest.convert(data, {'@id': 'schema:Thing'}));
+      }
+      return fetch(url + ".jsonld").then(res => res.text()).then(data => JsonldToManifest.convert(data));
+    }
+    return fetch(url).then(res => res.text());
+  }
+
+  async loadParticleClass(spec) {
+    let clazz = await this.requireParticle(spec.implFile);
+    clazz.spec = spec;
+    return clazz;
+  }
+
+  async requireParticle(fileName) {
+    let src = await this.loadResource(fileName);
+    // Note. This is not real isolation.
+    let script = new vm.Script(src, {fileName});
+    let result = [];
+    let self = {
+      defineParticle(particleWrapper) {
+        result.push(particleWrapper);
+      },
+      console,
+      importScripts: s => null //console.log(`(skipping browser-space import for [${s}])`)
+    };
+    script.runInNewContext(self);
+    assert(result.length > 0 && typeof result[0] == 'function', `Error while instantiating particle implementation from ${fileName}`);
+    return this.unwrapParticle(result[0]);
+  }
+
+  unwrapParticle(particleWrapper) {
+    return particleWrapper({particle, Particle: particle.Particle, DomParticle});
+  }
+
+}
+
+module.exports = Loader;
+
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
+
+/***/ }),
+/* 60 */
 /***/ (function(module, exports) {
 
 module.exports = [["0","\u0000",127,"€"],["8140","丂丄丅丆丏丒丗丟丠両丣並丩丮丯丱丳丵丷丼乀乁乂乄乆乊乑乕乗乚乛乢乣乤乥乧乨乪",5,"乲乴",9,"乿",6,"亇亊"],["8180","亐亖亗亙亜亝亞亣亪亯亰亱亴亶亷亸亹亼亽亾仈仌仏仐仒仚仛仜仠仢仦仧仩仭仮仯仱仴仸仹仺仼仾伀伂",6,"伋伌伒",4,"伜伝伡伣伨伩伬伭伮伱伳伵伷伹伻伾",4,"佄佅佇",5,"佒佔佖佡佢佦佨佪佫佭佮佱佲併佷佸佹佺佽侀侁侂侅來侇侊侌侎侐侒侓侕侖侘侙侚侜侞侟価侢"],["8240","侤侫侭侰",4,"侶",8,"俀俁係俆俇俈俉俋俌俍俒",4,"俙俛俠俢俤俥俧俫俬俰俲俴俵俶俷俹俻俼俽俿",11],["8280","個倎倐們倓倕倖倗倛倝倞倠倢倣値倧倫倯",10,"倻倽倿偀偁偂偄偅偆偉偊偋偍偐",4,"偖偗偘偙偛偝",7,"偦",5,"偭",8,"偸偹偺偼偽傁傂傃傄傆傇傉傊傋傌傎",20,"傤傦傪傫傭",4,"傳",6,"傼"],["8340","傽",17,"僐",5,"僗僘僙僛",10,"僨僩僪僫僯僰僱僲僴僶",4,"僼",9,"儈"],["8380","儉儊儌",5,"儓",13,"儢",28,"兂兇兊兌兎兏児兒兓兗兘兙兛兝",4,"兣兤兦內兩兪兯兲兺兾兿冃冄円冇冊冋冎冏冐冑冓冔冘冚冝冞冟冡冣冦",4,"冭冮冴冸冹冺冾冿凁凂凃凅凈凊凍凎凐凒",5],["8440","凘凙凚凜凞凟凢凣凥",5,"凬凮凱凲凴凷凾刄刅刉刋刌刏刐刓刔刕刜刞刟刡刢刣別刦刧刪刬刯刱刲刴刵刼刾剄",5,"剋剎剏剒剓剕剗剘"],["8480","剙剚剛剝剟剠剢剣剤剦剨剫剬剭剮剰剱剳",9,"剾劀劃",4,"劉",6,"劑劒劔",6,"劜劤劥劦劧劮劯劰労",9,"勀勁勂勄勅勆勈勊勌勍勎勏勑勓勔動勗務",5,"勠勡勢勣勥",10,"勱",7,"勻勼勽匁匂匃匄匇匉匊匋匌匎"],["8540","匑匒匓匔匘匛匜匞匟匢匤匥匧匨匩匫匬匭匯",9,"匼匽區卂卄卆卋卌卍卐協単卙卛卝卥卨卪卬卭卲卶卹卻卼卽卾厀厁厃厇厈厊厎厏"],["8580","厐",4,"厖厗厙厛厜厞厠厡厤厧厪厫厬厭厯",6,"厷厸厹厺厼厽厾叀參",4,"収叏叐叒叓叕叚叜叝叞叡叢叧叴叺叾叿吀吂吅吇吋吔吘吙吚吜吢吤吥吪吰吳吶吷吺吽吿呁呂呄呅呇呉呌呍呎呏呑呚呝",4,"呣呥呧呩",7,"呴呹呺呾呿咁咃咅咇咈咉咊咍咑咓咗咘咜咞咟咠咡"],["8640","咢咥咮咰咲咵咶咷咹咺咼咾哃哅哊哋哖哘哛哠",4,"哫哬哯哰哱哴",5,"哻哾唀唂唃唄唅唈唊",4,"唒唓唕",5,"唜唝唞唟唡唥唦"],["8680","唨唩唫唭唲唴唵唶唸唹唺唻唽啀啂啅啇啈啋",4,"啑啒啓啔啗",4,"啝啞啟啠啢啣啨啩啫啯",5,"啹啺啽啿喅喆喌喍喎喐喒喓喕喖喗喚喛喞喠",6,"喨",8,"喲喴営喸喺喼喿",4,"嗆嗇嗈嗊嗋嗎嗏嗐嗕嗗",4,"嗞嗠嗢嗧嗩嗭嗮嗰嗱嗴嗶嗸",4,"嗿嘂嘃嘄嘅"],["8740","嘆嘇嘊嘋嘍嘐",7,"嘙嘚嘜嘝嘠嘡嘢嘥嘦嘨嘩嘪嘫嘮嘯嘰嘳嘵嘷嘸嘺嘼嘽嘾噀",11,"噏",4,"噕噖噚噛噝",4],["8780","噣噥噦噧噭噮噯噰噲噳噴噵噷噸噹噺噽",7,"嚇",6,"嚐嚑嚒嚔",14,"嚤",10,"嚰",6,"嚸嚹嚺嚻嚽",12,"囋",8,"囕囖囘囙囜団囥",5,"囬囮囯囲図囶囷囸囻囼圀圁圂圅圇國",6],["8840","園",9,"圝圞圠圡圢圤圥圦圧圫圱圲圴",4,"圼圽圿坁坃坄坅坆坈坉坋坒",4,"坘坙坢坣坥坧坬坮坰坱坲坴坵坸坹坺坽坾坿垀"],["8880","垁垇垈垉垊垍",4,"垔",6,"垜垝垞垟垥垨垪垬垯垰垱垳垵垶垷垹",8,"埄",6,"埌埍埐埑埓埖埗埛埜埞埡埢埣埥",7,"埮埰埱埲埳埵埶執埻埼埾埿堁堃堄堅堈堉堊堌堎堏堐堒堓堔堖堗堘堚堛堜堝堟堢堣堥",4,"堫",4,"報堲堳場堶",7],["8940","堾",5,"塅",6,"塎塏塐塒塓塕塖塗塙",4,"塟",5,"塦",4,"塭",16,"塿墂墄墆墇墈墊墋墌"],["8980","墍",4,"墔",4,"墛墜墝墠",7,"墪",17,"墽墾墿壀壂壃壄壆",10,"壒壓壔壖",13,"壥",5,"壭壯壱売壴壵壷壸壺",7,"夃夅夆夈",4,"夎夐夑夒夓夗夘夛夝夞夠夡夢夣夦夨夬夰夲夳夵夶夻"],["8a40","夽夾夿奀奃奅奆奊奌奍奐奒奓奙奛",4,"奡奣奤奦",12,"奵奷奺奻奼奾奿妀妅妉妋妌妎妏妐妑妔妕妘妚妛妜妝妟妠妡妢妦"],["8a80","妧妬妭妰妱妳",5,"妺妼妽妿",6,"姇姈姉姌姍姎姏姕姖姙姛姞",4,"姤姦姧姩姪姫姭",11,"姺姼姽姾娀娂娊娋娍娎娏娐娒娔娕娖娗娙娚娛娝娞娡娢娤娦娧娨娪",6,"娳娵娷",4,"娽娾娿婁",4,"婇婈婋",9,"婖婗婘婙婛",5],["8b40","婡婣婤婥婦婨婩婫",8,"婸婹婻婼婽婾媀",17,"媓",6,"媜",13,"媫媬"],["8b80","媭",4,"媴媶媷媹",4,"媿嫀嫃",5,"嫊嫋嫍",4,"嫓嫕嫗嫙嫚嫛嫝嫞嫟嫢嫤嫥嫧嫨嫪嫬",4,"嫲",22,"嬊",11,"嬘",25,"嬳嬵嬶嬸",7,"孁",6],["8c40","孈",7,"孒孖孞孠孡孧孨孫孭孮孯孲孴孶孷學孹孻孼孾孿宂宆宊宍宎宐宑宒宔宖実宧宨宩宬宭宮宯宱宲宷宺宻宼寀寁寃寈寉寊寋寍寎寏"],["8c80","寑寔",8,"寠寢寣實寧審",4,"寯寱",6,"寽対尀専尃尅將專尋尌對導尐尒尓尗尙尛尞尟尠尡尣尦尨尩尪尫尭尮尯尰尲尳尵尶尷屃屄屆屇屌屍屒屓屔屖屗屘屚屛屜屝屟屢層屧",6,"屰屲",6,"屻屼屽屾岀岃",4,"岉岊岋岎岏岒岓岕岝",4,"岤",4],["8d40","岪岮岯岰岲岴岶岹岺岻岼岾峀峂峃峅",5,"峌",5,"峓",5,"峚",6,"峢峣峧峩峫峬峮峯峱",9,"峼",4],["8d80","崁崄崅崈",5,"崏",4,"崕崗崘崙崚崜崝崟",4,"崥崨崪崫崬崯",4,"崵",7,"崿",7,"嵈嵉嵍",10,"嵙嵚嵜嵞",10,"嵪嵭嵮嵰嵱嵲嵳嵵",12,"嶃",21,"嶚嶛嶜嶞嶟嶠"],["8e40","嶡",21,"嶸",12,"巆",6,"巎",12,"巜巟巠巣巤巪巬巭"],["8e80","巰巵巶巸",4,"巿帀帄帇帉帊帋帍帎帒帓帗帞",7,"帨",4,"帯帰帲",4,"帹帺帾帿幀幁幃幆",5,"幍",6,"幖",4,"幜幝幟幠幣",14,"幵幷幹幾庁庂広庅庈庉庌庍庎庒庘庛庝庡庢庣庤庨",4,"庮",4,"庴庺庻庼庽庿",6],["8f40","廆廇廈廋",5,"廔廕廗廘廙廚廜",11,"廩廫",8,"廵廸廹廻廼廽弅弆弇弉弌弍弎弐弒弔弖弙弚弜弝弞弡弢弣弤"],["8f80","弨弫弬弮弰弲",6,"弻弽弾弿彁",14,"彑彔彙彚彛彜彞彟彠彣彥彧彨彫彮彯彲彴彵彶彸彺彽彾彿徃徆徍徎徏徑従徔徖徚徛徝從徟徠徢",5,"復徫徬徯",5,"徶徸徹徺徻徾",4,"忇忈忊忋忎忓忔忕忚忛応忞忟忢忣忥忦忨忩忬忯忰忲忳忴忶忷忹忺忼怇"],["9040","怈怉怋怌怐怑怓怗怘怚怞怟怢怣怤怬怭怮怰",4,"怶",4,"怽怾恀恄",6,"恌恎恏恑恓恔恖恗恘恛恜恞恟恠恡恥恦恮恱恲恴恵恷恾悀"],["9080","悁悂悅悆悇悈悊悋悎悏悐悑悓悕悗悘悙悜悞悡悢悤悥悧悩悪悮悰悳悵悶悷悹悺悽",7,"惇惈惉惌",4,"惒惓惔惖惗惙惛惞惡",4,"惪惱惲惵惷惸惻",4,"愂愃愄愅愇愊愋愌愐",4,"愖愗愘愙愛愜愝愞愡愢愥愨愩愪愬",18,"慀",6],["9140","慇慉態慍慏慐慒慓慔慖",6,"慞慟慠慡慣慤慥慦慩",6,"慱慲慳慴慶慸",18,"憌憍憏",4,"憕"],["9180","憖",6,"憞",8,"憪憫憭",9,"憸",5,"憿懀懁懃",4,"應懌",4,"懓懕",16,"懧",13,"懶",8,"戀",5,"戇戉戓戔戙戜戝戞戠戣戦戧戨戩戫戭戯戰戱戲戵戶戸",4,"扂扄扅扆扊"],["9240","扏扐払扖扗扙扚扜",6,"扤扥扨扱扲扴扵扷扸扺扻扽抁抂抃抅抆抇抈抋",5,"抔抙抜抝択抣抦抧抩抪抭抮抯抰抲抳抴抶抷抸抺抾拀拁"],["9280","拃拋拏拑拕拝拞拠拡拤拪拫拰拲拵拸拹拺拻挀挃挄挅挆挊挋挌挍挏挐挒挓挔挕挗挘挙挜挦挧挩挬挭挮挰挱挳",5,"挻挼挾挿捀捁捄捇捈捊捑捒捓捔捖",7,"捠捤捥捦捨捪捫捬捯捰捲捳捴捵捸捹捼捽捾捿掁掃掄掅掆掋掍掑掓掔掕掗掙",6,"採掤掦掫掯掱掲掵掶掹掻掽掿揀"],["9340","揁揂揃揅揇揈揊揋揌揑揓揔揕揗",6,"揟揢揤",4,"揫揬揮揯揰揱揳揵揷揹揺揻揼揾搃搄搆",4,"損搎搑搒搕",5,"搝搟搢搣搤"],["9380","搥搧搨搩搫搮",5,"搵",4,"搻搼搾摀摂摃摉摋",6,"摓摕摖摗摙",4,"摟",7,"摨摪摫摬摮",9,"摻",6,"撃撆撈",8,"撓撔撗撘撚撛撜撝撟",4,"撥撦撧撨撪撫撯撱撲撳撴撶撹撻撽撾撿擁擃擄擆",6,"擏擑擓擔擕擖擙據"],["9440","擛擜擝擟擠擡擣擥擧",24,"攁",7,"攊",7,"攓",4,"攙",8],["9480","攢攣攤攦",4,"攬攭攰攱攲攳攷攺攼攽敀",4,"敆敇敊敋敍敎敐敒敓敔敗敘敚敜敟敠敡敤敥敧敨敩敪敭敮敯敱敳敵敶數",14,"斈斉斊斍斎斏斒斔斕斖斘斚斝斞斠斢斣斦斨斪斬斮斱",7,"斺斻斾斿旀旂旇旈旉旊旍旐旑旓旔旕旘",7,"旡旣旤旪旫"],["9540","旲旳旴旵旸旹旻",4,"昁昄昅昇昈昉昋昍昐昑昒昖昗昘昚昛昜昞昡昢昣昤昦昩昪昫昬昮昰昲昳昷",4,"昽昿晀時晄",6,"晍晎晐晑晘"],["9580","晙晛晜晝晞晠晢晣晥晧晩",4,"晱晲晳晵晸晹晻晼晽晿暀暁暃暅暆暈暉暊暋暍暎暏暐暒暓暔暕暘",4,"暞",8,"暩",4,"暯",4,"暵暶暷暸暺暻暼暽暿",25,"曚曞",7,"曧曨曪",5,"曱曵曶書曺曻曽朁朂會"],["9640","朄朅朆朇朌朎朏朑朒朓朖朘朙朚朜朞朠",5,"朧朩朮朰朲朳朶朷朸朹朻朼朾朿杁杄杅杇杊杋杍杒杔杕杗",4,"杝杢杣杤杦杧杫杬杮東杴杶"],["9680","杸杹杺杻杽枀枂枃枅枆枈枊枌枍枎枏枑枒枓枔枖枙枛枟枠枡枤枦枩枬枮枱枲枴枹",7,"柂柅",9,"柕柖柗柛柟柡柣柤柦柧柨柪柫柭柮柲柵",7,"柾栁栂栃栄栆栍栐栒栔栕栘",4,"栞栟栠栢",6,"栫",6,"栴栵栶栺栻栿桇桋桍桏桒桖",5],["9740","桜桝桞桟桪桬",7,"桵桸",8,"梂梄梇",7,"梐梑梒梔梕梖梘",9,"梣梤梥梩梪梫梬梮梱梲梴梶梷梸"],["9780","梹",6,"棁棃",5,"棊棌棎棏棐棑棓棔棖棗棙棛",4,"棡棢棤",9,"棯棲棳棴棶棷棸棻棽棾棿椀椂椃椄椆",4,"椌椏椑椓",11,"椡椢椣椥",7,"椮椯椱椲椳椵椶椷椸椺椻椼椾楀楁楃",16,"楕楖楘楙楛楜楟"],["9840","楡楢楤楥楧楨楩楪楬業楯楰楲",4,"楺楻楽楾楿榁榃榅榊榋榌榎",5,"榖榗榙榚榝",9,"榩榪榬榮榯榰榲榳榵榶榸榹榺榼榽"],["9880","榾榿槀槂",7,"構槍槏槑槒槓槕",5,"槜槝槞槡",11,"槮槯槰槱槳",9,"槾樀",9,"樋",11,"標",5,"樠樢",5,"権樫樬樭樮樰樲樳樴樶",6,"樿",4,"橅橆橈",7,"橑",6,"橚"],["9940","橜",4,"橢橣橤橦",10,"橲",6,"橺橻橽橾橿檁檂檃檅",8,"檏檒",4,"檘",7,"檡",5],["9980","檧檨檪檭",114,"欥欦欨",6],["9a40","欯欰欱欳欴欵欶欸欻欼欽欿歀歁歂歄歅歈歊歋歍",11,"歚",7,"歨歩歫",13,"歺歽歾歿殀殅殈"],["9a80","殌殎殏殐殑殔殕殗殘殙殜",4,"殢",7,"殫",7,"殶殸",6,"毀毃毄毆",4,"毌毎毐毑毘毚毜",4,"毢",7,"毬毭毮毰毱毲毴毶毷毸毺毻毼毾",6,"氈",4,"氎氒気氜氝氞氠氣氥氫氬氭氱氳氶氷氹氺氻氼氾氿汃汄汅汈汋",4,"汑汒汓汖汘"],["9b40","汙汚汢汣汥汦汧汫",4,"汱汳汵汷汸決汻汼汿沀沄沇沊沋沍沎沑沒沕沖沗沘沚沜沝沞沠沢沨沬沯沰沴沵沶沷沺泀況泂泃泆泇泈泋泍泎泏泑泒泘"],["9b80","泙泚泜泝泟泤泦泧泩泬泭泲泴泹泿洀洂洃洅洆洈洉洊洍洏洐洑洓洔洕洖洘洜洝洟",5,"洦洨洩洬洭洯洰洴洶洷洸洺洿浀浂浄浉浌浐浕浖浗浘浛浝浟浡浢浤浥浧浨浫浬浭浰浱浲浳浵浶浹浺浻浽",4,"涃涄涆涇涊涋涍涏涐涒涖",4,"涜涢涥涬涭涰涱涳涴涶涷涹",5,"淁淂淃淈淉淊"],["9c40","淍淎淏淐淒淓淔淕淗淚淛淜淟淢淣淥淧淨淩淪淭淯淰淲淴淵淶淸淺淽",7,"渆渇済渉渋渏渒渓渕渘渙減渜渞渟渢渦渧渨渪測渮渰渱渳渵"],["9c80","渶渷渹渻",7,"湅",7,"湏湐湑湒湕湗湙湚湜湝湞湠",10,"湬湭湯",14,"満溁溂溄溇溈溊",4,"溑",6,"溙溚溛溝溞溠溡溣溤溦溨溩溫溬溭溮溰溳溵溸溹溼溾溿滀滃滄滅滆滈滉滊滌滍滎滐滒滖滘滙滛滜滝滣滧滪",5],["9d40","滰滱滲滳滵滶滷滸滺",7,"漃漄漅漇漈漊",4,"漐漑漒漖",9,"漡漢漣漥漦漧漨漬漮漰漲漴漵漷",6,"漿潀潁潂"],["9d80","潃潄潅潈潉潊潌潎",9,"潙潚潛潝潟潠潡潣潤潥潧",5,"潯潰潱潳潵潶潷潹潻潽",6,"澅澆澇澊澋澏",12,"澝澞澟澠澢",4,"澨",10,"澴澵澷澸澺",5,"濁濃",5,"濊",6,"濓",10,"濟濢濣濤濥"],["9e40","濦",7,"濰",32,"瀒",7,"瀜",6,"瀤",6],["9e80","瀫",9,"瀶瀷瀸瀺",17,"灍灎灐",13,"灟",11,"灮灱灲灳灴灷灹灺灻災炁炂炃炄炆炇炈炋炌炍炏炐炑炓炗炘炚炛炞",12,"炰炲炴炵炶為炾炿烄烅烆烇烉烋",12,"烚"],["9f40","烜烝烞烠烡烢烣烥烪烮烰",6,"烸烺烻烼烾",10,"焋",4,"焑焒焔焗焛",10,"焧",7,"焲焳焴"],["9f80","焵焷",13,"煆煇煈煉煋煍煏",12,"煝煟",4,"煥煩",4,"煯煰煱煴煵煶煷煹煻煼煾",5,"熅",4,"熋熌熍熎熐熑熒熓熕熖熗熚",4,"熡",6,"熩熪熫熭",5,"熴熶熷熸熺",8,"燄",9,"燏",4],["a040","燖",9,"燡燢燣燤燦燨",5,"燯",9,"燺",11,"爇",19],["a080","爛爜爞",9,"爩爫爭爮爯爲爳爴爺爼爾牀",6,"牉牊牋牎牏牐牑牓牔牕牗牘牚牜牞牠牣牤牥牨牪牫牬牭牰牱牳牴牶牷牸牻牼牽犂犃犅",4,"犌犎犐犑犓",11,"犠",11,"犮犱犲犳犵犺",6,"狅狆狇狉狊狋狌狏狑狓狔狕狖狘狚狛"],["a1a1","　、。·ˉˇ¨〃々—～‖…‘’“”〔〕〈",7,"〖〗【】±×÷∶∧∨∑∏∪∩∈∷√⊥∥∠⌒⊙∫∮≡≌≈∽∝≠≮≯≤≥∞∵∴♂♀°′″℃＄¤￠￡‰§№☆★○●◎◇◆□■△▲※→←↑↓〓"],["a2a1","ⅰ",9],["a2b1","⒈",19,"⑴",19,"①",9],["a2e5","㈠",9],["a2f1","Ⅰ",11],["a3a1","！＂＃￥％",88,"￣"],["a4a1","ぁ",82],["a5a1","ァ",85],["a6a1","Α",16,"Σ",6],["a6c1","α",16,"σ",6],["a6e0","︵︶︹︺︿﹀︽︾﹁﹂﹃﹄"],["a6ee","︻︼︷︸︱"],["a6f4","︳︴"],["a7a1","А",5,"ЁЖ",25],["a7d1","а",5,"ёж",25],["a840","ˊˋ˙–―‥‵℅℉↖↗↘↙∕∟∣≒≦≧⊿═",35,"▁",6],["a880","█",7,"▓▔▕▼▽◢◣◤◥☉⊕〒〝〞"],["a8a1","āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüêɑ"],["a8bd","ńň"],["a8c0","ɡ"],["a8c5","ㄅ",36],["a940","〡",8,"㊣㎎㎏㎜㎝㎞㎡㏄㏎㏑㏒㏕︰￢￤"],["a959","℡㈱"],["a95c","‐"],["a960","ー゛゜ヽヾ〆ゝゞ﹉",9,"﹔﹕﹖﹗﹙",8],["a980","﹢",4,"﹨﹩﹪﹫"],["a996","〇"],["a9a4","─",75],["aa40","狜狝狟狢",5,"狪狫狵狶狹狽狾狿猀猂猄",5,"猋猌猍猏猐猑猒猔猘猙猚猟猠猣猤猦猧猨猭猯猰猲猳猵猶猺猻猼猽獀",8],["aa80","獉獊獋獌獎獏獑獓獔獕獖獘",7,"獡",10,"獮獰獱"],["ab40","獲",11,"獿",4,"玅玆玈玊玌玍玏玐玒玓玔玕玗玘玙玚玜玝玞玠玡玣",5,"玪玬玭玱玴玵玶玸玹玼玽玾玿珁珃",4],["ab80","珋珌珎珒",6,"珚珛珜珝珟珡珢珣珤珦珨珪珫珬珮珯珰珱珳",4],["ac40","珸",10,"琄琇琈琋琌琍琎琑",8,"琜",5,"琣琤琧琩琫琭琯琱琲琷",4,"琽琾琿瑀瑂",11],["ac80","瑎",6,"瑖瑘瑝瑠",12,"瑮瑯瑱",4,"瑸瑹瑺"],["ad40","瑻瑼瑽瑿璂璄璅璆璈璉璊璌璍璏璑",10,"璝璟",7,"璪",15,"璻",12],["ad80","瓈",9,"瓓",8,"瓝瓟瓡瓥瓧",6,"瓰瓱瓲"],["ae40","瓳瓵瓸",6,"甀甁甂甃甅",7,"甎甐甒甔甕甖甗甛甝甞甠",4,"甦甧甪甮甴甶甹甼甽甿畁畂畃畄畆畇畉畊畍畐畑畒畓畕畖畗畘"],["ae80","畝",7,"畧畨畩畫",6,"畳畵當畷畺",4,"疀疁疂疄疅疇"],["af40","疈疉疊疌疍疎疐疓疕疘疛疜疞疢疦",4,"疭疶疷疺疻疿痀痁痆痋痌痎痏痐痑痓痗痙痚痜痝痟痠痡痥痩痬痭痮痯痲痳痵痶痷痸痺痻痽痾瘂瘄瘆瘇"],["af80","瘈瘉瘋瘍瘎瘏瘑瘒瘓瘔瘖瘚瘜瘝瘞瘡瘣瘧瘨瘬瘮瘯瘱瘲瘶瘷瘹瘺瘻瘽癁療癄"],["b040","癅",6,"癎",5,"癕癗",4,"癝癟癠癡癢癤",6,"癬癭癮癰",7,"癹発發癿皀皁皃皅皉皊皌皍皏皐皒皔皕皗皘皚皛"],["b080","皜",7,"皥",8,"皯皰皳皵",9,"盀盁盃啊阿埃挨哎唉哀皑癌蔼矮艾碍爱隘鞍氨安俺按暗岸胺案肮昂盎凹敖熬翱袄傲奥懊澳芭捌扒叭吧笆八疤巴拔跋靶把耙坝霸罢爸白柏百摆佰败拜稗斑班搬扳般颁板版扮拌伴瓣半办绊邦帮梆榜膀绑棒磅蚌镑傍谤苞胞包褒剥"],["b140","盄盇盉盋盌盓盕盙盚盜盝盞盠",4,"盦",7,"盰盳盵盶盷盺盻盽盿眀眂眃眅眆眊県眎",10,"眛眜眝眞眡眣眤眥眧眪眫"],["b180","眬眮眰",4,"眹眻眽眾眿睂睄睅睆睈",7,"睒",7,"睜薄雹保堡饱宝抱报暴豹鲍爆杯碑悲卑北辈背贝钡倍狈备惫焙被奔苯本笨崩绷甭泵蹦迸逼鼻比鄙笔彼碧蓖蔽毕毙毖币庇痹闭敝弊必辟壁臂避陛鞭边编贬扁便变卞辨辩辫遍标彪膘表鳖憋别瘪彬斌濒滨宾摈兵冰柄丙秉饼炳"],["b240","睝睞睟睠睤睧睩睪睭",11,"睺睻睼瞁瞂瞃瞆",5,"瞏瞐瞓",11,"瞡瞣瞤瞦瞨瞫瞭瞮瞯瞱瞲瞴瞶",4],["b280","瞼瞾矀",12,"矎",8,"矘矙矚矝",4,"矤病并玻菠播拨钵波博勃搏铂箔伯帛舶脖膊渤泊驳捕卜哺补埠不布步簿部怖擦猜裁材才财睬踩采彩菜蔡餐参蚕残惭惨灿苍舱仓沧藏操糙槽曹草厕策侧册测层蹭插叉茬茶查碴搽察岔差诧拆柴豺搀掺蝉馋谗缠铲产阐颤昌猖"],["b340","矦矨矪矯矰矱矲矴矵矷矹矺矻矼砃",5,"砊砋砎砏砐砓砕砙砛砞砠砡砢砤砨砪砫砮砯砱砲砳砵砶砽砿硁硂硃硄硆硈硉硊硋硍硏硑硓硔硘硙硚"],["b380","硛硜硞",11,"硯",7,"硸硹硺硻硽",6,"场尝常长偿肠厂敞畅唱倡超抄钞朝嘲潮巢吵炒车扯撤掣彻澈郴臣辰尘晨忱沉陈趁衬撑称城橙成呈乘程惩澄诚承逞骋秤吃痴持匙池迟弛驰耻齿侈尺赤翅斥炽充冲虫崇宠抽酬畴踌稠愁筹仇绸瞅丑臭初出橱厨躇锄雏滁除楚"],["b440","碄碅碆碈碊碋碏碐碒碔碕碖碙碝碞碠碢碤碦碨",7,"碵碶碷碸確碻碼碽碿磀磂磃磄磆磇磈磌磍磎磏磑磒磓磖磗磘磚",9],["b480","磤磥磦磧磩磪磫磭",4,"磳磵磶磸磹磻",5,"礂礃礄礆",6,"础储矗搐触处揣川穿椽传船喘串疮窗幢床闯创吹炊捶锤垂春椿醇唇淳纯蠢戳绰疵茨磁雌辞慈瓷词此刺赐次聪葱囱匆从丛凑粗醋簇促蹿篡窜摧崔催脆瘁粹淬翠村存寸磋撮搓措挫错搭达答瘩打大呆歹傣戴带殆代贷袋待逮"],["b540","礍",5,"礔",9,"礟",4,"礥",14,"礵",4,"礽礿祂祃祄祅祇祊",8,"祔祕祘祙祡祣"],["b580","祤祦祩祪祫祬祮祰",6,"祹祻",4,"禂禃禆禇禈禉禋禌禍禎禐禑禒怠耽担丹单郸掸胆旦氮但惮淡诞弹蛋当挡党荡档刀捣蹈倒岛祷导到稻悼道盗德得的蹬灯登等瞪凳邓堤低滴迪敌笛狄涤翟嫡抵底地蒂第帝弟递缔颠掂滇碘点典靛垫电佃甸店惦奠淀殿碉叼雕凋刁掉吊钓调跌爹碟蝶迭谍叠"],["b640","禓",6,"禛",11,"禨",10,"禴",4,"禼禿秂秄秅秇秈秊秌秎秏秐秓秔秖秗秙",5,"秠秡秢秥秨秪"],["b680","秬秮秱",6,"秹秺秼秾秿稁稄稅稇稈稉稊稌稏",4,"稕稖稘稙稛稜丁盯叮钉顶鼎锭定订丢东冬董懂动栋侗恫冻洞兜抖斗陡豆逗痘都督毒犊独读堵睹赌杜镀肚度渡妒端短锻段断缎堆兑队对墩吨蹲敦顿囤钝盾遁掇哆多夺垛躲朵跺舵剁惰堕蛾峨鹅俄额讹娥恶厄扼遏鄂饿恩而儿耳尔饵洱二"],["b740","稝稟稡稢稤",14,"稴稵稶稸稺稾穀",5,"穇",9,"穒",4,"穘",16],["b780","穩",6,"穱穲穳穵穻穼穽穾窂窅窇窉窊窋窌窎窏窐窓窔窙窚窛窞窡窢贰发罚筏伐乏阀法珐藩帆番翻樊矾钒繁凡烦反返范贩犯饭泛坊芳方肪房防妨仿访纺放菲非啡飞肥匪诽吠肺废沸费芬酚吩氛分纷坟焚汾粉奋份忿愤粪丰封枫蜂峰锋风疯烽逢冯缝讽奉凤佛否夫敷肤孵扶拂辐幅氟符伏俘服"],["b840","窣窤窧窩窪窫窮",4,"窴",10,"竀",10,"竌",9,"竗竘竚竛竜竝竡竢竤竧",5,"竮竰竱竲竳"],["b880","竴",4,"竻竼竾笀笁笂笅笇笉笌笍笎笐笒笓笖笗笘笚笜笝笟笡笢笣笧笩笭浮涪福袱弗甫抚辅俯釜斧脯腑府腐赴副覆赋复傅付阜父腹负富讣附妇缚咐噶嘎该改概钙盖溉干甘杆柑竿肝赶感秆敢赣冈刚钢缸肛纲岗港杠篙皋高膏羔糕搞镐稿告哥歌搁戈鸽胳疙割革葛格蛤阁隔铬个各给根跟耕更庚羹"],["b940","笯笰笲笴笵笶笷笹笻笽笿",5,"筆筈筊筍筎筓筕筗筙筜筞筟筡筣",10,"筯筰筳筴筶筸筺筼筽筿箁箂箃箄箆",6,"箎箏"],["b980","箑箒箓箖箘箙箚箛箞箟箠箣箤箥箮箯箰箲箳箵箶箷箹",7,"篂篃範埂耿梗工攻功恭龚供躬公宫弓巩汞拱贡共钩勾沟苟狗垢构购够辜菇咕箍估沽孤姑鼓古蛊骨谷股故顾固雇刮瓜剐寡挂褂乖拐怪棺关官冠观管馆罐惯灌贯光广逛瑰规圭硅归龟闺轨鬼诡癸桂柜跪贵刽辊滚棍锅郭国果裹过哈"],["ba40","篅篈築篊篋篍篎篏篐篒篔",4,"篛篜篞篟篠篢篣篤篧篨篩篫篬篭篯篰篲",4,"篸篹篺篻篽篿",7,"簈簉簊簍簎簐",5,"簗簘簙"],["ba80","簚",4,"簠",5,"簨簩簫",12,"簹",5,"籂骸孩海氦亥害骇酣憨邯韩含涵寒函喊罕翰撼捍旱憾悍焊汗汉夯杭航壕嚎豪毫郝好耗号浩呵喝荷菏核禾和何合盒貉阂河涸赫褐鹤贺嘿黑痕很狠恨哼亨横衡恒轰哄烘虹鸿洪宏弘红喉侯猴吼厚候后呼乎忽瑚壶葫胡蝴狐糊湖"],["bb40","籃",9,"籎",36,"籵",5,"籾",9],["bb80","粈粊",6,"粓粔粖粙粚粛粠粡粣粦粧粨粩粫粬粭粯粰粴",4,"粺粻弧虎唬护互沪户花哗华猾滑画划化话槐徊怀淮坏欢环桓还缓换患唤痪豢焕涣宦幻荒慌黄磺蝗簧皇凰惶煌晃幌恍谎灰挥辉徽恢蛔回毁悔慧卉惠晦贿秽会烩汇讳诲绘荤昏婚魂浑混豁活伙火获或惑霍货祸击圾基机畸稽积箕"],["bc40","粿糀糂糃糄糆糉糋糎",6,"糘糚糛糝糞糡",6,"糩",5,"糰",7,"糹糺糼",13,"紋",5],["bc80","紑",14,"紡紣紤紥紦紨紩紪紬紭紮細",6,"肌饥迹激讥鸡姬绩缉吉极棘辑籍集及急疾汲即嫉级挤几脊己蓟技冀季伎祭剂悸济寄寂计记既忌际妓继纪嘉枷夹佳家加荚颊贾甲钾假稼价架驾嫁歼监坚尖笺间煎兼肩艰奸缄茧检柬碱硷拣捡简俭剪减荐槛鉴践贱见键箭件"],["bd40","紷",54,"絯",7],["bd80","絸",32,"健舰剑饯渐溅涧建僵姜将浆江疆蒋桨奖讲匠酱降蕉椒礁焦胶交郊浇骄娇嚼搅铰矫侥脚狡角饺缴绞剿教酵轿较叫窖揭接皆秸街阶截劫节桔杰捷睫竭洁结解姐戒藉芥界借介疥诫届巾筋斤金今津襟紧锦仅谨进靳晋禁近烬浸"],["be40","継",12,"綧",6,"綯",42],["be80","線",32,"尽劲荆兢茎睛晶鲸京惊精粳经井警景颈静境敬镜径痉靖竟竞净炯窘揪究纠玖韭久灸九酒厩救旧臼舅咎就疚鞠拘狙疽居驹菊局咀矩举沮聚拒据巨具距踞锯俱句惧炬剧捐鹃娟倦眷卷绢撅攫抉掘倔爵觉决诀绝均菌钧军君峻"],["bf40","緻",62],["bf80","縺縼",4,"繂",4,"繈",21,"俊竣浚郡骏喀咖卡咯开揩楷凯慨刊堪勘坎砍看康慷糠扛抗亢炕考拷烤靠坷苛柯棵磕颗科壳咳可渴克刻客课肯啃垦恳坑吭空恐孔控抠口扣寇枯哭窟苦酷库裤夸垮挎跨胯块筷侩快宽款匡筐狂框矿眶旷况亏盔岿窥葵奎魁傀"],["c040","繞",35,"纃",23,"纜纝纞"],["c080","纮纴纻纼绖绤绬绹缊缐缞缷缹缻",6,"罃罆",9,"罒罓馈愧溃坤昆捆困括扩廓阔垃拉喇蜡腊辣啦莱来赖蓝婪栏拦篮阑兰澜谰揽览懒缆烂滥琅榔狼廊郎朗浪捞劳牢老佬姥酪烙涝勒乐雷镭蕾磊累儡垒擂肋类泪棱楞冷厘梨犁黎篱狸离漓理李里鲤礼莉荔吏栗丽厉励砾历利傈例俐"],["c140","罖罙罛罜罝罞罠罣",4,"罫罬罭罯罰罳罵罶罷罸罺罻罼罽罿羀羂",7,"羋羍羏",4,"羕",4,"羛羜羠羢羣羥羦羨",6,"羱"],["c180","羳",4,"羺羻羾翀翂翃翄翆翇翈翉翋翍翏",4,"翖翗翙",5,"翢翣痢立粒沥隶力璃哩俩联莲连镰廉怜涟帘敛脸链恋炼练粮凉梁粱良两辆量晾亮谅撩聊僚疗燎寥辽潦了撂镣廖料列裂烈劣猎琳林磷霖临邻鳞淋凛赁吝拎玲菱零龄铃伶羚凌灵陵岭领另令溜琉榴硫馏留刘瘤流柳六龙聋咙笼窿"],["c240","翤翧翨翪翫翬翭翯翲翴",6,"翽翾翿耂耇耈耉耊耎耏耑耓耚耛耝耞耟耡耣耤耫",5,"耲耴耹耺耼耾聀聁聄聅聇聈聉聎聏聐聑聓聕聖聗"],["c280","聙聛",13,"聫",5,"聲",11,"隆垄拢陇楼娄搂篓漏陋芦卢颅庐炉掳卤虏鲁麓碌露路赂鹿潞禄录陆戮驴吕铝侣旅履屡缕虑氯律率滤绿峦挛孪滦卵乱掠略抡轮伦仑沦纶论萝螺罗逻锣箩骡裸落洛骆络妈麻玛码蚂马骂嘛吗埋买麦卖迈脉瞒馒蛮满蔓曼慢漫"],["c340","聾肁肂肅肈肊肍",5,"肔肕肗肙肞肣肦肧肨肬肰肳肵肶肸肹肻胅胇",4,"胏",6,"胘胟胠胢胣胦胮胵胷胹胻胾胿脀脁脃脄脅脇脈脋"],["c380","脌脕脗脙脛脜脝脟",12,"脭脮脰脳脴脵脷脹",4,"脿谩芒茫盲氓忙莽猫茅锚毛矛铆卯茂冒帽貌贸么玫枚梅酶霉煤没眉媒镁每美昧寐妹媚门闷们萌蒙檬盟锰猛梦孟眯醚靡糜迷谜弥米秘觅泌蜜密幂棉眠绵冕免勉娩缅面苗描瞄藐秒渺庙妙蔑灭民抿皿敏悯闽明螟鸣铭名命谬摸"],["c440","腀",5,"腇腉腍腎腏腒腖腗腘腛",4,"腡腢腣腤腦腨腪腫腬腯腲腳腵腶腷腸膁膃",4,"膉膋膌膍膎膐膒",5,"膙膚膞",4,"膤膥"],["c480","膧膩膫",7,"膴",5,"膼膽膾膿臄臅臇臈臉臋臍",6,"摹蘑模膜磨摩魔抹末莫墨默沫漠寞陌谋牟某拇牡亩姆母墓暮幕募慕木目睦牧穆拿哪呐钠那娜纳氖乃奶耐奈南男难囊挠脑恼闹淖呢馁内嫩能妮霓倪泥尼拟你匿腻逆溺蔫拈年碾撵捻念娘酿鸟尿捏聂孽啮镊镍涅您柠狞凝宁"],["c540","臔",14,"臤臥臦臨臩臫臮",4,"臵",5,"臽臿舃與",4,"舎舏舑舓舕",5,"舝舠舤舥舦舧舩舮舲舺舼舽舿"],["c580","艀艁艂艃艅艆艈艊艌艍艎艐",7,"艙艛艜艝艞艠",7,"艩拧泞牛扭钮纽脓浓农弄奴努怒女暖虐疟挪懦糯诺哦欧鸥殴藕呕偶沤啪趴爬帕怕琶拍排牌徘湃派攀潘盘磐盼畔判叛乓庞旁耪胖抛咆刨炮袍跑泡呸胚培裴赔陪配佩沛喷盆砰抨烹澎彭蓬棚硼篷膨朋鹏捧碰坯砒霹批披劈琵毗"],["c640","艪艫艬艭艱艵艶艷艸艻艼芀芁芃芅芆芇芉芌芐芓芔芕芖芚芛芞芠芢芣芧芲芵芶芺芻芼芿苀苂苃苅苆苉苐苖苙苚苝苢苧苨苩苪苬苭苮苰苲苳苵苶苸"],["c680","苺苼",4,"茊茋茍茐茒茓茖茘茙茝",9,"茩茪茮茰茲茷茻茽啤脾疲皮匹痞僻屁譬篇偏片骗飘漂瓢票撇瞥拼频贫品聘乒坪苹萍平凭瓶评屏坡泼颇婆破魄迫粕剖扑铺仆莆葡菩蒲埔朴圃普浦谱曝瀑期欺栖戚妻七凄漆柒沏其棋奇歧畦崎脐齐旗祈祁骑起岂乞企启契砌器气迄弃汽泣讫掐"],["c740","茾茿荁荂荄荅荈荊",4,"荓荕",4,"荝荢荰",6,"荹荺荾",6,"莇莈莊莋莌莍莏莐莑莔莕莖莗莙莚莝莟莡",6,"莬莭莮"],["c780","莯莵莻莾莿菂菃菄菆菈菉菋菍菎菐菑菒菓菕菗菙菚菛菞菢菣菤菦菧菨菫菬菭恰洽牵扦钎铅千迁签仟谦乾黔钱钳前潜遣浅谴堑嵌欠歉枪呛腔羌墙蔷强抢橇锹敲悄桥瞧乔侨巧鞘撬翘峭俏窍切茄且怯窃钦侵亲秦琴勤芹擒禽寝沁青轻氢倾卿清擎晴氰情顷请庆琼穷秋丘邱球求囚酋泅趋区蛆曲躯屈驱渠"],["c840","菮華菳",4,"菺菻菼菾菿萀萂萅萇萈萉萊萐萒",5,"萙萚萛萞",5,"萩",7,"萲",5,"萹萺萻萾",7,"葇葈葉"],["c880","葊",6,"葒",4,"葘葝葞葟葠葢葤",4,"葪葮葯葰葲葴葷葹葻葼取娶龋趣去圈颧权醛泉全痊拳犬券劝缺炔瘸却鹊榷确雀裙群然燃冉染瓤壤攘嚷让饶扰绕惹热壬仁人忍韧任认刃妊纫扔仍日戎茸蓉荣融熔溶容绒冗揉柔肉茹蠕儒孺如辱乳汝入褥软阮蕊瑞锐闰润若弱撒洒萨腮鳃塞赛三叁"],["c940","葽",4,"蒃蒄蒅蒆蒊蒍蒏",7,"蒘蒚蒛蒝蒞蒟蒠蒢",12,"蒰蒱蒳蒵蒶蒷蒻蒼蒾蓀蓂蓃蓅蓆蓇蓈蓋蓌蓎蓏蓒蓔蓕蓗"],["c980","蓘",4,"蓞蓡蓢蓤蓧",4,"蓭蓮蓯蓱",10,"蓽蓾蔀蔁蔂伞散桑嗓丧搔骚扫嫂瑟色涩森僧莎砂杀刹沙纱傻啥煞筛晒珊苫杉山删煽衫闪陕擅赡膳善汕扇缮墒伤商赏晌上尚裳梢捎稍烧芍勺韶少哨邵绍奢赊蛇舌舍赦摄射慑涉社设砷申呻伸身深娠绅神沈审婶甚肾慎渗声生甥牲升绳"],["ca40","蔃",8,"蔍蔎蔏蔐蔒蔔蔕蔖蔘蔙蔛蔜蔝蔞蔠蔢",8,"蔭",9,"蔾",4,"蕄蕅蕆蕇蕋",10],["ca80","蕗蕘蕚蕛蕜蕝蕟",4,"蕥蕦蕧蕩",8,"蕳蕵蕶蕷蕸蕼蕽蕿薀薁省盛剩胜圣师失狮施湿诗尸虱十石拾时什食蚀实识史矢使屎驶始式示士世柿事拭誓逝势是嗜噬适仕侍释饰氏市恃室视试收手首守寿授售受瘦兽蔬枢梳殊抒输叔舒淑疏书赎孰熟薯暑曙署蜀黍鼠属术述树束戍竖墅庶数漱"],["cb40","薂薃薆薈",6,"薐",10,"薝",6,"薥薦薧薩薫薬薭薱",5,"薸薺",6,"藂",6,"藊",4,"藑藒"],["cb80","藔藖",5,"藝",6,"藥藦藧藨藪",14,"恕刷耍摔衰甩帅栓拴霜双爽谁水睡税吮瞬顺舜说硕朔烁斯撕嘶思私司丝死肆寺嗣四伺似饲巳松耸怂颂送宋讼诵搜艘擞嗽苏酥俗素速粟僳塑溯宿诉肃酸蒜算虽隋随绥髓碎岁穗遂隧祟孙损笋蓑梭唆缩琐索锁所塌他它她塔"],["cc40","藹藺藼藽藾蘀",4,"蘆",10,"蘒蘓蘔蘕蘗",15,"蘨蘪",13,"蘹蘺蘻蘽蘾蘿虀"],["cc80","虁",11,"虒虓處",4,"虛虜虝號虠虡虣",7,"獭挞蹋踏胎苔抬台泰酞太态汰坍摊贪瘫滩坛檀痰潭谭谈坦毯袒碳探叹炭汤塘搪堂棠膛唐糖倘躺淌趟烫掏涛滔绦萄桃逃淘陶讨套特藤腾疼誊梯剔踢锑提题蹄啼体替嚏惕涕剃屉天添填田甜恬舔腆挑条迢眺跳贴铁帖厅听烃"],["cd40","虭虯虰虲",6,"蚃",6,"蚎",4,"蚔蚖",5,"蚞",4,"蚥蚦蚫蚭蚮蚲蚳蚷蚸蚹蚻",4,"蛁蛂蛃蛅蛈蛌蛍蛒蛓蛕蛖蛗蛚蛜"],["cd80","蛝蛠蛡蛢蛣蛥蛦蛧蛨蛪蛫蛬蛯蛵蛶蛷蛺蛻蛼蛽蛿蜁蜄蜅蜆蜋蜌蜎蜏蜐蜑蜔蜖汀廷停亭庭挺艇通桐酮瞳同铜彤童桶捅筒统痛偷投头透凸秃突图徒途涂屠土吐兔湍团推颓腿蜕褪退吞屯臀拖托脱鸵陀驮驼椭妥拓唾挖哇蛙洼娃瓦袜歪外豌弯湾玩顽丸烷完碗挽晚皖惋宛婉万腕汪王亡枉网往旺望忘妄威"],["ce40","蜙蜛蜝蜟蜠蜤蜦蜧蜨蜪蜫蜬蜭蜯蜰蜲蜳蜵蜶蜸蜹蜺蜼蜽蝀",6,"蝊蝋蝍蝏蝐蝑蝒蝔蝕蝖蝘蝚",5,"蝡蝢蝦",7,"蝯蝱蝲蝳蝵"],["ce80","蝷蝸蝹蝺蝿螀螁螄螆螇螉螊螌螎",4,"螔螕螖螘",6,"螠",4,"巍微危韦违桅围唯惟为潍维苇萎委伟伪尾纬未蔚味畏胃喂魏位渭谓尉慰卫瘟温蚊文闻纹吻稳紊问嗡翁瓮挝蜗涡窝我斡卧握沃巫呜钨乌污诬屋无芜梧吾吴毋武五捂午舞伍侮坞戊雾晤物勿务悟误昔熙析西硒矽晰嘻吸锡牺"],["cf40","螥螦螧螩螪螮螰螱螲螴螶螷螸螹螻螼螾螿蟁",4,"蟇蟈蟉蟌",4,"蟔",6,"蟜蟝蟞蟟蟡蟢蟣蟤蟦蟧蟨蟩蟫蟬蟭蟯",9],["cf80","蟺蟻蟼蟽蟿蠀蠁蠂蠄",5,"蠋",7,"蠔蠗蠘蠙蠚蠜",4,"蠣稀息希悉膝夕惜熄烯溪汐犀檄袭席习媳喜铣洗系隙戏细瞎虾匣霞辖暇峡侠狭下厦夏吓掀锨先仙鲜纤咸贤衔舷闲涎弦嫌显险现献县腺馅羡宪陷限线相厢镶香箱襄湘乡翔祥详想响享项巷橡像向象萧硝霄削哮嚣销消宵淆晓"],["d040","蠤",13,"蠳",5,"蠺蠻蠽蠾蠿衁衂衃衆",5,"衎",5,"衕衖衘衚",6,"衦衧衪衭衯衱衳衴衵衶衸衹衺"],["d080","衻衼袀袃袆袇袉袊袌袎袏袐袑袓袔袕袗",4,"袝",4,"袣袥",5,"小孝校肖啸笑效楔些歇蝎鞋协挟携邪斜胁谐写械卸蟹懈泄泻谢屑薪芯锌欣辛新忻心信衅星腥猩惺兴刑型形邢行醒幸杏性姓兄凶胸匈汹雄熊休修羞朽嗅锈秀袖绣墟戌需虚嘘须徐许蓄酗叙旭序畜恤絮婿绪续轩喧宣悬旋玄"],["d140","袬袮袯袰袲",4,"袸袹袺袻袽袾袿裀裃裄裇裈裊裋裌裍裏裐裑裓裖裗裚",4,"裠裡裦裧裩",6,"裲裵裶裷裺裻製裿褀褁褃",5],["d180","褉褋",4,"褑褔",4,"褜",4,"褢褣褤褦褧褨褩褬褭褮褯褱褲褳褵褷选癣眩绚靴薛学穴雪血勋熏循旬询寻驯巡殉汛训讯逊迅压押鸦鸭呀丫芽牙蚜崖衙涯雅哑亚讶焉咽阉烟淹盐严研蜒岩延言颜阎炎沿奄掩眼衍演艳堰燕厌砚雁唁彦焰宴谚验殃央鸯秧杨扬佯疡羊洋阳氧仰痒养样漾邀腰妖瑶"],["d240","褸",8,"襂襃襅",24,"襠",5,"襧",19,"襼"],["d280","襽襾覀覂覄覅覇",26,"摇尧遥窑谣姚咬舀药要耀椰噎耶爷野冶也页掖业叶曳腋夜液一壹医揖铱依伊衣颐夷遗移仪胰疑沂宜姨彝椅蚁倚已乙矣以艺抑易邑屹亿役臆逸肄疫亦裔意毅忆义益溢诣议谊译异翼翌绎茵荫因殷音阴姻吟银淫寅饮尹引隐"],["d340","覢",30,"觃觍觓觔觕觗觘觙觛觝觟觠觡觢觤觧觨觩觪觬觭觮觰觱觲觴",6],["d380","觻",4,"訁",5,"計",21,"印英樱婴鹰应缨莹萤营荧蝇迎赢盈影颖硬映哟拥佣臃痈庸雍踊蛹咏泳涌永恿勇用幽优悠忧尤由邮铀犹油游酉有友右佑釉诱又幼迂淤于盂榆虞愚舆余俞逾鱼愉渝渔隅予娱雨与屿禹宇语羽玉域芋郁吁遇喻峪御愈欲狱育誉"],["d440","訞",31,"訿",8,"詉",21],["d480","詟",25,"詺",6,"浴寓裕预豫驭鸳渊冤元垣袁原援辕园员圆猿源缘远苑愿怨院曰约越跃钥岳粤月悦阅耘云郧匀陨允运蕴酝晕韵孕匝砸杂栽哉灾宰载再在咱攒暂赞赃脏葬遭糟凿藻枣早澡蚤躁噪造皂灶燥责择则泽贼怎增憎曾赠扎喳渣札轧"],["d540","誁",7,"誋",7,"誔",46],["d580","諃",32,"铡闸眨栅榨咋乍炸诈摘斋宅窄债寨瞻毡詹粘沾盏斩辗崭展蘸栈占战站湛绽樟章彰漳张掌涨杖丈帐账仗胀瘴障招昭找沼赵照罩兆肇召遮折哲蛰辙者锗蔗这浙珍斟真甄砧臻贞针侦枕疹诊震振镇阵蒸挣睁征狰争怔整拯正政"],["d640","諤",34,"謈",27],["d680","謤謥謧",30,"帧症郑证芝枝支吱蜘知肢脂汁之织职直植殖执值侄址指止趾只旨纸志挚掷至致置帜峙制智秩稚质炙痔滞治窒中盅忠钟衷终种肿重仲众舟周州洲诌粥轴肘帚咒皱宙昼骤珠株蛛朱猪诸诛逐竹烛煮拄瞩嘱主著柱助蛀贮铸筑"],["d740","譆",31,"譧",4,"譭",25],["d780","讇",24,"讬讱讻诇诐诪谉谞住注祝驻抓爪拽专砖转撰赚篆桩庄装妆撞壮状椎锥追赘坠缀谆准捉拙卓桌琢茁酌啄着灼浊兹咨资姿滋淄孜紫仔籽滓子自渍字鬃棕踪宗综总纵邹走奏揍租足卒族祖诅阻组钻纂嘴醉最罪尊遵昨左佐柞做作坐座"],["d840","谸",8,"豂豃豄豅豈豊豋豍",7,"豖豗豘豙豛",5,"豣",6,"豬",6,"豴豵豶豷豻",6,"貃貄貆貇"],["d880","貈貋貍",6,"貕貖貗貙",20,"亍丌兀丐廿卅丕亘丞鬲孬噩丨禺丿匕乇夭爻卮氐囟胤馗毓睾鼗丶亟鼐乜乩亓芈孛啬嘏仄厍厝厣厥厮靥赝匚叵匦匮匾赜卦卣刂刈刎刭刳刿剀剌剞剡剜蒯剽劂劁劐劓冂罔亻仃仉仂仨仡仫仞伛仳伢佤仵伥伧伉伫佞佧攸佚佝"],["d940","貮",62],["d980","賭",32,"佟佗伲伽佶佴侑侉侃侏佾佻侪佼侬侔俦俨俪俅俚俣俜俑俟俸倩偌俳倬倏倮倭俾倜倌倥倨偾偃偕偈偎偬偻傥傧傩傺僖儆僭僬僦僮儇儋仝氽佘佥俎龠汆籴兮巽黉馘冁夔勹匍訇匐凫夙兕亠兖亳衮袤亵脔裒禀嬴蠃羸冫冱冽冼"],["da40","贎",14,"贠赑赒赗赟赥赨赩赪赬赮赯赱赲赸",8,"趂趃趆趇趈趉趌",4,"趒趓趕",9,"趠趡"],["da80","趢趤",12,"趲趶趷趹趻趽跀跁跂跅跇跈跉跊跍跐跒跓跔凇冖冢冥讠讦讧讪讴讵讷诂诃诋诏诎诒诓诔诖诘诙诜诟诠诤诨诩诮诰诳诶诹诼诿谀谂谄谇谌谏谑谒谔谕谖谙谛谘谝谟谠谡谥谧谪谫谮谯谲谳谵谶卩卺阝阢阡阱阪阽阼陂陉陔陟陧陬陲陴隈隍隗隰邗邛邝邙邬邡邴邳邶邺"],["db40","跕跘跙跜跠跡跢跥跦跧跩跭跮跰跱跲跴跶跼跾",6,"踆踇踈踋踍踎踐踑踒踓踕",7,"踠踡踤",4,"踫踭踰踲踳踴踶踷踸踻踼踾"],["db80","踿蹃蹅蹆蹌",4,"蹓",5,"蹚",11,"蹧蹨蹪蹫蹮蹱邸邰郏郅邾郐郄郇郓郦郢郜郗郛郫郯郾鄄鄢鄞鄣鄱鄯鄹酃酆刍奂劢劬劭劾哿勐勖勰叟燮矍廴凵凼鬯厶弁畚巯坌垩垡塾墼壅壑圩圬圪圳圹圮圯坜圻坂坩垅坫垆坼坻坨坭坶坳垭垤垌垲埏垧垴垓垠埕埘埚埙埒垸埴埯埸埤埝"],["dc40","蹳蹵蹷",4,"蹽蹾躀躂躃躄躆躈",6,"躑躒躓躕",6,"躝躟",11,"躭躮躰躱躳",6,"躻",7],["dc80","軃",10,"軏",21,"堋堍埽埭堀堞堙塄堠塥塬墁墉墚墀馨鼙懿艹艽艿芏芊芨芄芎芑芗芙芫芸芾芰苈苊苣芘芷芮苋苌苁芩芴芡芪芟苄苎芤苡茉苷苤茏茇苜苴苒苘茌苻苓茑茚茆茔茕苠苕茜荑荛荜茈莒茼茴茱莛荞茯荏荇荃荟荀茗荠茭茺茳荦荥"],["dd40","軥",62],["dd80","輤",32,"荨茛荩荬荪荭荮莰荸莳莴莠莪莓莜莅荼莶莩荽莸荻莘莞莨莺莼菁萁菥菘堇萘萋菝菽菖萜萸萑萆菔菟萏萃菸菹菪菅菀萦菰菡葜葑葚葙葳蒇蒈葺蒉葸萼葆葩葶蒌蒎萱葭蓁蓍蓐蓦蒽蓓蓊蒿蒺蓠蒡蒹蒴蒗蓥蓣蔌甍蔸蓰蔹蔟蔺"],["de40","轅",32,"轪辀辌辒辝辠辡辢辤辥辦辧辪辬辭辮辯農辳辴辵辷辸辺辻込辿迀迃迆"],["de80","迉",4,"迏迒迖迗迚迠迡迣迧迬迯迱迲迴迵迶迺迻迼迾迿逇逈逌逎逓逕逘蕖蔻蓿蓼蕙蕈蕨蕤蕞蕺瞢蕃蕲蕻薤薨薇薏蕹薮薜薅薹薷薰藓藁藜藿蘧蘅蘩蘖蘼廾弈夼奁耷奕奚奘匏尢尥尬尴扌扪抟抻拊拚拗拮挢拶挹捋捃掭揶捱捺掎掴捭掬掊捩掮掼揲揸揠揿揄揞揎摒揆掾摅摁搋搛搠搌搦搡摞撄摭撖"],["df40","這逜連逤逥逧",5,"逰",4,"逷逹逺逽逿遀遃遅遆遈",4,"過達違遖遙遚遜",5,"遤遦遧適遪遫遬遯",4,"遶",6,"遾邁"],["df80","還邅邆邇邉邊邌",4,"邒邔邖邘邚邜邞邟邠邤邥邧邨邩邫邭邲邷邼邽邿郀摺撷撸撙撺擀擐擗擤擢攉攥攮弋忒甙弑卟叱叽叩叨叻吒吖吆呋呒呓呔呖呃吡呗呙吣吲咂咔呷呱呤咚咛咄呶呦咝哐咭哂咴哒咧咦哓哔呲咣哕咻咿哌哙哚哜咩咪咤哝哏哞唛哧唠哽唔哳唢唣唏唑唧唪啧喏喵啉啭啁啕唿啐唼"],["e040","郂郃郆郈郉郋郌郍郒郔郕郖郘郙郚郞郟郠郣郤郥郩郪郬郮郰郱郲郳郵郶郷郹郺郻郼郿鄀鄁鄃鄅",19,"鄚鄛鄜"],["e080","鄝鄟鄠鄡鄤",10,"鄰鄲",6,"鄺",8,"酄唷啖啵啶啷唳唰啜喋嗒喃喱喹喈喁喟啾嗖喑啻嗟喽喾喔喙嗪嗷嗉嘟嗑嗫嗬嗔嗦嗝嗄嗯嗥嗲嗳嗌嗍嗨嗵嗤辔嘞嘈嘌嘁嘤嘣嗾嘀嘧嘭噘嘹噗嘬噍噢噙噜噌噔嚆噤噱噫噻噼嚅嚓嚯囔囗囝囡囵囫囹囿圄圊圉圜帏帙帔帑帱帻帼"],["e140","酅酇酈酑酓酔酕酖酘酙酛酜酟酠酦酧酨酫酭酳酺酻酼醀",4,"醆醈醊醎醏醓",6,"醜",5,"醤",5,"醫醬醰醱醲醳醶醷醸醹醻"],["e180","醼",10,"釈釋釐釒",9,"針",8,"帷幄幔幛幞幡岌屺岍岐岖岈岘岙岑岚岜岵岢岽岬岫岱岣峁岷峄峒峤峋峥崂崃崧崦崮崤崞崆崛嵘崾崴崽嵬嵛嵯嵝嵫嵋嵊嵩嵴嶂嶙嶝豳嶷巅彳彷徂徇徉後徕徙徜徨徭徵徼衢彡犭犰犴犷犸狃狁狎狍狒狨狯狩狲狴狷猁狳猃狺"],["e240","釦",62],["e280","鈥",32,"狻猗猓猡猊猞猝猕猢猹猥猬猸猱獐獍獗獠獬獯獾舛夥飧夤夂饣饧",5,"饴饷饽馀馄馇馊馍馐馑馓馔馕庀庑庋庖庥庠庹庵庾庳赓廒廑廛廨廪膺忄忉忖忏怃忮怄忡忤忾怅怆忪忭忸怙怵怦怛怏怍怩怫怊怿怡恸恹恻恺恂"],["e340","鉆",45,"鉵",16],["e380","銆",7,"銏",24,"恪恽悖悚悭悝悃悒悌悛惬悻悱惝惘惆惚悴愠愦愕愣惴愀愎愫慊慵憬憔憧憷懔懵忝隳闩闫闱闳闵闶闼闾阃阄阆阈阊阋阌阍阏阒阕阖阗阙阚丬爿戕氵汔汜汊沣沅沐沔沌汨汩汴汶沆沩泐泔沭泷泸泱泗沲泠泖泺泫泮沱泓泯泾"],["e440","銨",5,"銯",24,"鋉",31],["e480","鋩",32,"洹洧洌浃浈洇洄洙洎洫浍洮洵洚浏浒浔洳涑浯涞涠浞涓涔浜浠浼浣渚淇淅淞渎涿淠渑淦淝淙渖涫渌涮渫湮湎湫溲湟溆湓湔渲渥湄滟溱溘滠漭滢溥溧溽溻溷滗溴滏溏滂溟潢潆潇漤漕滹漯漶潋潴漪漉漩澉澍澌潸潲潼潺濑"],["e540","錊",51,"錿",10],["e580","鍊",31,"鍫濉澧澹澶濂濡濮濞濠濯瀚瀣瀛瀹瀵灏灞宀宄宕宓宥宸甯骞搴寤寮褰寰蹇謇辶迓迕迥迮迤迩迦迳迨逅逄逋逦逑逍逖逡逵逶逭逯遄遑遒遐遨遘遢遛暹遴遽邂邈邃邋彐彗彖彘尻咫屐屙孱屣屦羼弪弩弭艴弼鬻屮妁妃妍妩妪妣"],["e640","鍬",34,"鎐",27],["e680","鎬",29,"鏋鏌鏍妗姊妫妞妤姒妲妯姗妾娅娆姝娈姣姘姹娌娉娲娴娑娣娓婀婧婊婕娼婢婵胬媪媛婷婺媾嫫媲嫒嫔媸嫠嫣嫱嫖嫦嫘嫜嬉嬗嬖嬲嬷孀尕尜孚孥孳孑孓孢驵驷驸驺驿驽骀骁骅骈骊骐骒骓骖骘骛骜骝骟骠骢骣骥骧纟纡纣纥纨纩"],["e740","鏎",7,"鏗",54],["e780","鐎",32,"纭纰纾绀绁绂绉绋绌绐绔绗绛绠绡绨绫绮绯绱绲缍绶绺绻绾缁缂缃缇缈缋缌缏缑缒缗缙缜缛缟缡",6,"缪缫缬缭缯",4,"缵幺畿巛甾邕玎玑玮玢玟珏珂珑玷玳珀珉珈珥珙顼琊珩珧珞玺珲琏琪瑛琦琥琨琰琮琬"],["e840","鐯",14,"鐿",43,"鑬鑭鑮鑯"],["e880","鑰",20,"钑钖钘铇铏铓铔铚铦铻锜锠琛琚瑁瑜瑗瑕瑙瑷瑭瑾璜璎璀璁璇璋璞璨璩璐璧瓒璺韪韫韬杌杓杞杈杩枥枇杪杳枘枧杵枨枞枭枋杷杼柰栉柘栊柩枰栌柙枵柚枳柝栀柃枸柢栎柁柽栲栳桠桡桎桢桄桤梃栝桕桦桁桧桀栾桊桉栩梵梏桴桷梓桫棂楮棼椟椠棹"],["e940","锧锳锽镃镈镋镕镚镠镮镴镵長",7,"門",42],["e980","閫",32,"椤棰椋椁楗棣椐楱椹楠楂楝榄楫榀榘楸椴槌榇榈槎榉楦楣楹榛榧榻榫榭槔榱槁槊槟榕槠榍槿樯槭樗樘橥槲橄樾檠橐橛樵檎橹樽樨橘橼檑檐檩檗檫猷獒殁殂殇殄殒殓殍殚殛殡殪轫轭轱轲轳轵轶轸轷轹轺轼轾辁辂辄辇辋"],["ea40","闌",27,"闬闿阇阓阘阛阞阠阣",6,"阫阬阭阯阰阷阸阹阺阾陁陃陊陎陏陑陒陓陖陗"],["ea80","陘陙陚陜陝陞陠陣陥陦陫陭",4,"陳陸",12,"隇隉隊辍辎辏辘辚軎戋戗戛戟戢戡戥戤戬臧瓯瓴瓿甏甑甓攴旮旯旰昊昙杲昃昕昀炅曷昝昴昱昶昵耆晟晔晁晏晖晡晗晷暄暌暧暝暾曛曜曦曩贲贳贶贻贽赀赅赆赈赉赇赍赕赙觇觊觋觌觎觏觐觑牮犟牝牦牯牾牿犄犋犍犏犒挈挲掰"],["eb40","隌階隑隒隓隕隖隚際隝",9,"隨",7,"隱隲隴隵隷隸隺隻隿雂雃雈雊雋雐雑雓雔雖",9,"雡",6,"雫"],["eb80","雬雭雮雰雱雲雴雵雸雺電雼雽雿霂霃霅霊霋霌霐霑霒霔霕霗",4,"霝霟霠搿擘耄毪毳毽毵毹氅氇氆氍氕氘氙氚氡氩氤氪氲攵敕敫牍牒牖爰虢刖肟肜肓肼朊肽肱肫肭肴肷胧胨胩胪胛胂胄胙胍胗朐胝胫胱胴胭脍脎胲胼朕脒豚脶脞脬脘脲腈腌腓腴腙腚腱腠腩腼腽腭腧塍媵膈膂膑滕膣膪臌朦臊膻"],["ec40","霡",8,"霫霬霮霯霱霳",4,"霺霻霼霽霿",18,"靔靕靗靘靚靜靝靟靣靤靦靧靨靪",7],["ec80","靲靵靷",4,"靽",7,"鞆",4,"鞌鞎鞏鞐鞓鞕鞖鞗鞙",4,"臁膦欤欷欹歃歆歙飑飒飓飕飙飚殳彀毂觳斐齑斓於旆旄旃旌旎旒旖炀炜炖炝炻烀炷炫炱烨烊焐焓焖焯焱煳煜煨煅煲煊煸煺熘熳熵熨熠燠燔燧燹爝爨灬焘煦熹戾戽扃扈扉礻祀祆祉祛祜祓祚祢祗祠祯祧祺禅禊禚禧禳忑忐"],["ed40","鞞鞟鞡鞢鞤",6,"鞬鞮鞰鞱鞳鞵",46],["ed80","韤韥韨韮",4,"韴韷",23,"怼恝恚恧恁恙恣悫愆愍慝憩憝懋懑戆肀聿沓泶淼矶矸砀砉砗砘砑斫砭砜砝砹砺砻砟砼砥砬砣砩硎硭硖硗砦硐硇硌硪碛碓碚碇碜碡碣碲碹碥磔磙磉磬磲礅磴礓礤礞礴龛黹黻黼盱眄眍盹眇眈眚眢眙眭眦眵眸睐睑睇睃睚睨"],["ee40","頏",62],["ee80","顎",32,"睢睥睿瞍睽瞀瞌瞑瞟瞠瞰瞵瞽町畀畎畋畈畛畲畹疃罘罡罟詈罨罴罱罹羁罾盍盥蠲钅钆钇钋钊钌钍钏钐钔钗钕钚钛钜钣钤钫钪钭钬钯钰钲钴钶",4,"钼钽钿铄铈",6,"铐铑铒铕铖铗铙铘铛铞铟铠铢铤铥铧铨铪"],["ef40","顯",5,"颋颎颒颕颙颣風",37,"飏飐飔飖飗飛飜飝飠",4],["ef80","飥飦飩",30,"铩铫铮铯铳铴铵铷铹铼铽铿锃锂锆锇锉锊锍锎锏锒",4,"锘锛锝锞锟锢锪锫锩锬锱锲锴锶锷锸锼锾锿镂锵镄镅镆镉镌镎镏镒镓镔镖镗镘镙镛镞镟镝镡镢镤",8,"镯镱镲镳锺矧矬雉秕秭秣秫稆嵇稃稂稞稔"],["f040","餈",4,"餎餏餑",28,"餯",26],["f080","饊",9,"饖",12,"饤饦饳饸饹饻饾馂馃馉稹稷穑黏馥穰皈皎皓皙皤瓞瓠甬鸠鸢鸨",4,"鸲鸱鸶鸸鸷鸹鸺鸾鹁鹂鹄鹆鹇鹈鹉鹋鹌鹎鹑鹕鹗鹚鹛鹜鹞鹣鹦",6,"鹱鹭鹳疒疔疖疠疝疬疣疳疴疸痄疱疰痃痂痖痍痣痨痦痤痫痧瘃痱痼痿瘐瘀瘅瘌瘗瘊瘥瘘瘕瘙"],["f140","馌馎馚",10,"馦馧馩",47],["f180","駙",32,"瘛瘼瘢瘠癀瘭瘰瘿瘵癃瘾瘳癍癞癔癜癖癫癯翊竦穸穹窀窆窈窕窦窠窬窨窭窳衤衩衲衽衿袂袢裆袷袼裉裢裎裣裥裱褚裼裨裾裰褡褙褓褛褊褴褫褶襁襦襻疋胥皲皴矜耒耔耖耜耠耢耥耦耧耩耨耱耋耵聃聆聍聒聩聱覃顸颀颃"],["f240","駺",62],["f280","騹",32,"颉颌颍颏颔颚颛颞颟颡颢颥颦虍虔虬虮虿虺虼虻蚨蚍蚋蚬蚝蚧蚣蚪蚓蚩蚶蛄蚵蛎蚰蚺蚱蚯蛉蛏蚴蛩蛱蛲蛭蛳蛐蜓蛞蛴蛟蛘蛑蜃蜇蛸蜈蜊蜍蜉蜣蜻蜞蜥蜮蜚蜾蝈蜴蜱蜩蜷蜿螂蜢蝽蝾蝻蝠蝰蝌蝮螋蝓蝣蝼蝤蝙蝥螓螯螨蟒"],["f340","驚",17,"驲骃骉骍骎骔骕骙骦骩",6,"骲骳骴骵骹骻骽骾骿髃髄髆",4,"髍髎髏髐髒體髕髖髗髙髚髛髜"],["f380","髝髞髠髢髣髤髥髧髨髩髪髬髮髰",8,"髺髼",6,"鬄鬅鬆蟆螈螅螭螗螃螫蟥螬螵螳蟋蟓螽蟑蟀蟊蟛蟪蟠蟮蠖蠓蟾蠊蠛蠡蠹蠼缶罂罄罅舐竺竽笈笃笄笕笊笫笏筇笸笪笙笮笱笠笥笤笳笾笞筘筚筅筵筌筝筠筮筻筢筲筱箐箦箧箸箬箝箨箅箪箜箢箫箴篑篁篌篝篚篥篦篪簌篾篼簏簖簋"],["f440","鬇鬉",5,"鬐鬑鬒鬔",10,"鬠鬡鬢鬤",10,"鬰鬱鬳",7,"鬽鬾鬿魀魆魊魋魌魎魐魒魓魕",5],["f480","魛",32,"簟簪簦簸籁籀臾舁舂舄臬衄舡舢舣舭舯舨舫舸舻舳舴舾艄艉艋艏艚艟艨衾袅袈裘裟襞羝羟羧羯羰羲籼敉粑粝粜粞粢粲粼粽糁糇糌糍糈糅糗糨艮暨羿翎翕翥翡翦翩翮翳糸絷綦綮繇纛麸麴赳趄趔趑趱赧赭豇豉酊酐酎酏酤"],["f540","魼",62],["f580","鮻",32,"酢酡酰酩酯酽酾酲酴酹醌醅醐醍醑醢醣醪醭醮醯醵醴醺豕鹾趸跫踅蹙蹩趵趿趼趺跄跖跗跚跞跎跏跛跆跬跷跸跣跹跻跤踉跽踔踝踟踬踮踣踯踺蹀踹踵踽踱蹉蹁蹂蹑蹒蹊蹰蹶蹼蹯蹴躅躏躔躐躜躞豸貂貊貅貘貔斛觖觞觚觜"],["f640","鯜",62],["f680","鰛",32,"觥觫觯訾謦靓雩雳雯霆霁霈霏霎霪霭霰霾龀龃龅",5,"龌黾鼋鼍隹隼隽雎雒瞿雠銎銮鋈錾鍪鏊鎏鐾鑫鱿鲂鲅鲆鲇鲈稣鲋鲎鲐鲑鲒鲔鲕鲚鲛鲞",5,"鲥",4,"鲫鲭鲮鲰",7,"鲺鲻鲼鲽鳄鳅鳆鳇鳊鳋"],["f740","鰼",62],["f780","鱻鱽鱾鲀鲃鲄鲉鲊鲌鲏鲓鲖鲗鲘鲙鲝鲪鲬鲯鲹鲾",4,"鳈鳉鳑鳒鳚鳛鳠鳡鳌",4,"鳓鳔鳕鳗鳘鳙鳜鳝鳟鳢靼鞅鞑鞒鞔鞯鞫鞣鞲鞴骱骰骷鹘骶骺骼髁髀髅髂髋髌髑魅魃魇魉魈魍魑飨餍餮饕饔髟髡髦髯髫髻髭髹鬈鬏鬓鬟鬣麽麾縻麂麇麈麋麒鏖麝麟黛黜黝黠黟黢黩黧黥黪黯鼢鼬鼯鼹鼷鼽鼾齄"],["f840","鳣",62],["f880","鴢",32],["f940","鵃",62],["f980","鶂",32],["fa40","鶣",62],["fa80","鷢",32],["fb40","鸃",27,"鸤鸧鸮鸰鸴鸻鸼鹀鹍鹐鹒鹓鹔鹖鹙鹝鹟鹠鹡鹢鹥鹮鹯鹲鹴",9,"麀"],["fb80","麁麃麄麅麆麉麊麌",5,"麔",8,"麞麠",5,"麧麨麩麪"],["fc40","麫",8,"麵麶麷麹麺麼麿",4,"黅黆黇黈黊黋黌黐黒黓黕黖黗黙黚點黡黣黤黦黨黫黬黭黮黰",8,"黺黽黿",6],["fc80","鼆",4,"鼌鼏鼑鼒鼔鼕鼖鼘鼚",5,"鼡鼣",8,"鼭鼮鼰鼱"],["fd40","鼲",4,"鼸鼺鼼鼿",4,"齅",10,"齒",38],["fd80","齹",5,"龁龂龍",11,"龜龝龞龡",4,"郎凉秊裏隣"],["fe40","兀嗀﨎﨏﨑﨓﨔礼﨟蘒﨡﨣﨤﨧﨨﨩"]]
 
 /***/ }),
-/* 60 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer, global) {
@@ -14662,7 +14828,7 @@ Body.Promise = global.Promise;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(3)))
 
 /***/ }),
-/* 61 */
+/* 62 */
 /***/ (function(module, exports) {
 
 
@@ -14809,7 +14975,7 @@ Headers.prototype.raw = function() {
 
 
 /***/ }),
-/* 62 */
+/* 63 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14823,9 +14989,9 @@ Headers.prototype.raw = function() {
 
 
 const assert = __webpack_require__(1);
-const Entity = __webpack_require__(42);
-const Type = __webpack_require__(9);
-const Symbols = __webpack_require__(45);
+const Entity = __webpack_require__(43);
+const Type = __webpack_require__(10);
+const Symbols = __webpack_require__(46);
 
 // TODO: Should relations normalized by another layer, or here?
 class Relation extends Entity {
@@ -14846,7 +15012,7 @@ module.exports = Relation;
 
 
 /***/ }),
-/* 63 */
+/* 64 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14862,17 +15028,18 @@ module.exports = Relation;
 
 
 const assert = __webpack_require__(1);
-const view = __webpack_require__(46);
-const Symbols = __webpack_require__(45);
-const Entity = __webpack_require__(42);
+const view = __webpack_require__(47);
+const Symbols = __webpack_require__(46);
+const Entity = __webpack_require__(43);
 const Schema = __webpack_require__(21);
-const Type = __webpack_require__(9);
-const Relation = __webpack_require__(62);
+const Type = __webpack_require__(10);
+const Relation = __webpack_require__(63);
 
 function testEntityClass(type) {
   return new Schema({
     name: type,
     sections: [],
+    parents: [],
   }).entityClass();
 }
 
@@ -14896,7 +15063,7 @@ Object.assign(exports, {
 
 
 /***/ }),
-/* 64 */
+/* 65 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -14906,9 +15073,9 @@ Object.assign(exports, {
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let RecipeWalker = __webpack_require__(11);
-let Recipe = __webpack_require__(6);
+let {Strategy} = __webpack_require__(6);
+let RecipeWalker = __webpack_require__(8);
+let Recipe = __webpack_require__(4);
 let RecipeUtil = __webpack_require__(17);
 let assert = __webpack_require__(1);
 
@@ -14916,7 +15083,7 @@ class ViewMapperBase extends Strategy {
   async generate(strategizer) {
     var self = this;
 
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onView(recipe, view) {
         if (view.fate !== self.fate)
           return;
@@ -14988,7 +15155,7 @@ module.exports = ViewMapperBase;
 
 
 /***/ }),
-/* 65 */
+/* 66 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var inherits = __webpack_require__(2);
@@ -15110,7 +15277,7 @@ EncoderBuffer.prototype.join = function join(out, offset) {
 
 
 /***/ }),
-/* 66 */
+/* 67 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var constants = exports;
@@ -15135,7 +15302,7 @@ constants.der = __webpack_require__(129);
 
 
 /***/ }),
-/* 67 */
+/* 68 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var inherits = __webpack_require__(2);
@@ -15465,7 +15632,7 @@ function derDecodeLen(buf, primitive, fail) {
 
 
 /***/ }),
-/* 68 */
+/* 69 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var inherits = __webpack_require__(2);
@@ -15766,7 +15933,7 @@ function encodeTag(tag, primitive, cls, reporter) {
 
 
 /***/ }),
-/* 69 */
+/* 70 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var r;
@@ -15824,7 +15991,7 @@ if (typeof self === 'object') {
 } else {
   // Node.js or Web worker with no crypto support
   try {
-    var crypto = __webpack_require__(287);
+    var crypto = __webpack_require__(290);
     if (typeof crypto.randomBytes !== 'function')
       throw new Error('Not supported');
 
@@ -15837,10 +16004,10 @@ if (typeof self === 'object') {
 
 
 /***/ }),
-/* 70 */
+/* 71 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(31)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(32)
 var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
 var GHASH = __webpack_require__(137)
@@ -15941,7 +16108,7 @@ function xorTest (a, b) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 71 */
+/* 72 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var xor = __webpack_require__(24)
@@ -15964,7 +16131,7 @@ exports.decrypt = function (self, block) {
 
 
 /***/ }),
-/* 72 */
+/* 73 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(24)
@@ -16002,7 +16169,7 @@ function encryptStart (self, data, decrypt) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 73 */
+/* 74 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {function encryptByte (self, byteParam, decrypt) {
@@ -16043,7 +16210,7 @@ function shiftIn (buffer, value) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 74 */
+/* 75 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {function encryptByte (self, byteParam, decrypt) {
@@ -16065,7 +16232,7 @@ exports.encrypt = function (self, chunk, decrypt) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 75 */
+/* 76 */
 /***/ (function(module, exports) {
 
 exports.encrypt = function (self, block) {
@@ -16077,7 +16244,7 @@ exports.decrypt = function (self, block) {
 
 
 /***/ }),
-/* 76 */
+/* 77 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var xor = __webpack_require__(24)
@@ -16100,10 +16267,10 @@ exports.encrypt = function (self, chunk) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 77 */
+/* 78 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(31)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(32)
 var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
 
@@ -16132,19 +16299,19 @@ StreamCipher.prototype._final = function () {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 78 */
+/* 79 */
 /***/ (function(module, exports) {
 
 module.exports = {"sha224WithRSAEncryption":{"sign":"rsa","hash":"sha224","id":"302d300d06096086480165030402040500041c"},"RSA-SHA224":{"sign":"ecdsa/rsa","hash":"sha224","id":"302d300d06096086480165030402040500041c"},"sha256WithRSAEncryption":{"sign":"rsa","hash":"sha256","id":"3031300d060960864801650304020105000420"},"RSA-SHA256":{"sign":"ecdsa/rsa","hash":"sha256","id":"3031300d060960864801650304020105000420"},"sha384WithRSAEncryption":{"sign":"rsa","hash":"sha384","id":"3041300d060960864801650304020205000430"},"RSA-SHA384":{"sign":"ecdsa/rsa","hash":"sha384","id":"3041300d060960864801650304020205000430"},"sha512WithRSAEncryption":{"sign":"rsa","hash":"sha512","id":"3051300d060960864801650304020305000440"},"RSA-SHA512":{"sign":"ecdsa/rsa","hash":"sha512","id":"3051300d060960864801650304020305000440"},"RSA-SHA1":{"sign":"rsa","hash":"sha1","id":"3021300906052b0e03021a05000414"},"ecdsa-with-SHA1":{"sign":"ecdsa","hash":"sha1","id":""},"sha256":{"sign":"ecdsa","hash":"sha256","id":""},"sha224":{"sign":"ecdsa","hash":"sha224","id":""},"sha384":{"sign":"ecdsa","hash":"sha384","id":""},"sha512":{"sign":"ecdsa","hash":"sha512","id":""},"DSA-SHA":{"sign":"dsa","hash":"sha1","id":""},"DSA-SHA1":{"sign":"dsa","hash":"sha1","id":""},"DSA":{"sign":"dsa","hash":"sha1","id":""},"DSA-WITH-SHA224":{"sign":"dsa","hash":"sha224","id":""},"DSA-SHA224":{"sign":"dsa","hash":"sha224","id":""},"DSA-WITH-SHA256":{"sign":"dsa","hash":"sha256","id":""},"DSA-SHA256":{"sign":"dsa","hash":"sha256","id":""},"DSA-WITH-SHA384":{"sign":"dsa","hash":"sha384","id":""},"DSA-SHA384":{"sign":"dsa","hash":"sha384","id":""},"DSA-WITH-SHA512":{"sign":"dsa","hash":"sha512","id":""},"DSA-SHA512":{"sign":"dsa","hash":"sha512","id":""},"DSA-RIPEMD160":{"sign":"dsa","hash":"rmd160","id":""},"ripemd160WithRSA":{"sign":"rsa","hash":"rmd160","id":"3021300906052b2403020105000414"},"RSA-RIPEMD160":{"sign":"rsa","hash":"rmd160","id":"3021300906052b2403020105000414"},"md5WithRSAEncryption":{"sign":"rsa","hash":"md5","id":"3020300c06082a864886f70d020505000410"},"RSA-MD5":{"sign":"rsa","hash":"md5","id":"3020300c06082a864886f70d020505000410"}}
 
 /***/ }),
-/* 79 */
+/* 80 */
 /***/ (function(module, exports) {
 
 module.exports = {"1.3.132.0.10":"secp256k1","1.3.132.0.33":"p224","1.2.840.10045.3.1.1":"p192","1.2.840.10045.3.1.7":"p256","1.3.132.0.34":"p384","1.3.132.0.35":"p521"}
 
 /***/ }),
-/* 80 */
+/* 81 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -16153,7 +16320,7 @@ var inherits = __webpack_require__(2)
 var Legacy = __webpack_require__(150)
 var Base = __webpack_require__(15)
 var Buffer = __webpack_require__(14).Buffer
-var md5 = __webpack_require__(34)
+var md5 = __webpack_require__(35)
 var RIPEMD160 = __webpack_require__(55)
 
 var sha = __webpack_require__(56)
@@ -16213,16 +16380,16 @@ module.exports = function createHmac (alg, key) {
 
 
 /***/ }),
-/* 81 */
+/* 82 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var randomBytes = __webpack_require__(28);
 module.exports = findPrime;
 findPrime.simpleSieve = simpleSieve;
 findPrime.fermatTest = fermatTest;
-var BN = __webpack_require__(4);
+var BN = __webpack_require__(5);
 var TWENTYFOUR = new BN(24);
-var MillerRabin = __webpack_require__(86);
+var MillerRabin = __webpack_require__(87);
 var millerRabin = new MillerRabin();
 var ONE = new BN(1);
 var TWO = new BN(2);
@@ -16324,7 +16491,7 @@ function findPrime(bits, gen) {
 
 
 /***/ }),
-/* 82 */
+/* 83 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -16332,8 +16499,8 @@ function findPrime(bits, gen) {
 
 var utils = __webpack_require__(13);
 var common = __webpack_require__(27);
-var shaCommon = __webpack_require__(84);
-var assert = __webpack_require__(10);
+var shaCommon = __webpack_require__(85);
+var assert = __webpack_require__(11);
 
 var sum32 = utils.sum32;
 var sum32_4 = utils.sum32_4;
@@ -16436,7 +16603,7 @@ SHA256.prototype._digest = function digest(enc) {
 
 
 /***/ }),
-/* 83 */
+/* 84 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -16444,7 +16611,7 @@ SHA256.prototype._digest = function digest(enc) {
 
 var utils = __webpack_require__(13);
 var common = __webpack_require__(27);
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 
 var rotr64_hi = utils.rotr64_hi;
 var rotr64_lo = utils.rotr64_lo;
@@ -16773,7 +16940,7 @@ function g1_512_lo(xh, xl) {
 
 
 /***/ }),
-/* 84 */
+/* 85 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -16829,7 +16996,7 @@ exports.g1_256 = g1_256;
 
 
 /***/ }),
-/* 85 */
+/* 86 */
 /***/ (function(module, exports) {
 
 var toString = {}.toString;
@@ -16840,11 +17007,11 @@ module.exports = Array.isArray || function (arr) {
 
 
 /***/ }),
-/* 86 */
+/* 87 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var bn = __webpack_require__(4);
-var brorand = __webpack_require__(69);
+var bn = __webpack_require__(5);
+var brorand = __webpack_require__(70);
 
 function MillerRabin(rand) {
   this.rand = rand || new brorand.Rand();
@@ -16959,7 +17126,7 @@ MillerRabin.prototype.getDivisor = function getDivisor(n, k) {
 
 
 /***/ }),
-/* 87 */
+/* 88 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17024,7 +17191,7 @@ utils.encode = function encode(arr, enc) {
 
 
 /***/ }),
-/* 88 */
+/* 89 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17063,7 +17230,7 @@ module.exports = adler32;
 
 
 /***/ }),
-/* 89 */
+/* 90 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17111,7 +17278,7 @@ module.exports = crc32;
 
 
 /***/ }),
-/* 90 */
+/* 91 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17131,7 +17298,7 @@ module.exports = {
 
 
 /***/ }),
-/* 91 */
+/* 92 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {// Copyright Joyent, Inc. and other Node contributors.
@@ -17359,20 +17526,20 @@ var substr = 'ab'.substr(-1) === 'b'
     }
 ;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
 
 /***/ }),
-/* 92 */
+/* 93 */
 /***/ (function(module, exports, __webpack_require__) {
 
 
 exports.pbkdf2 = __webpack_require__(196)
 
-exports.pbkdf2Sync = __webpack_require__(95)
+exports.pbkdf2Sync = __webpack_require__(96)
 
 
 /***/ }),
-/* 93 */
+/* 94 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {var defaultEncoding
@@ -17386,10 +17553,10 @@ if (process.browser) {
 }
 module.exports = defaultEncoding
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
 
 /***/ }),
-/* 94 */
+/* 95 */
 /***/ (function(module, exports) {
 
 var MAX_ALLOC = Math.pow(2, 30) - 1 // default in iojs
@@ -17413,15 +17580,15 @@ module.exports = function (iterations, keylen) {
 
 
 /***/ }),
-/* 95 */
+/* 96 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var md5 = __webpack_require__(34)
+var md5 = __webpack_require__(35)
 var rmd160 = __webpack_require__(55)
 var sha = __webpack_require__(56)
 
-var checkParameters = __webpack_require__(94)
-var defaultEncoding = __webpack_require__(93)
+var checkParameters = __webpack_require__(95)
+var defaultEncoding = __webpack_require__(94)
 var Buffer = __webpack_require__(14).Buffer
 var ZEROS = Buffer.alloc(128)
 var sizes = {
@@ -17520,7 +17687,7 @@ module.exports = pbkdf2
 
 
 /***/ }),
-/* 96 */
+/* 97 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var createHash = __webpack_require__(26);
@@ -17542,10 +17709,10 @@ function i2ops(c) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 97 */
+/* 98 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var bn = __webpack_require__(4);
+/* WEBPACK VAR INJECTION */(function(Buffer) {var bn = __webpack_require__(5);
 function withPublic(paddedMsg, key) {
   return new Buffer(paddedMsg
     .toRed(bn.mont(key.modulus))
@@ -17558,7 +17725,7 @@ module.exports = withPublic;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 98 */
+/* 99 */
 /***/ (function(module, exports) {
 
 module.exports = function xor(a, b) {
@@ -17571,7 +17738,7 @@ module.exports = function xor(a, b) {
 };
 
 /***/ }),
-/* 99 */
+/* 100 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17600,13 +17767,13 @@ module.exports = function xor(a, b) {
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(40);
+var processNextTick = __webpack_require__(41);
 /*</replacement>*/
 
 module.exports = Readable;
 
 /*<replacement>*/
-var isArray = __webpack_require__(85);
+var isArray = __webpack_require__(86);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -17624,7 +17791,7 @@ var EElistenerCount = function (emitter, type) {
 /*</replacement>*/
 
 /*<replacement>*/
-var Stream = __webpack_require__(102);
+var Stream = __webpack_require__(103);
 /*</replacement>*/
 
 // TODO(bmeurer): Change this back to const once hole checks are
@@ -17646,7 +17813,7 @@ util.inherits = __webpack_require__(2);
 /*</replacement>*/
 
 /*<replacement>*/
-var debugUtil = __webpack_require__(288);
+var debugUtil = __webpack_require__(291);
 var debug = void 0;
 if (debugUtil && debugUtil.debuglog) {
   debug = debugUtil.debuglog('stream');
@@ -17656,7 +17823,7 @@ if (debugUtil && debugUtil.debuglog) {
 /*</replacement>*/
 
 var BufferList = __webpack_require__(206);
-var destroyImpl = __webpack_require__(101);
+var destroyImpl = __webpack_require__(102);
 var StringDecoder;
 
 util.inherits(Readable, Stream);
@@ -17739,7 +17906,7 @@ function ReadableState(options, stream) {
   this.decoder = null;
   this.encoding = null;
   if (options.encoding) {
-    if (!StringDecoder) StringDecoder = __webpack_require__(37).StringDecoder;
+    if (!StringDecoder) StringDecoder = __webpack_require__(38).StringDecoder;
     this.decoder = new StringDecoder(options.encoding);
     this.encoding = options.encoding;
   }
@@ -17895,7 +18062,7 @@ Readable.prototype.isPaused = function () {
 
 // backwards compatibility.
 Readable.prototype.setEncoding = function (enc) {
-  if (!StringDecoder) StringDecoder = __webpack_require__(37).StringDecoder;
+  if (!StringDecoder) StringDecoder = __webpack_require__(38).StringDecoder;
   this._readableState.decoder = new StringDecoder(enc);
   this._readableState.encoding = enc;
   return this;
@@ -18582,10 +18749,10 @@ function indexOf(xs, x) {
   }
   return -1;
 }
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
-/* 100 */
+/* 101 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18805,7 +18972,7 @@ function done(stream, er, data) {
 }
 
 /***/ }),
-/* 101 */
+/* 102 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18813,7 +18980,7 @@ function done(stream, er, data) {
 
 /*<replacement>*/
 
-var processNextTick = __webpack_require__(40);
+var processNextTick = __webpack_require__(41);
 /*</replacement>*/
 
 // undocumented cb() API, needed for core, not for public API
@@ -18883,21 +19050,21 @@ module.exports = {
 };
 
 /***/ }),
-/* 102 */
+/* 103 */
 /***/ (function(module, exports, __webpack_require__) {
 
 module.exports = __webpack_require__(51).EventEmitter;
 
 
 /***/ }),
-/* 103 */
+/* 104 */
 /***/ (function(module, exports, __webpack_require__) {
 
 module.exports = __webpack_require__(29).Transform
 
 
 /***/ }),
-/* 104 */
+/* 105 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {/**
@@ -19038,7 +19205,7 @@ module.exports = Sha256
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 105 */
+/* 106 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var inherits = __webpack_require__(2)
@@ -19304,7 +19471,7 @@ module.exports = Sha512
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer))
 
 /***/ }),
-/* 106 */
+/* 107 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {exports.fetch = isFunction(global.fetch) && isFunction(global.ReadableStream)
@@ -19380,7 +19547,7 @@ xhr = null // Help gc
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
 
 /***/ }),
-/* 107 */
+/* 108 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var indexOf = __webpack_require__(184);
@@ -19524,7 +19691,7 @@ exports.createContext = Script.createContext = function (context) {
 
 
 /***/ }),
-/* 108 */
+/* 109 */
 /***/ (function(module, exports) {
 
 module.exports = function(module) {
@@ -19552,7 +19719,7 @@ module.exports = function(module) {
 
 
 /***/ }),
-/* 109 */
+/* 110 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -19568,7 +19735,8 @@ module.exports = function(module) {
 
 
 const assert = __webpack_require__(1);
-const ParticleSpec = __webpack_require__(43);
+const ParticleSpec = __webpack_require__(44);
+const Type = __webpack_require__(10);
 
 class ThingMapper {
   constructor(prefix) {
@@ -19790,7 +19958,7 @@ class PECOuterPort extends APIPort {
       {spec: this.ByLiteral(ParticleSpec), views: this.Map(this.Direct, this.Mapped)});
 
     this.registerCall("UIEvent", {particle: this.Mapped, slotName: this.Direct, event: this.Direct});
-    this.registerCall("ViewCallback", {callback: this.Direct, data: this.Direct});
+    this.registerCall("SimpleCallback", {callback: this.Direct, data: this.Direct});
     this.registerCall("AwaitIdle", {version: this.Direct});
     this.registerCall("StartRender", {particle: this.Mapped, slotName: this.Direct, contentTypes: this.List(this.Direct)});
     this.registerCall("StopRender", {particle: this.Mapped, slotName: this.Direct});
@@ -19808,7 +19976,12 @@ class PECOuterPort extends APIPort {
     this.registerHandler("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
     this.registerHandler("ConstructInnerArc", {callback: this.Direct, particle: this.Mapped});
-    this.registerCall("ParticleCallback", {callback: this.Direct});
+    this.registerCall("ConstructArcCallback", {callback: this.Direct, arc: this.LocalMapped});
+
+    this.registerHandler("ArcCreateView", {callback: this.Direct, arc: this.LocalMapped, viewType: this.ByLiteral(Type), name: this.Direct});
+    this.registerInitializer("CreateViewCallback", {callback: this.Direct, viewType: this.Direct, name: this.Direct, id: this.Direct});
+
+    this.registerHandler("ArcLoadRecipe", {arc: this.LocalMapped, recipe: this.Direct, callback: this.Direct});
   }
 }
 
@@ -19825,7 +19998,7 @@ class PECInnerPort extends APIPort {
       {spec: this.ByLiteral(ParticleSpec), views: this.Map(this.Direct, this.Mapped)});
 
     this.registerHandler("UIEvent", {particle: this.Mapped, slotName: this.Direct, event: this.Direct});
-    this.registerHandler("ViewCallback", {callback: this.LocalMapped, data: this.Direct});
+    this.registerHandler("SimpleCallback", {callback: this.LocalMapped, data: this.Direct});
     this.registerHandler("AwaitIdle", {version: this.Direct});
     this.registerHandler("StartRender", {particle: this.Mapped, slotName: this.Direct, contentTypes: this.Direct});
     this.registerHandler("StopRender", {particle: this.Mapped, slotName: this.Direct});
@@ -19843,7 +20016,12 @@ class PECInnerPort extends APIPort {
     this.registerCall("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
     this.registerCall("ConstructInnerArc", {callback: this.LocalMapped, particle: this.Mapped});
-    this.registerHandler("ParticleCallback", {callback: this.LocalMapped});
+    this.registerHandler("ConstructArcCallback", {callback: this.LocalMapped, arc: this.Direct});
+
+    this.registerCall("ArcCreateView", {callback: this.LocalMapped, arc: this.Direct, viewType: this.ByLiteral(Type), name: this.Direct});
+    this.registerInitializerHandler("CreateViewCallback", {callback: this.LocalMapped, viewType: this.Direct, name: this.Direct, id: this.Direct});
+
+    this.registerCall("ArcLoadRecipe", {arc: this.Direct, recipe: this.Direct, callback: this.LocalMapped});
   }
 }
 
@@ -19851,7 +20029,7 @@ module.exports = { PECOuterPort, PECInnerPort };
 
 
 /***/ }),
-/* 110 */
+/* 111 */
 /***/ (function(module, exports) {
 
 /**
@@ -19971,7 +20149,7 @@ else
 
 
 /***/ }),
-/* 111 */
+/* 112 */
 /***/ (function(module, exports) {
 
 /*
@@ -20325,7 +20503,7 @@ else
 })(this);
 
 /***/ }),
-/* 112 */
+/* 113 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20345,9 +20523,9 @@ const {
   ViewChanges,
   //StateChanges,
   //SlotChanges
-} = __webpack_require__(44);
+} = __webpack_require__(45);
 
-const XenStateMixin = __webpack_require__(110);
+const XenStateMixin = __webpack_require__(111);
 
 //let log = !global.document || (global.logging === false) ? () => {} : console.log.bind(console, `---------- DomParticle::`);
 //console.log(!!global.document, global.logging, log);
@@ -20475,104 +20653,6 @@ module.exports = DomParticle;
 
 
 /***/ }),
-/* 113 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-/* WEBPACK VAR INJECTION */(function(global) {/**
- * @license
- * Copyright (c) 2017 Google Inc. All rights reserved.
- * This code may only be used under the BSD style license found at
- * http://polymer.github.io/LICENSE.txt
- * Code distributed by Google as part of this project is also
- * subject to an additional IP rights grant found at
- * http://polymer.github.io/PATENTS.txt
- */
-
-
-var fs = __webpack_require__(53);
-var assert = __webpack_require__(1);
-const particle = __webpack_require__(44);
-const DomParticle = __webpack_require__(112);
-const vm = __webpack_require__(107);
-let JsonldToManifest = __webpack_require__(223);
-
-let fetch = global.fetch || __webpack_require__(258);
-
-function schemaLocationFor(name) {
-  return `../entities/${name}.schema`;
-}
-
-class Loader {
-  path(fileName) {
-    let path = fileName.replace(/[\/][^\/]+$/, '/')
-    return path;
-  }
-
-  join(prefix, path) {
-    if (/^https?:\/\//.test(path))
-      return path;
-    prefix = this.path(prefix);
-    return prefix + path;
-  }
-
-  loadResource(file) {
-    console.log(file);
-    if (/^https?:\/\//.test(file))
-      return this._loadURL(file);
-    return this._loadFile(file);
-  }
-
-  _loadFile(file) {
-    return new Promise((resolve, reject) => {
-      fs.readFile(file, (err, data) => {
-        if (err)
-          reject(err);
-        else
-          resolve(data.toString('utf-8'));
-      });
-    });
-  }
-
-  _loadURL(url) {
-    if (/\/\/schema.org\//.test(url))
-      return fetch(url + ".jsonld").then(res => res.text()).then(data => JsonldToManifest.convert(data));
-    return fetch(url).then(res => res.text());
-  }
-
-  async loadParticleClass(spec) {
-    let clazz = await this.requireParticle(spec.implFile);
-    clazz.spec = spec;
-    return clazz;
-  }
-
-  async requireParticle(fileName) {
-    let src = await this.loadResource(fileName);
-    // Note. This is not real isolation.
-    let script = new vm.Script(src, {fileName});
-    let result = [];
-    let self = {
-      defineParticle(particleWrapper) {
-        result.push(particleWrapper);
-      },
-      console,
-      importScripts: s => null //console.log(`(skipping browser-space import for [${s}])`)
-    };
-    script.runInNewContext(self);
-    return this.unwrapParticle(result[0]);
-  }
-
-  unwrapParticle(particleWrapper) {
-    return particleWrapper({particle, Particle: particle.Particle, DomParticle});
-  }
-
-}
-
-module.exports = Loader;
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3)))
-
-/***/ }),
 /* 114 */
 /***/ (function(module, exports) {
 
@@ -20669,10 +20749,10 @@ class Search {
   get unresolvedTokens() { return this._unresolvedTokens; }
   get resolvedTokens() { return this._resolvedTokens; }
   resolveToken(token) {
-    let index = this.unresolvedTokens.indexOf(token);
+    let index = this.unresolvedTokens.indexOf(token.toLowerCase());
     assert(index >= 0, `Cannot resolved nonexistent token ${token}`);
     this._unresolvedTokens.splice(index, 1);
-    this._resolvedTokens.push(token);
+    this._resolvedTokens.push(token.toLowerCase());
   }
 
   isValid() {
@@ -20710,7 +20790,7 @@ class Search {
     result.push(`search \`${this.phrase}\``);
 
     let tokenStr = [];
-    tokenStr.push('tokens');
+    tokenStr.push('  tokens');
     if (this.unresolvedTokens.length > 0) {
       tokenStr.push(this.unresolvedTokens.map(t => `\`${t}\``).join(" "));
     }
@@ -20938,10 +21018,10 @@ module.exports = Slot;
 
 
 const Identifier = __webpack_require__(231);
-const Entity = __webpack_require__(42);
-const Relation = __webpack_require__(62);
-const Symbols = __webpack_require__(45);
-const underlyingView = __webpack_require__(46);
+const Entity = __webpack_require__(43);
+const Relation = __webpack_require__(63);
+const Symbols = __webpack_require__(46);
+const underlyingView = __webpack_require__(47);
 let identifier = Symbols.identifier;
 const assert = __webpack_require__(1);
 
@@ -21159,9 +21239,9 @@ module.exports = { viewletFor };
  */
 
 
-const Loader = __webpack_require__(113);
-const particle = __webpack_require__(44);
-const DomParticle = __webpack_require__(112);
+const Loader = __webpack_require__(59);
+const particle = __webpack_require__(45);
+const DomParticle = __webpack_require__(113);
 
 module.exports = class BrowserLoader extends Loader {
   constructor(urlMap) {
@@ -21224,21 +21304,21 @@ module.exports = class BrowserLoader extends Loader {
  */
 
 
-var runtime = __webpack_require__(63);
+var runtime = __webpack_require__(64);
 var assert = __webpack_require__(1);
 var tracing = __webpack_require__(20);
-const Type = __webpack_require__(9);
-const {View, Variable} = __webpack_require__(46);
-const Relation = __webpack_require__(62);
+const Type = __webpack_require__(10);
+const {View, Variable} = __webpack_require__(47);
+const Relation = __webpack_require__(63);
 let viewlet = __webpack_require__(120);
 const OuterPec = __webpack_require__(262);
-const Recipe = __webpack_require__(6);
-const Manifest = __webpack_require__(47);
+const Recipe = __webpack_require__(4);
+const Manifest = __webpack_require__(31);
 const Description = __webpack_require__(30);
 const util = __webpack_require__(12);
 
 class Arc {
-  constructor({id, context, pecFactory, slotComposer}) {
+  constructor({id, context, pecFactory, slotComposer, loader}) {
     // TODO: context should not be optional.
     this._context = context || new Manifest();
     // TODO: pecFactory should not be optional. update all callers and fix here.
@@ -21246,6 +21326,7 @@ class Arc {
     this.id = id;
     this._nextLocalID = 0;
     this._activeRecipe = new Recipe();
+    this._loader = loader;
 
     // All the views, mapped by view ID
     this._viewsById = new Map();
@@ -21258,7 +21339,7 @@ class Arc {
     this.particleViewMaps = new Map();
     let pecId = this.generateID();
     let innerPecPort = this._pecFactory(pecId);
-    this.pec = new OuterPec(innerPecPort, slotComposer, `${pecId}:outer`);
+    this.pec = new OuterPec(innerPecPort, slotComposer, this, `${pecId}:outer`);
     if (slotComposer) {
       slotComposer.arc = this;
     }
@@ -21400,7 +21481,7 @@ class Arc {
     for (let recipeView of views) {
       if (['copy', 'create'].includes(recipeView.fate)) {
         let view = this.createView(recipeView.type, /* name= */ null, /* id= */ null, recipeView.tags);
-        if (recipeView._fate === "copy") {
+        if (recipeView.fate === "copy") {
           var copiedView = this.findViewById(recipeView.id);
           view.cloneFrom(copiedView);
         }
@@ -21435,7 +21516,7 @@ class Arc {
 
   createView(type, name, id, tags) {
     tags = tags || [];
-    assert(type instanceof Type, "can't createView with a type that isn't a Type");
+    assert(type instanceof Type, `can't createView with type ${type} that isn't a Type`);
     if (type.isRelation)
       type = Type.newView(type);
     let view;
@@ -21561,24 +21642,27 @@ module.exports = Arc;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy, Strategizer} = __webpack_require__(7);
+let {Strategy, Strategizer} = __webpack_require__(6);
 var assert = __webpack_require__(1);
-let Recipe = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
 let RecipeUtil = __webpack_require__(17);
-let RecipeWalker = __webpack_require__(11);
-let ConvertConstraintsToConnections = __webpack_require__(277);
+let RecipeWalker = __webpack_require__(8);
+let ConvertConstraintsToConnections = __webpack_require__(278);
 let AssignRemoteViews = __webpack_require__(275);
-let CopyRemoteViews = __webpack_require__(278);
+let CopyRemoteViews = __webpack_require__(279);
 let AssignViewsByTagAndType = __webpack_require__(276);
-let InitPopulation = __webpack_require__(279);
-let MapConsumedSlots = __webpack_require__(281);
-let MapRemoteSlots = __webpack_require__(282);
-let MatchParticleByVerb = __webpack_require__(283);
-let NameUnnamedConnections = __webpack_require__(284);
+let InitPopulation = __webpack_require__(282);
+let MapConsumedSlots = __webpack_require__(284);
+let MapRemoteSlots = __webpack_require__(285);
+let MatchParticleByVerb = __webpack_require__(286);
+let NameUnnamedConnections = __webpack_require__(287);
 let AddUseViews = __webpack_require__(274);
-let Manifest = __webpack_require__(47);
-let InitSearch = __webpack_require__(280);
-let SearchTokensToParticles = __webpack_require__(285);
+let Manifest = __webpack_require__(31);
+let InitSearch = __webpack_require__(283);
+let SearchTokensToParticles = __webpack_require__(288);
+let FallbackFate = __webpack_require__(280);
+let GroupViewConnections = __webpack_require__(281);
+let CombinedStrategy = __webpack_require__(277);
 
 const Speculator = __webpack_require__(273);
 const Description = __webpack_require__(30);
@@ -21587,7 +21671,7 @@ const Tracing = __webpack_require__(20);
 class CreateViews extends Strategy {
   // TODO: move generation to use an async generator.
   async generate(strategizer) {
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onView(recipe, view) {
         var counts = RecipeUtil.directionCounts(view);
 
@@ -21601,8 +21685,8 @@ class CreateViews extends Strategy {
             score = 0;
         }
 
-        if (!view.id && view._fate == "?") {
-          return (recipe, view) => {view._fate = "create"; return score}
+        if (!view.id && view.fate == "?") {
+          return (recipe, view) => {view.fate = "create"; return score}
         }
       }
     }(RecipeWalker.Permuted), this);
@@ -21619,7 +21703,11 @@ class Planner {
     let strategies = [
       new InitPopulation(arc),
       new InitSearch(arc),
-      new SearchTokensToParticles(arc),
+      new CombinedStrategy([
+        new SearchTokensToParticles(arc),
+        new GroupViewConnections(),
+      ]),
+      new FallbackFate(),
       new CreateViews(),
       new AssignViewsByTagAndType(arc),
       new ConvertConstraintsToConnections(arc),
@@ -21728,7 +21816,7 @@ class Planner {
 
 module.exports = Planner;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
 /* 124 */
@@ -21894,10 +21982,10 @@ let Arcs = {
   version: '0.2',
   Arc: __webpack_require__(122),
   Description: __webpack_require__(30),
-  Manifest: __webpack_require__(47),
+  Manifest: __webpack_require__(31),
   Planner: __webpack_require__(123),
   SlotComposer: __webpack_require__(124),
-  Type: __webpack_require__(9),
+  Type: __webpack_require__(10),
   BrowserLoader: __webpack_require__(121)
 };
 
@@ -21928,7 +22016,7 @@ function Entity(name, body) {
 Entity.prototype._createNamed = function createNamed(base) {
   var named;
   try {
-    named = __webpack_require__(107).runInThisContext(
+    named = __webpack_require__(108).runInThisContext(
       '(function ' + this.name + '(entity) {\n' +
       '  this._initNamed(entity);\n' +
       '})'
@@ -21978,7 +22066,7 @@ Entity.prototype.encode = function encode(data, enc, /* internal */ reporter) {
 var Reporter = __webpack_require__(23).Reporter;
 var EncoderBuffer = __webpack_require__(23).EncoderBuffer;
 var DecoderBuffer = __webpack_require__(23).DecoderBuffer;
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 
 // Supported tags
 var tags = [
@@ -22742,7 +22830,7 @@ ReporterError.prototype.rethrow = function rethrow(msg) {
 /* 129 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var constants = __webpack_require__(66);
+var constants = __webpack_require__(67);
 
 exports.tagClass = {
   0: 'universal',
@@ -22792,7 +22880,7 @@ exports.tagByName = constants._reverse(exports.tag);
 
 var decoders = exports;
 
-decoders.der = __webpack_require__(67);
+decoders.der = __webpack_require__(68);
 decoders.pem = __webpack_require__(131);
 
 
@@ -22803,7 +22891,7 @@ decoders.pem = __webpack_require__(131);
 var inherits = __webpack_require__(2);
 var Buffer = __webpack_require__(0).Buffer;
 
-var DERDecoder = __webpack_require__(67);
+var DERDecoder = __webpack_require__(68);
 
 function PEMDecoder(entity) {
   DERDecoder.call(this, entity);
@@ -22857,7 +22945,7 @@ PEMDecoder.prototype.decode = function decode(data, options) {
 
 var encoders = exports;
 
-encoders.der = __webpack_require__(68);
+encoders.der = __webpack_require__(69);
 encoders.pem = __webpack_require__(133);
 
 
@@ -22867,7 +22955,7 @@ encoders.pem = __webpack_require__(133);
 
 var inherits = __webpack_require__(2);
 
-var DEREncoder = __webpack_require__(68);
+var DEREncoder = __webpack_require__(69);
 
 function PEMEncoder(entity) {
   DEREncoder.call(this, entity);
@@ -23013,13 +23101,13 @@ function fromByteArray (uint8) {
 /* 135 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(31)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(32)
 var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
-var modes = __webpack_require__(32)
-var StreamCipher = __webpack_require__(77)
-var AuthCipher = __webpack_require__(70)
-var ebtk = __webpack_require__(36)
+var modes = __webpack_require__(33)
+var StreamCipher = __webpack_require__(78)
+var AuthCipher = __webpack_require__(71)
+var ebtk = __webpack_require__(37)
 
 inherits(Decipher, Transform)
 function Decipher (mode, key, iv) {
@@ -23105,14 +23193,14 @@ function unpad (last) {
 }
 
 var modelist = {
-  ECB: __webpack_require__(75),
-  CBC: __webpack_require__(71),
-  CFB: __webpack_require__(72),
-  CFB8: __webpack_require__(74),
-  CFB1: __webpack_require__(73),
-  OFB: __webpack_require__(76),
-  CTR: __webpack_require__(33),
-  GCM: __webpack_require__(33)
+  ECB: __webpack_require__(76),
+  CBC: __webpack_require__(72),
+  CFB: __webpack_require__(73),
+  CFB8: __webpack_require__(75),
+  CFB1: __webpack_require__(74),
+  OFB: __webpack_require__(77),
+  CTR: __webpack_require__(34),
+  GCM: __webpack_require__(34)
 }
 
 function createDecipheriv (suite, password, iv) {
@@ -23157,13 +23245,13 @@ exports.createDecipheriv = createDecipheriv
 /* 136 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(31)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var aes = __webpack_require__(32)
 var Transform = __webpack_require__(15)
 var inherits = __webpack_require__(2)
-var modes = __webpack_require__(32)
-var ebtk = __webpack_require__(36)
-var StreamCipher = __webpack_require__(77)
-var AuthCipher = __webpack_require__(70)
+var modes = __webpack_require__(33)
+var ebtk = __webpack_require__(37)
+var StreamCipher = __webpack_require__(78)
+var AuthCipher = __webpack_require__(71)
 inherits(Cipher, Transform)
 function Cipher (mode, key, iv) {
   if (!(this instanceof Cipher)) {
@@ -23234,14 +23322,14 @@ Splitter.prototype.flush = function () {
   return out
 }
 var modelist = {
-  ECB: __webpack_require__(75),
-  CBC: __webpack_require__(71),
-  CFB: __webpack_require__(72),
-  CFB8: __webpack_require__(74),
-  CFB1: __webpack_require__(73),
-  OFB: __webpack_require__(76),
-  CTR: __webpack_require__(33),
-  GCM: __webpack_require__(33)
+  ECB: __webpack_require__(76),
+  CBC: __webpack_require__(72),
+  CFB: __webpack_require__(73),
+  CFB8: __webpack_require__(75),
+  CFB1: __webpack_require__(74),
+  OFB: __webpack_require__(77),
+  CTR: __webpack_require__(34),
+  GCM: __webpack_require__(34)
 }
 
 function createCipheriv (suite, password, iv) {
@@ -23391,11 +23479,11 @@ function xor (a, b) {
 /* 138 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var ebtk = __webpack_require__(36)
+var ebtk = __webpack_require__(37)
 var aes = __webpack_require__(48)
 var DES = __webpack_require__(139)
 var desModes = __webpack_require__(140)
-var aesModes = __webpack_require__(32)
+var aesModes = __webpack_require__(33)
 function createCipher (suite, password) {
   var keyLen, ivLen
   suite = suite.toLowerCase()
@@ -23550,7 +23638,7 @@ exports['des-ede'] = {
 /* 141 */
 /***/ (function(module, exports, __webpack_require__) {
 
-module.exports = __webpack_require__(78)
+module.exports = __webpack_require__(79)
 
 
 /***/ }),
@@ -23563,7 +23651,7 @@ var inherits = __webpack_require__(2)
 var sign = __webpack_require__(143)
 var verify = __webpack_require__(144)
 
-var algorithms = __webpack_require__(78)
+var algorithms = __webpack_require__(79)
 Object.keys(algorithms).forEach(function (key) {
   algorithms[key].id = new Buffer(algorithms[key].id, 'hex')
   algorithms[key.toLowerCase()] = algorithms[key]
@@ -23656,12 +23744,12 @@ module.exports = {
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// much of this based on https://github.com/indutny/self-signed/blob/gh-pages/lib/rsa.js
-var createHmac = __webpack_require__(80)
+var createHmac = __webpack_require__(81)
 var crt = __webpack_require__(49)
-var EC = __webpack_require__(8).ec
-var BN = __webpack_require__(4)
-var parseKeys = __webpack_require__(39)
-var curves = __webpack_require__(79)
+var EC = __webpack_require__(9).ec
+var BN = __webpack_require__(5)
+var parseKeys = __webpack_require__(40)
+var curves = __webpack_require__(80)
 
 function sign (hash, key, hashType, signType, tag) {
   var priv = parseKeys(key)
@@ -23808,10 +23896,10 @@ module.exports.makeKey = makeKey
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {// much of this based on https://github.com/indutny/self-signed/blob/gh-pages/lib/rsa.js
-var BN = __webpack_require__(4)
-var EC = __webpack_require__(8).ec
-var parseKeys = __webpack_require__(39)
-var curves = __webpack_require__(79)
+var BN = __webpack_require__(5)
+var EC = __webpack_require__(9).ec
+var parseKeys = __webpack_require__(40)
+var curves = __webpack_require__(80)
 
 function verify (sig, hash, key, signType, tag) {
   var pub = parseKeys(key)
@@ -23897,7 +23985,7 @@ module.exports = verify
 /* 145 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(process, Buffer) {var msg = __webpack_require__(90);
+/* WEBPACK VAR INJECTION */(function(process, Buffer) {var msg = __webpack_require__(91);
 var zstream = __webpack_require__(191);
 var zlib_deflate = __webpack_require__(186);
 var zlib_inflate = __webpack_require__(188);
@@ -24134,7 +24222,7 @@ Zlib.prototype._error = function(status) {
 
 exports.Zlib = Zlib;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(0).Buffer))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7), __webpack_require__(0).Buffer))
 
 /***/ }),
 /* 146 */
@@ -24161,7 +24249,7 @@ exports.Zlib = Zlib;
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-var Transform = __webpack_require__(103);
+var Transform = __webpack_require__(104);
 
 var binding = __webpack_require__(145);
 var util = __webpack_require__(58);
@@ -24751,7 +24839,7 @@ util.inherits(DeflateRaw, Zlib);
 util.inherits(InflateRaw, Zlib);
 util.inherits(Unzip, Zlib);
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(7)))
 
 /***/ }),
 /* 147 */
@@ -24827,8 +24915,8 @@ module.exports = {
 /* 148 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var elliptic = __webpack_require__(8);
-var BN = __webpack_require__(4);
+/* WEBPACK VAR INJECTION */(function(Buffer) {var elliptic = __webpack_require__(9);
+var BN = __webpack_require__(5);
 
 module.exports = function createECDH(curve) {
 	return new ECDH(curve);
@@ -25052,7 +25140,7 @@ module.exports = Hmac
 
 exports.randomBytes = exports.rng = exports.pseudoRandomBytes = exports.prng = __webpack_require__(28)
 exports.createHash = exports.Hash = __webpack_require__(26)
-exports.createHmac = exports.Hmac = __webpack_require__(80)
+exports.createHmac = exports.Hmac = __webpack_require__(81)
 
 var algos = __webpack_require__(141)
 var algoKeys = Object.keys(algos)
@@ -25061,7 +25149,7 @@ exports.getHashes = function () {
   return hashes
 }
 
-var p = __webpack_require__(92)
+var p = __webpack_require__(93)
 exports.pbkdf2 = p.pbkdf2
 exports.pbkdf2Sync = p.pbkdf2Sync
 
@@ -25149,7 +25237,7 @@ exports.constants = {
 "use strict";
 
 
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 var inherits = __webpack_require__(2);
 
 var proto = {};
@@ -25221,7 +25309,7 @@ proto._update = function _update(inp, inOff, out, outOff) {
 "use strict";
 
 
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 
 function Cipher(options) {
   this.options = options;
@@ -25369,7 +25457,7 @@ Cipher.prototype._finalDecrypt = function _finalDecrypt() {
 "use strict";
 
 
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 var inherits = __webpack_require__(2);
 
 var des = __webpack_require__(50);
@@ -25519,7 +25607,7 @@ DES.prototype._decrypt = function _decrypt(state, lStart, rStart, out, off) {
 "use strict";
 
 
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 var inherits = __webpack_require__(2);
 
 var des = __webpack_require__(50);
@@ -25841,7 +25929,7 @@ exports.padSplit = function padSplit(num, size, group) {
 /* 157 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var generatePrime = __webpack_require__(81)
+/* WEBPACK VAR INJECTION */(function(Buffer) {var generatePrime = __webpack_require__(82)
 var primes = __webpack_require__(159)
 
 var DH = __webpack_require__(158)
@@ -25890,15 +25978,15 @@ exports.createDiffieHellman = exports.DiffieHellman = createDiffieHellman
 /* 158 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var BN = __webpack_require__(4);
-var MillerRabin = __webpack_require__(86);
+/* WEBPACK VAR INJECTION */(function(Buffer) {var BN = __webpack_require__(5);
+var MillerRabin = __webpack_require__(87);
 var millerRabin = new MillerRabin();
 var TWENTYFOUR = new BN(24);
 var ELEVEN = new BN(11);
 var TEN = new BN(10);
 var THREE = new BN(3);
 var SEVEN = new BN(7);
-var primes = __webpack_require__(81);
+var primes = __webpack_require__(82);
 var randomBytes = __webpack_require__(28);
 module.exports = DH;
 
@@ -26070,8 +26158,8 @@ module.exports = {"modp1":{"gen":"02","prime":"ffffffffffffffffc90fdaa22168c234c
 "use strict";
 
 
-var BN = __webpack_require__(4);
-var elliptic = __webpack_require__(8);
+var BN = __webpack_require__(5);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 var getNAF = utils.getNAF;
 var getJSF = utils.getJSF;
@@ -26452,9 +26540,9 @@ BasePoint.prototype.dblp = function dblp(k) {
 "use strict";
 
 
-var curve = __webpack_require__(35);
-var elliptic = __webpack_require__(8);
-var BN = __webpack_require__(4);
+var curve = __webpack_require__(36);
+var elliptic = __webpack_require__(9);
+var BN = __webpack_require__(5);
 var inherits = __webpack_require__(2);
 var Base = curve.base;
 
@@ -26892,12 +26980,12 @@ Point.prototype.mixedAdd = Point.prototype.add;
 "use strict";
 
 
-var curve = __webpack_require__(35);
-var BN = __webpack_require__(4);
+var curve = __webpack_require__(36);
+var BN = __webpack_require__(5);
 var inherits = __webpack_require__(2);
 var Base = curve.base;
 
-var elliptic = __webpack_require__(8);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 
 function MontCurve(conf) {
@@ -27079,9 +27167,9 @@ Point.prototype.getX = function getX() {
 "use strict";
 
 
-var curve = __webpack_require__(35);
-var elliptic = __webpack_require__(8);
-var BN = __webpack_require__(4);
+var curve = __webpack_require__(36);
+var elliptic = __webpack_require__(9);
+var BN = __webpack_require__(5);
 var inherits = __webpack_require__(2);
 var Base = curve.base;
 
@@ -28027,7 +28115,7 @@ JPoint.prototype.isInfinity = function isInfinity() {
 var curves = exports;
 
 var hash = __webpack_require__(52);
-var elliptic = __webpack_require__(8);
+var elliptic = __webpack_require__(9);
 
 var assert = elliptic.utils.assert;
 
@@ -28236,9 +28324,9 @@ defineCurve('secp256k1', {
 "use strict";
 
 
-var BN = __webpack_require__(4);
+var BN = __webpack_require__(5);
 var HmacDRBG = __webpack_require__(181);
-var elliptic = __webpack_require__(8);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 var assert = utils.assert;
 
@@ -28483,8 +28571,8 @@ EC.prototype.getKeyRecoveryParam = function(e, signature, Q, enc) {
 "use strict";
 
 
-var BN = __webpack_require__(4);
-var elliptic = __webpack_require__(8);
+var BN = __webpack_require__(5);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 var assert = utils.assert;
 
@@ -28609,9 +28697,9 @@ KeyPair.prototype.inspect = function inspect() {
 "use strict";
 
 
-var BN = __webpack_require__(4);
+var BN = __webpack_require__(5);
 
-var elliptic = __webpack_require__(8);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 var assert = utils.assert;
 
@@ -28752,7 +28840,7 @@ Signature.prototype.toDER = function toDER(enc) {
 
 
 var hash = __webpack_require__(52);
-var elliptic = __webpack_require__(8);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 var assert = utils.assert;
 var parseBytes = utils.parseBytes;
@@ -28876,7 +28964,7 @@ EDDSA.prototype.isPoint = function isPoint(val) {
 "use strict";
 
 
-var elliptic = __webpack_require__(8);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 var assert = utils.assert;
 var parseBytes = utils.parseBytes;
@@ -28979,8 +29067,8 @@ module.exports = KeyPair;
 "use strict";
 
 
-var BN = __webpack_require__(4);
-var elliptic = __webpack_require__(8);
+var BN = __webpack_require__(5);
+var elliptic = __webpack_require__(9);
 var utils = elliptic.utils;
 var assert = utils.assert;
 var cachedProperty = utils.cachedProperty;
@@ -29839,9 +29927,9 @@ module.exports = {
 
 
 var utils = exports;
-var BN = __webpack_require__(4);
-var minAssert = __webpack_require__(10);
-var minUtils = __webpack_require__(87);
+var BN = __webpack_require__(5);
+var minAssert = __webpack_require__(11);
+var minUtils = __webpack_require__(88);
 
 utils.assert = minAssert;
 utils.toArray = minUtils.toArray;
@@ -30063,7 +30151,7 @@ module.exports = HashBase
 
 
 var utils = __webpack_require__(13);
-var assert = __webpack_require__(10);
+var assert = __webpack_require__(11);
 
 function Hmac(hash, key, enc) {
   if (!(this instanceof Hmac))
@@ -30271,9 +30359,9 @@ var sh = [
 
 exports.sha1 = __webpack_require__(178);
 exports.sha224 = __webpack_require__(179);
-exports.sha256 = __webpack_require__(82);
+exports.sha256 = __webpack_require__(83);
 exports.sha384 = __webpack_require__(180);
-exports.sha512 = __webpack_require__(83);
+exports.sha512 = __webpack_require__(84);
 
 
 /***/ }),
@@ -30285,7 +30373,7 @@ exports.sha512 = __webpack_require__(83);
 
 var utils = __webpack_require__(13);
 var common = __webpack_require__(27);
-var shaCommon = __webpack_require__(84);
+var shaCommon = __webpack_require__(85);
 
 var rotl32 = utils.rotl32;
 var sum32 = utils.sum32;
@@ -30365,7 +30453,7 @@ SHA1.prototype._digest = function digest(enc) {
 
 
 var utils = __webpack_require__(13);
-var SHA256 = __webpack_require__(82);
+var SHA256 = __webpack_require__(83);
 
 function SHA224() {
   if (!(this instanceof SHA224))
@@ -30403,7 +30491,7 @@ SHA224.prototype._digest = function digest(enc) {
 
 var utils = __webpack_require__(13);
 
-var SHA512 = __webpack_require__(83);
+var SHA512 = __webpack_require__(84);
 
 function SHA384() {
   if (!(this instanceof SHA384))
@@ -30444,8 +30532,8 @@ SHA384.prototype._digest = function digest(enc) {
 
 
 var hash = __webpack_require__(52);
-var utils = __webpack_require__(87);
-var assert = __webpack_require__(10);
+var utils = __webpack_require__(88);
+var assert = __webpack_require__(11);
 
 function HmacDRBG(options) {
   if (!(this instanceof HmacDRBG))
@@ -30745,11 +30833,11 @@ module.exports = {
 "use strict";
 
 
-var utils   = __webpack_require__(38);
+var utils   = __webpack_require__(39);
 var trees   = __webpack_require__(190);
-var adler32 = __webpack_require__(88);
-var crc32   = __webpack_require__(89);
-var msg     = __webpack_require__(90);
+var adler32 = __webpack_require__(89);
+var crc32   = __webpack_require__(90);
+var msg     = __webpack_require__(91);
 
 /* Public constants ==========================================================*/
 /* ===========================================================================*/
@@ -32941,9 +33029,9 @@ module.exports = function inflate_fast(strm, start) {
 
 
 
-var utils         = __webpack_require__(38);
-var adler32       = __webpack_require__(88);
-var crc32         = __webpack_require__(89);
+var utils         = __webpack_require__(39);
+var adler32       = __webpack_require__(89);
+var crc32         = __webpack_require__(90);
 var inflate_fast  = __webpack_require__(187);
 var inflate_table = __webpack_require__(189);
 
@@ -34486,7 +34574,7 @@ exports.inflateUndermine = inflateUndermine;
 
 
 
-var utils = __webpack_require__(38);
+var utils = __webpack_require__(39);
 
 var MAXBITS = 15;
 var ENOUGH_LENS = 852;
@@ -34820,7 +34908,7 @@ module.exports = function inflate_table(type, lens, lens_index, codes, table, ta
 
 
 
-var utils = __webpack_require__(38);
+var utils = __webpack_require__(39);
 
 /* Public constants ==========================================================*/
 /* ===========================================================================*/
@@ -36295,7 +36383,7 @@ module.exports = X509Certificate
 var findProc = /Proc-Type: 4,ENCRYPTED\n\r?DEK-Info: AES-((?:128)|(?:192)|(?:256))-CBC,([0-9A-H]+)\n\r?\n\r?([0-9A-z\n\r\+\/\=]+)\n\r?/m
 var startRegex = /^-----BEGIN ((?:.* KEY)|CERTIFICATE)-----\n/m
 var fullRegex = /^-----BEGIN ((?:.* KEY)|CERTIFICATE)-----\n\r?([0-9A-z\n\r\+\/\=]+)\n\r?-----END \1-----$/m
-var evp = __webpack_require__(36)
+var evp = __webpack_require__(37)
 var ciphers = __webpack_require__(48)
 module.exports = function (okey, password) {
   var key = okey.toString()
@@ -36328,9 +36416,9 @@ module.exports = function (okey, password) {
 /* 196 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(global, process) {var checkParameters = __webpack_require__(94)
-var defaultEncoding = __webpack_require__(93)
-var sync = __webpack_require__(95)
+/* WEBPACK VAR INJECTION */(function(global, process) {var checkParameters = __webpack_require__(95)
+var defaultEncoding = __webpack_require__(94)
+var sync = __webpack_require__(96)
 var Buffer = __webpack_require__(14).Buffer
 
 var ZERO_BUF
@@ -36427,7 +36515,7 @@ module.exports = function (password, salt, iterations, keylen, digest, callback)
   }), callback)
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
 /* 197 */
@@ -36448,13 +36536,13 @@ exports.publicDecrypt = function publicDecrypt(key, buf) {
 /* 198 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var parseKeys = __webpack_require__(39);
-var mgf = __webpack_require__(96);
-var xor = __webpack_require__(98);
-var bn = __webpack_require__(4);
+/* WEBPACK VAR INJECTION */(function(Buffer) {var parseKeys = __webpack_require__(40);
+var mgf = __webpack_require__(97);
+var xor = __webpack_require__(99);
+var bn = __webpack_require__(5);
 var crt = __webpack_require__(49);
 var createHash = __webpack_require__(26);
-var withPublic = __webpack_require__(97);
+var withPublic = __webpack_require__(98);
 module.exports = function privateDecrypt(private_key, enc, reverse) {
   var padding;
   if (private_key.padding) {
@@ -36562,13 +36650,13 @@ function compare(a, b){
 /* 199 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer) {var parseKeys = __webpack_require__(39);
+/* WEBPACK VAR INJECTION */(function(Buffer) {var parseKeys = __webpack_require__(40);
 var randomBytes = __webpack_require__(28);
 var createHash = __webpack_require__(26);
-var mgf = __webpack_require__(96);
-var xor = __webpack_require__(98);
-var bn = __webpack_require__(4);
-var withPublic = __webpack_require__(97);
+var mgf = __webpack_require__(97);
+var xor = __webpack_require__(99);
+var bn = __webpack_require__(5);
+var withPublic = __webpack_require__(98);
 var crt = __webpack_require__(49);
 
 var constants = {
@@ -37196,7 +37284,7 @@ function nonZero(len, crypto) {
 
 }(this));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(108)(module), __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(109)(module), __webpack_require__(3)))
 
 /***/ }),
 /* 201 */
@@ -37433,7 +37521,7 @@ module.exports = __webpack_require__(18);
 
 module.exports = PassThrough;
 
-var Transform = __webpack_require__(100);
+var Transform = __webpack_require__(101);
 
 /*<replacement>*/
 var util = __webpack_require__(25);
@@ -37737,7 +37825,7 @@ module.exports = __webpack_require__(54);
     attachTo.clearImmediate = clearImmediate;
 }(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
 /* 210 */
@@ -37957,7 +38045,7 @@ module.exports = Sha1
  */
 
 var inherits = __webpack_require__(2)
-var Sha256 = __webpack_require__(104)
+var Sha256 = __webpack_require__(105)
 var Hash = __webpack_require__(19)
 
 var W = new Array(64)
@@ -38008,7 +38096,7 @@ module.exports = Sha224
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer) {var inherits = __webpack_require__(2)
-var SHA512 = __webpack_require__(105)
+var SHA512 = __webpack_require__(106)
 var Hash = __webpack_require__(19)
 
 var W = new Array(160)
@@ -38070,7 +38158,7 @@ module.exports = Sha384
 /* 214 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(Buffer, global, process) {var capability = __webpack_require__(106)
+/* WEBPACK VAR INJECTION */(function(Buffer, global, process) {var capability = __webpack_require__(107)
 var inherits = __webpack_require__(2)
 var response = __webpack_require__(215)
 var stream = __webpack_require__(29)
@@ -38377,13 +38465,13 @@ var unsafeHeaders = [
 	'via'
 ]
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(3), __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0).Buffer, __webpack_require__(3), __webpack_require__(7)))
 
 /***/ }),
 /* 215 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(process, Buffer, global) {var capability = __webpack_require__(106)
+/* WEBPACK VAR INJECTION */(function(process, Buffer, global) {var capability = __webpack_require__(107)
 var inherits = __webpack_require__(2)
 var stream = __webpack_require__(29)
 
@@ -38566,7 +38654,7 @@ IncomingMessage.prototype._onXHRProgress = function () {
 	}
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5), __webpack_require__(0).Buffer, __webpack_require__(3)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7), __webpack_require__(0).Buffer, __webpack_require__(3)))
 
 /***/ }),
 /* 216 */
@@ -38839,10 +38927,15 @@ function extend() {
 var supportedTypes = ["Text", "URL"];
 
 class JsonldToManifest {
-  static convert(jsonld) {
+  static convert(jsonld, theClass) {
     var obj = JSON.parse(jsonld);
     var classes = {};
     var properties = {};
+
+    if (!obj['@graph']) {
+      obj['@graph'] = [obj];
+    }
+
     for (var item of obj['@graph']) {
       if (item["@type"] == "rdf:Property")
         properties[item["@id"]] = item;
@@ -38852,16 +38945,27 @@ class JsonldToManifest {
         item.superclass = null;
       }
     }
+
     for (var clazz of Object.values(classes)) {
       if (clazz['rdfs:subClassOf'] !== undefined) {
-        var superclass = clazz['rdfs:subClassOf']['@id'];
-        classes[superclass].subclasses.push(clazz);
-        clazz.superclass = classes[superclass];
+        if (clazz['rdfs:subClassOf'].length == undefined)
+          clazz['rdfs:subClassOf'] = [clazz['rdfs:subClassOf']];
+        for (let subClass of clazz['rdfs:subClassOf']) {
+          var superclass = subClass['@id'];
+          if (clazz.superclass == undefined)
+            clazz.superclass = [];
+          if (classes[superclass]) {
+            classes[superclass].subclasses.push(clazz);
+            clazz.superclass.push(classes[superclass]);
+          } else {
+            clazz.superclass.push({'@id': superclass});
+          }
+        }
       }
     }
-    var theClass = null;
+
     for (var clazz of Object.values(classes)) {
-      if (clazz.subclasses.length == 0) {
+      if (clazz.subclasses.length == 0 && theClass == undefined) {
         theClass = clazz;
       }
     }
@@ -38869,12 +38973,16 @@ class JsonldToManifest {
     var relevantProperties = [];
     for (var property of Object.values(properties)) {
       var domains = property['schema:domainIncludes'];
+      if (!domains)
+        domains = {'@id': theClass['@id']};
       if (!domains.length)
         domains = [domains];
       domains = domains.map(a => a['@id']);
       if (domains.includes(theClass['@id'])) {
         var name = property['@id'].split(':')[1];
         var type = property['schema:rangeIncludes'];
+        if (!type)
+          console.log(property);
         if (!type.length)
           type = [type];
 
@@ -38886,15 +38994,15 @@ class JsonldToManifest {
     }
 
     var className = theClass['@id'].split(':')[1];
-    var superName = theClass.superclass ? theClass.superclass['@id'].split(':')[1] : null;
+    var superNames = theClass.superclass ? theClass.superclass.map(a => a['@id'].split(':')[1]) : [];
 
     var s = '';
-    if (superName !== null)
+    for (let superName of superNames)
       s += `import 'https://schema.org/${superName}'\n\n`
 
     s += `schema ${className}`
-    if (superName !== null)
-      s += ` extends ${superName}`
+    if (superNames.length > 0)
+      s += ` extends ${superNames.join(', ')}`
 
     if (relevantProperties.length > 0) {
       s += '\n  optional';
@@ -38973,9 +39081,9 @@ module.exports = ModelSelect;
  */
 
 
-const XTemplate = __webpack_require__(111);
+const XTemplate = __webpack_require__(112);
 const XElement = __webpack_require__(226);
-const XState = __webpack_require__(110);
+const XState = __webpack_require__(111);
 
 class XList extends XState(XElement) {
   static get observedAttributes() {
@@ -39264,7 +39372,7 @@ module.exports = (function() {
               args,
               affordance,
               slots,
-              description
+              description,
             };
           },
         peg$c16 = "(",
@@ -39432,6 +39540,7 @@ module.exports = (function() {
               param,
               dir,
               target: optional(target, target => target[1], null),
+              location: location(),
             };
           },
         peg$c84 = function(param, name, providedSlots) {
@@ -39537,23 +39646,30 @@ module.exports = (function() {
               name: optional(name, name => name[1], '')
             }
           },
-        peg$c132 = "schema",
-        peg$c133 = { type: "literal", value: "schema", description: "\"schema\"" },
-        peg$c134 = "extends",
-        peg$c135 = { type: "literal", value: "extends", description: "\"extends\"" },
-        peg$c136 = function(name, parent, sections) {
+        peg$c132 = "extends",
+        peg$c133 = { type: "literal", value: "extends", description: "\"extends\"" },
+        peg$c134 = function(first, rest) {
+          var list = [first];
+          for (let item of rest) {
+            list.push(item[3]);
+          }
+          return list;
+        },
+        peg$c135 = "schema",
+        peg$c136 = { type: "literal", value: "schema", description: "\"schema\"" },
+        peg$c137 = function(name, parent, sections) {
             return {
               kind: 'schema',
               name: name,
-              parent: optional(parent, parent => parent[3], null),
+              parents: optional(parent, parent => parent, []),
               sections: optional(sections, extractIndented, []),
             };
           },
-        peg$c137 = "normative",
-        peg$c138 = { type: "literal", value: "normative", description: "\"normative\"" },
-        peg$c139 = "optional",
-        peg$c140 = { type: "literal", value: "optional", description: "\"optional\"" },
-        peg$c141 = function(sectionType, fields) {
+        peg$c138 = "normative",
+        peg$c139 = { type: "literal", value: "normative", description: "\"normative\"" },
+        peg$c140 = "optional",
+        peg$c141 = { type: "literal", value: "optional", description: "\"optional\"" },
+        peg$c142 = function(sectionType, fields) {
             let fieldDict = {};
             for (let field of extractIndented(fields)) {
               fieldDict[field.name] = field.type;
@@ -39563,35 +39679,35 @@ module.exports = (function() {
               fields: fieldDict,
             };
           },
-        peg$c142 = function(type, name) {
+        peg$c143 = function(type, name) {
             return {
               type,
               name,
             };
           },
-        peg$c143 = "Text",
-        peg$c144 = { type: "literal", value: "Text", description: "\"Text\"" },
-        peg$c145 = "URL",
-        peg$c146 = { type: "literal", value: "URL", description: "\"URL\"" },
-        peg$c147 = "or",
-        peg$c148 = { type: "literal", value: "or", description: "\"or\"" },
-        peg$c149 = function(first, rest) {
+        peg$c144 = "Text",
+        peg$c145 = { type: "literal", value: "Text", description: "\"Text\"" },
+        peg$c146 = "URL",
+        peg$c147 = { type: "literal", value: "URL", description: "\"URL\"" },
+        peg$c148 = "or",
+        peg$c149 = { type: "literal", value: "or", description: "\"or\"" },
+        peg$c150 = function(first, rest) {
           let typeList = [first];
           for (let type of rest) {
             typeList.push(type[3]);
           }
           return typeList;
         },
-        peg$c150 = "@",
-        peg$c151 = { type: "literal", value: "@", description: "\"@\"" },
-        peg$c152 = /^[0-9]/,
-        peg$c153 = { type: "class", value: "[0-9]", description: "[0-9]" },
-        peg$c154 = function(version) {
+        peg$c151 = "@",
+        peg$c152 = { type: "literal", value: "@", description: "\"@\"" },
+        peg$c153 = /^[0-9]/,
+        peg$c154 = { type: "class", value: "[0-9]", description: "[0-9]" },
+        peg$c155 = function(version) {
             return Number(version.join(''));
           },
-        peg$c155 = " ",
-        peg$c156 = { type: "literal", value: " ", description: "\" \"" },
-        peg$c157 = function(i) {
+        peg$c156 = " ",
+        peg$c157 = { type: "literal", value: " ", description: "\" \"" },
+        peg$c158 = function(i) {
           i = i.join('');
           if (i.length > indent.length) {
             indents.push(indent);
@@ -39599,7 +39715,7 @@ module.exports = (function() {
             return true;
           }
         },
-        peg$c158 = function(i) {
+        peg$c159 = function(i) {
           i = i.join('');
           if (i.length == indent.length) {
             return true;
@@ -39608,7 +39724,7 @@ module.exports = (function() {
             return false;
           }
         },
-        peg$c159 = function(i) {
+        peg$c160 = function(i) {
           i = i.join('');
           if (i.length >= indent.length) {
             return true;
@@ -39617,32 +39733,37 @@ module.exports = (function() {
             return false;
           }
         },
-        peg$c160 = "`",
-        peg$c161 = { type: "literal", value: "`", description: "\"`\"" },
-        peg$c162 = /^[^`]/,
-        peg$c163 = { type: "class", value: "[^`]", description: "[^`]" },
-        peg$c164 = function(pattern) { return pattern.join(''); },
-        peg$c165 = "'",
-        peg$c166 = { type: "literal", value: "'", description: "\"'\"" },
-        peg$c167 = /^[^']/,
-        peg$c168 = { type: "class", value: "[^']", description: "[^']" },
-        peg$c169 = function(id) {return id.join('')},
-        peg$c170 = /^[A-Z]/,
-        peg$c171 = { type: "class", value: "[A-Z]", description: "[A-Z]" },
-        peg$c172 = /^[a-z0-9_]/i,
-        peg$c173 = { type: "class", value: "[a-z0-9_]i", description: "[a-z0-9_]i" },
-        peg$c174 = function(ident) {return text()},
-        peg$c175 = /^[a-z]/,
-        peg$c176 = { type: "class", value: "[a-z]", description: "[a-z]" },
-        peg$c177 = /^[ ]/,
-        peg$c178 = { type: "class", value: "[ ]", description: "[ ]" },
-        peg$c179 = { type: "any", description: "any character" },
-        peg$c180 = /^[^\n]/,
-        peg$c181 = { type: "class", value: "[^\\n]", description: "[^\\n]" },
-        peg$c182 = "\r",
-        peg$c183 = { type: "literal", value: "\r", description: "\"\\r\"" },
-        peg$c184 = "\n",
-        peg$c185 = { type: "literal", value: "\n", description: "\"\\n\"" },
+        peg$c161 = function() {
+            let fixed = text();
+            fixed = fixed.replace(/^(.)/, l => l.toUpperCase());
+            expected(`a top level identifier (e.g. "${fixed}")`);
+          },
+        peg$c162 = "`",
+        peg$c163 = { type: "literal", value: "`", description: "\"`\"" },
+        peg$c164 = /^[^`]/,
+        peg$c165 = { type: "class", value: "[^`]", description: "[^`]" },
+        peg$c166 = function(pattern) { return pattern.join(''); },
+        peg$c167 = "'",
+        peg$c168 = { type: "literal", value: "'", description: "\"'\"" },
+        peg$c169 = /^[^']/,
+        peg$c170 = { type: "class", value: "[^']", description: "[^']" },
+        peg$c171 = function(id) {return id.join('')},
+        peg$c172 = /^[A-Z]/,
+        peg$c173 = { type: "class", value: "[A-Z]", description: "[A-Z]" },
+        peg$c174 = /^[a-z0-9_]/i,
+        peg$c175 = { type: "class", value: "[a-z0-9_]i", description: "[a-z0-9_]i" },
+        peg$c176 = function(ident) {return text()},
+        peg$c177 = /^[a-z]/,
+        peg$c178 = { type: "class", value: "[a-z]", description: "[a-z]" },
+        peg$c179 = /^[ ]/,
+        peg$c180 = { type: "class", value: "[ ]", description: "[ ]" },
+        peg$c181 = { type: "any", description: "any character" },
+        peg$c182 = /^[^\n]/,
+        peg$c183 = { type: "class", value: "[^\\n]", description: "[^\\n]" },
+        peg$c184 = "\r",
+        peg$c185 = { type: "literal", value: "\r", description: "\"\\r\"" },
+        peg$c186 = "\n",
+        peg$c187 = { type: "literal", value: "\n", description: "\"\\n\"" },
 
         peg$currPos          = 0,
         peg$savedPos         = 0,
@@ -39931,7 +40052,7 @@ module.exports = (function() {
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
         if (s2 !== peg$FAILED) {
-          s3 = peg$parseupperIdent();
+          s3 = peg$parseTopLevelIdent();
           if (s3 !== peg$FAILED) {
             s4 = peg$parsewhiteSpace();
             if (s4 !== peg$FAILED) {
@@ -40245,7 +40366,7 @@ module.exports = (function() {
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
         if (s2 !== peg$FAILED) {
-          s3 = peg$parseupperIdent();
+          s3 = peg$parseTopLevelIdent();
           if (s3 !== peg$FAILED) {
             s4 = peg$currPos;
             s5 = peg$parsewhiteSpace();
@@ -41354,7 +41475,7 @@ module.exports = (function() {
         s2 = peg$currPos;
         s3 = peg$parsewhiteSpace();
         if (s3 !== peg$FAILED) {
-          s4 = peg$parseupperIdent();
+          s4 = peg$parseTopLevelIdent();
           if (s4 !== peg$FAILED) {
             s3 = [s3, s4];
             s2 = s3;
@@ -42619,55 +42740,145 @@ module.exports = (function() {
       return s0;
     }
 
+    function peg$parseExtendsList() {
+      var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10;
+
+      s0 = peg$currPos;
+      s1 = peg$parsewhiteSpace();
+      if (s1 !== peg$FAILED) {
+        if (input.substr(peg$currPos, 7) === peg$c132) {
+          s2 = peg$c132;
+          peg$currPos += 7;
+        } else {
+          s2 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c133); }
+        }
+        if (s2 !== peg$FAILED) {
+          s3 = peg$parsewhiteSpace();
+          if (s3 !== peg$FAILED) {
+            s4 = peg$parseupperIdent();
+            if (s4 !== peg$FAILED) {
+              s5 = [];
+              s6 = peg$currPos;
+              s7 = peg$parsewhiteSpace();
+              if (s7 === peg$FAILED) {
+                s7 = null;
+              }
+              if (s7 !== peg$FAILED) {
+                if (input.charCodeAt(peg$currPos) === 44) {
+                  s8 = peg$c21;
+                  peg$currPos++;
+                } else {
+                  s8 = peg$FAILED;
+                  if (peg$silentFails === 0) { peg$fail(peg$c22); }
+                }
+                if (s8 !== peg$FAILED) {
+                  s9 = peg$parsewhiteSpace();
+                  if (s9 !== peg$FAILED) {
+                    s10 = peg$parseupperIdent();
+                    if (s10 !== peg$FAILED) {
+                      s7 = [s7, s8, s9, s10];
+                      s6 = s7;
+                    } else {
+                      peg$currPos = s6;
+                      s6 = peg$FAILED;
+                    }
+                  } else {
+                    peg$currPos = s6;
+                    s6 = peg$FAILED;
+                  }
+                } else {
+                  peg$currPos = s6;
+                  s6 = peg$FAILED;
+                }
+              } else {
+                peg$currPos = s6;
+                s6 = peg$FAILED;
+              }
+              while (s6 !== peg$FAILED) {
+                s5.push(s6);
+                s6 = peg$currPos;
+                s7 = peg$parsewhiteSpace();
+                if (s7 === peg$FAILED) {
+                  s7 = null;
+                }
+                if (s7 !== peg$FAILED) {
+                  if (input.charCodeAt(peg$currPos) === 44) {
+                    s8 = peg$c21;
+                    peg$currPos++;
+                  } else {
+                    s8 = peg$FAILED;
+                    if (peg$silentFails === 0) { peg$fail(peg$c22); }
+                  }
+                  if (s8 !== peg$FAILED) {
+                    s9 = peg$parsewhiteSpace();
+                    if (s9 !== peg$FAILED) {
+                      s10 = peg$parseupperIdent();
+                      if (s10 !== peg$FAILED) {
+                        s7 = [s7, s8, s9, s10];
+                        s6 = s7;
+                      } else {
+                        peg$currPos = s6;
+                        s6 = peg$FAILED;
+                      }
+                    } else {
+                      peg$currPos = s6;
+                      s6 = peg$FAILED;
+                    }
+                  } else {
+                    peg$currPos = s6;
+                    s6 = peg$FAILED;
+                  }
+                } else {
+                  peg$currPos = s6;
+                  s6 = peg$FAILED;
+                }
+              }
+              if (s5 !== peg$FAILED) {
+                peg$savedPos = s0;
+                s1 = peg$c134(s4, s5);
+                s0 = s1;
+              } else {
+                peg$currPos = s0;
+                s0 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s0;
+              s0 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
+          }
+        } else {
+          peg$currPos = s0;
+          s0 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s0;
+        s0 = peg$FAILED;
+      }
+
+      return s0;
+    }
+
     function peg$parseSchema() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 6) === peg$c132) {
-        s1 = peg$c132;
+      if (input.substr(peg$currPos, 6) === peg$c135) {
+        s1 = peg$c135;
         peg$currPos += 6;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c133); }
+        if (peg$silentFails === 0) { peg$fail(peg$c136); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
         if (s2 !== peg$FAILED) {
-          s3 = peg$parseupperIdent();
+          s3 = peg$parseTopLevelIdent();
           if (s3 !== peg$FAILED) {
-            s4 = peg$currPos;
-            s5 = peg$parsewhiteSpace();
-            if (s5 !== peg$FAILED) {
-              if (input.substr(peg$currPos, 7) === peg$c134) {
-                s6 = peg$c134;
-                peg$currPos += 7;
-              } else {
-                s6 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c135); }
-              }
-              if (s6 !== peg$FAILED) {
-                s7 = peg$parsewhiteSpace();
-                if (s7 !== peg$FAILED) {
-                  s8 = peg$parseupperIdent();
-                  if (s8 !== peg$FAILED) {
-                    s5 = [s5, s6, s7, s8];
-                    s4 = s5;
-                  } else {
-                    peg$currPos = s4;
-                    s4 = peg$FAILED;
-                  }
-                } else {
-                  peg$currPos = s4;
-                  s4 = peg$FAILED;
-                }
-              } else {
-                peg$currPos = s4;
-                s4 = peg$FAILED;
-              }
-            } else {
-              peg$currPos = s4;
-              s4 = peg$FAILED;
-            }
+            s4 = peg$parseExtendsList();
             if (s4 === peg$FAILED) {
               s4 = null;
             }
@@ -42727,7 +42938,7 @@ module.exports = (function() {
                 }
                 if (s6 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c136(s3, s4, s6);
+                  s1 = peg$c137(s3, s4, s6);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -42761,20 +42972,20 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 9) === peg$c137) {
-        s1 = peg$c137;
+      if (input.substr(peg$currPos, 9) === peg$c138) {
+        s1 = peg$c138;
         peg$currPos += 9;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c138); }
+        if (peg$silentFails === 0) { peg$fail(peg$c139); }
       }
       if (s1 === peg$FAILED) {
-        if (input.substr(peg$currPos, 8) === peg$c139) {
-          s1 = peg$c139;
+        if (input.substr(peg$currPos, 8) === peg$c140) {
+          s1 = peg$c140;
           peg$currPos += 8;
         } else {
           s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c140); }
+          if (peg$silentFails === 0) { peg$fail(peg$c141); }
         }
       }
       if (s1 !== peg$FAILED) {
@@ -42846,7 +43057,7 @@ module.exports = (function() {
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c141(s1, s3);
+            s1 = peg$c142(s1, s3);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -42875,7 +43086,7 @@ module.exports = (function() {
           s3 = peg$parselowerIdent();
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c142(s1, s3);
+            s1 = peg$c143(s1, s3);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -42896,20 +43107,20 @@ module.exports = (function() {
     function peg$parseSchemaType() {
       var s0;
 
-      if (input.substr(peg$currPos, 4) === peg$c143) {
-        s0 = peg$c143;
+      if (input.substr(peg$currPos, 4) === peg$c144) {
+        s0 = peg$c144;
         peg$currPos += 4;
       } else {
         s0 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c144); }
+        if (peg$silentFails === 0) { peg$fail(peg$c145); }
       }
       if (s0 === peg$FAILED) {
-        if (input.substr(peg$currPos, 3) === peg$c145) {
-          s0 = peg$c145;
+        if (input.substr(peg$currPos, 3) === peg$c146) {
+          s0 = peg$c146;
           peg$currPos += 3;
         } else {
           s0 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c146); }
+          if (peg$silentFails === 0) { peg$fail(peg$c147); }
         }
         if (s0 === peg$FAILED) {
           s0 = peg$parseSchemaUnionType();
@@ -42942,12 +43153,12 @@ module.exports = (function() {
             s5 = peg$currPos;
             s6 = peg$parsewhiteSpace();
             if (s6 !== peg$FAILED) {
-              if (input.substr(peg$currPos, 2) === peg$c147) {
-                s7 = peg$c147;
+              if (input.substr(peg$currPos, 2) === peg$c148) {
+                s7 = peg$c148;
                 peg$currPos += 2;
               } else {
                 s7 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c148); }
+                if (peg$silentFails === 0) { peg$fail(peg$c149); }
               }
               if (s7 !== peg$FAILED) {
                 s8 = peg$parsewhiteSpace();
@@ -42977,12 +43188,12 @@ module.exports = (function() {
               s5 = peg$currPos;
               s6 = peg$parsewhiteSpace();
               if (s6 !== peg$FAILED) {
-                if (input.substr(peg$currPos, 2) === peg$c147) {
-                  s7 = peg$c147;
+                if (input.substr(peg$currPos, 2) === peg$c148) {
+                  s7 = peg$c148;
                   peg$currPos += 2;
                 } else {
                   s7 = peg$FAILED;
-                  if (peg$silentFails === 0) { peg$fail(peg$c148); }
+                  if (peg$silentFails === 0) { peg$fail(peg$c149); }
                 }
                 if (s7 !== peg$FAILED) {
                   s8 = peg$parsewhiteSpace();
@@ -43023,7 +43234,7 @@ module.exports = (function() {
                 }
                 if (s6 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c149(s3, s4);
+                  s1 = peg$c150(s3, s4);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -43058,30 +43269,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 64) {
-        s1 = peg$c150;
+        s1 = peg$c151;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c151); }
+        if (peg$silentFails === 0) { peg$fail(peg$c152); }
       }
       if (s1 !== peg$FAILED) {
         s2 = [];
-        if (peg$c152.test(input.charAt(peg$currPos))) {
+        if (peg$c153.test(input.charAt(peg$currPos))) {
           s3 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c153); }
+          if (peg$silentFails === 0) { peg$fail(peg$c154); }
         }
         if (s3 !== peg$FAILED) {
           while (s3 !== peg$FAILED) {
             s2.push(s3);
-            if (peg$c152.test(input.charAt(peg$currPos))) {
+            if (peg$c153.test(input.charAt(peg$currPos))) {
               s3 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c153); }
+              if (peg$silentFails === 0) { peg$fail(peg$c154); }
             }
           }
         } else {
@@ -43089,7 +43300,7 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c154(s2);
+          s1 = peg$c155(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -43111,21 +43322,21 @@ module.exports = (function() {
       s1 = peg$currPos;
       s2 = [];
       if (input.charCodeAt(peg$currPos) === 32) {
-        s3 = peg$c155;
+        s3 = peg$c156;
         peg$currPos++;
       } else {
         s3 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c156); }
+        if (peg$silentFails === 0) { peg$fail(peg$c157); }
       }
       if (s3 !== peg$FAILED) {
         while (s3 !== peg$FAILED) {
           s2.push(s3);
           if (input.charCodeAt(peg$currPos) === 32) {
-            s3 = peg$c155;
+            s3 = peg$c156;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c156); }
+            if (peg$silentFails === 0) { peg$fail(peg$c157); }
           }
         }
       } else {
@@ -43133,7 +43344,7 @@ module.exports = (function() {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = peg$currPos;
-        s3 = peg$c157(s2);
+        s3 = peg$c158(s2);
         if (s3) {
           s3 = void 0;
         } else {
@@ -43170,105 +43381,20 @@ module.exports = (function() {
       s2 = peg$currPos;
       s3 = [];
       if (input.charCodeAt(peg$currPos) === 32) {
-        s4 = peg$c155;
+        s4 = peg$c156;
         peg$currPos++;
       } else {
         s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c156); }
+        if (peg$silentFails === 0) { peg$fail(peg$c157); }
       }
       while (s4 !== peg$FAILED) {
         s3.push(s4);
         if (input.charCodeAt(peg$currPos) === 32) {
-          s4 = peg$c155;
+          s4 = peg$c156;
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c156); }
-        }
-      }
-      if (s3 !== peg$FAILED) {
-        peg$savedPos = peg$currPos;
-        s4 = peg$c158(s3);
-        if (s4) {
-          s4 = void 0;
-        } else {
-          s4 = peg$FAILED;
-        }
-        if (s4 !== peg$FAILED) {
-          s3 = [s3, s4];
-          s2 = s3;
-        } else {
-          peg$currPos = s2;
-          s2 = peg$FAILED;
-        }
-      } else {
-        peg$currPos = s2;
-        s2 = peg$FAILED;
-      }
-      peg$silentFails--;
-      if (s2 !== peg$FAILED) {
-        peg$currPos = s1;
-        s1 = void 0;
-      } else {
-        s1 = peg$FAILED;
-      }
-      if (s1 !== peg$FAILED) {
-        s2 = [];
-        if (input.charCodeAt(peg$currPos) === 32) {
-          s3 = peg$c155;
-          peg$currPos++;
-        } else {
-          s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c156); }
-        }
-        while (s3 !== peg$FAILED) {
-          s2.push(s3);
-          if (input.charCodeAt(peg$currPos) === 32) {
-            s3 = peg$c155;
-            peg$currPos++;
-          } else {
-            s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c156); }
-          }
-        }
-        if (s2 !== peg$FAILED) {
-          s1 = [s1, s2];
-          s0 = s1;
-        } else {
-          peg$currPos = s0;
-          s0 = peg$FAILED;
-        }
-      } else {
-        peg$currPos = s0;
-        s0 = peg$FAILED;
-      }
-
-      return s0;
-    }
-
-    function peg$parseSameOrMoreIndent() {
-      var s0, s1, s2, s3, s4;
-
-      s0 = peg$currPos;
-      s1 = peg$currPos;
-      peg$silentFails++;
-      s2 = peg$currPos;
-      s3 = [];
-      if (input.charCodeAt(peg$currPos) === 32) {
-        s4 = peg$c155;
-        peg$currPos++;
-      } else {
-        s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c156); }
-      }
-      while (s4 !== peg$FAILED) {
-        s3.push(s4);
-        if (input.charCodeAt(peg$currPos) === 32) {
-          s4 = peg$c155;
-          peg$currPos++;
-        } else {
-          s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c156); }
+          if (peg$silentFails === 0) { peg$fail(peg$c157); }
         }
       }
       if (s3 !== peg$FAILED) {
@@ -43300,20 +43426,20 @@ module.exports = (function() {
       if (s1 !== peg$FAILED) {
         s2 = [];
         if (input.charCodeAt(peg$currPos) === 32) {
-          s3 = peg$c155;
+          s3 = peg$c156;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c156); }
+          if (peg$silentFails === 0) { peg$fail(peg$c157); }
         }
         while (s3 !== peg$FAILED) {
           s2.push(s3);
           if (input.charCodeAt(peg$currPos) === 32) {
-            s3 = peg$c155;
+            s3 = peg$c156;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c156); }
+            if (peg$silentFails === 0) { peg$fail(peg$c157); }
           }
         }
         if (s2 !== peg$FAILED) {
@@ -43331,35 +43457,137 @@ module.exports = (function() {
       return s0;
     }
 
+    function peg$parseSameOrMoreIndent() {
+      var s0, s1, s2, s3, s4;
+
+      s0 = peg$currPos;
+      s1 = peg$currPos;
+      peg$silentFails++;
+      s2 = peg$currPos;
+      s3 = [];
+      if (input.charCodeAt(peg$currPos) === 32) {
+        s4 = peg$c156;
+        peg$currPos++;
+      } else {
+        s4 = peg$FAILED;
+        if (peg$silentFails === 0) { peg$fail(peg$c157); }
+      }
+      while (s4 !== peg$FAILED) {
+        s3.push(s4);
+        if (input.charCodeAt(peg$currPos) === 32) {
+          s4 = peg$c156;
+          peg$currPos++;
+        } else {
+          s4 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c157); }
+        }
+      }
+      if (s3 !== peg$FAILED) {
+        peg$savedPos = peg$currPos;
+        s4 = peg$c160(s3);
+        if (s4) {
+          s4 = void 0;
+        } else {
+          s4 = peg$FAILED;
+        }
+        if (s4 !== peg$FAILED) {
+          s3 = [s3, s4];
+          s2 = s3;
+        } else {
+          peg$currPos = s2;
+          s2 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s2;
+        s2 = peg$FAILED;
+      }
+      peg$silentFails--;
+      if (s2 !== peg$FAILED) {
+        peg$currPos = s1;
+        s1 = void 0;
+      } else {
+        s1 = peg$FAILED;
+      }
+      if (s1 !== peg$FAILED) {
+        s2 = [];
+        if (input.charCodeAt(peg$currPos) === 32) {
+          s3 = peg$c156;
+          peg$currPos++;
+        } else {
+          s3 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c157); }
+        }
+        while (s3 !== peg$FAILED) {
+          s2.push(s3);
+          if (input.charCodeAt(peg$currPos) === 32) {
+            s3 = peg$c156;
+            peg$currPos++;
+          } else {
+            s3 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c157); }
+          }
+        }
+        if (s2 !== peg$FAILED) {
+          s1 = [s1, s2];
+          s0 = s1;
+        } else {
+          peg$currPos = s0;
+          s0 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s0;
+        s0 = peg$FAILED;
+      }
+
+      return s0;
+    }
+
+    function peg$parseTopLevelIdent() {
+      var s0, s1;
+
+      s0 = peg$parseupperIdent();
+      if (s0 === peg$FAILED) {
+        s0 = peg$currPos;
+        s1 = peg$parselowerIdent();
+        if (s1 !== peg$FAILED) {
+          peg$savedPos = s0;
+          s1 = peg$c161();
+        }
+        s0 = s1;
+      }
+
+      return s0;
+    }
+
     function peg$parsebackquotedString() {
       var s0, s1, s2, s3;
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 96) {
-        s1 = peg$c160;
+        s1 = peg$c162;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c161); }
+        if (peg$silentFails === 0) { peg$fail(peg$c163); }
       }
       if (s1 !== peg$FAILED) {
         s2 = [];
-        if (peg$c162.test(input.charAt(peg$currPos))) {
+        if (peg$c164.test(input.charAt(peg$currPos))) {
           s3 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c163); }
+          if (peg$silentFails === 0) { peg$fail(peg$c165); }
         }
         if (s3 !== peg$FAILED) {
           while (s3 !== peg$FAILED) {
             s2.push(s3);
-            if (peg$c162.test(input.charAt(peg$currPos))) {
+            if (peg$c164.test(input.charAt(peg$currPos))) {
               s3 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c163); }
+              if (peg$silentFails === 0) { peg$fail(peg$c165); }
             }
           }
         } else {
@@ -43367,15 +43595,15 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           if (input.charCodeAt(peg$currPos) === 96) {
-            s3 = peg$c160;
+            s3 = peg$c162;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c161); }
+            if (peg$silentFails === 0) { peg$fail(peg$c163); }
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c164(s2);
+            s1 = peg$c166(s2);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -43398,30 +43626,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 39) {
-        s1 = peg$c165;
+        s1 = peg$c167;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c166); }
+        if (peg$silentFails === 0) { peg$fail(peg$c168); }
       }
       if (s1 !== peg$FAILED) {
         s2 = [];
-        if (peg$c167.test(input.charAt(peg$currPos))) {
+        if (peg$c169.test(input.charAt(peg$currPos))) {
           s3 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c168); }
+          if (peg$silentFails === 0) { peg$fail(peg$c170); }
         }
         if (s3 !== peg$FAILED) {
           while (s3 !== peg$FAILED) {
             s2.push(s3);
-            if (peg$c167.test(input.charAt(peg$currPos))) {
+            if (peg$c169.test(input.charAt(peg$currPos))) {
               s3 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c168); }
+              if (peg$silentFails === 0) { peg$fail(peg$c170); }
             }
           }
         } else {
@@ -43429,15 +43657,15 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           if (input.charCodeAt(peg$currPos) === 39) {
-            s3 = peg$c165;
+            s3 = peg$c167;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c166); }
+            if (peg$silentFails === 0) { peg$fail(peg$c168); }
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c169(s2);
+            s1 = peg$c171(s2);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -43460,30 +43688,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       s1 = peg$currPos;
-      if (peg$c170.test(input.charAt(peg$currPos))) {
+      if (peg$c172.test(input.charAt(peg$currPos))) {
         s2 = input.charAt(peg$currPos);
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c171); }
+        if (peg$silentFails === 0) { peg$fail(peg$c173); }
       }
       if (s2 !== peg$FAILED) {
         s3 = [];
-        if (peg$c172.test(input.charAt(peg$currPos))) {
+        if (peg$c174.test(input.charAt(peg$currPos))) {
           s4 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c173); }
+          if (peg$silentFails === 0) { peg$fail(peg$c175); }
         }
         while (s4 !== peg$FAILED) {
           s3.push(s4);
-          if (peg$c172.test(input.charAt(peg$currPos))) {
+          if (peg$c174.test(input.charAt(peg$currPos))) {
             s4 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c173); }
+            if (peg$silentFails === 0) { peg$fail(peg$c175); }
           }
         }
         if (s3 !== peg$FAILED) {
@@ -43499,7 +43727,7 @@ module.exports = (function() {
       }
       if (s1 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c174(s1);
+        s1 = peg$c176(s1);
       }
       s0 = s1;
 
@@ -43511,30 +43739,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       s1 = peg$currPos;
-      if (peg$c175.test(input.charAt(peg$currPos))) {
+      if (peg$c177.test(input.charAt(peg$currPos))) {
         s2 = input.charAt(peg$currPos);
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c176); }
+        if (peg$silentFails === 0) { peg$fail(peg$c178); }
       }
       if (s2 !== peg$FAILED) {
         s3 = [];
-        if (peg$c172.test(input.charAt(peg$currPos))) {
+        if (peg$c174.test(input.charAt(peg$currPos))) {
           s4 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c173); }
+          if (peg$silentFails === 0) { peg$fail(peg$c175); }
         }
         while (s4 !== peg$FAILED) {
           s3.push(s4);
-          if (peg$c172.test(input.charAt(peg$currPos))) {
+          if (peg$c174.test(input.charAt(peg$currPos))) {
             s4 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c173); }
+            if (peg$silentFails === 0) { peg$fail(peg$c175); }
           }
         }
         if (s3 !== peg$FAILED) {
@@ -43550,7 +43778,7 @@ module.exports = (function() {
       }
       if (s1 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c174(s1);
+        s1 = peg$c176(s1);
       }
       s0 = s1;
 
@@ -43562,21 +43790,21 @@ module.exports = (function() {
 
       s0 = [];
       if (input.charCodeAt(peg$currPos) === 32) {
-        s1 = peg$c155;
+        s1 = peg$c156;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c156); }
+        if (peg$silentFails === 0) { peg$fail(peg$c157); }
       }
       if (s1 !== peg$FAILED) {
         while (s1 !== peg$FAILED) {
           s0.push(s1);
           if (input.charCodeAt(peg$currPos) === 32) {
-            s1 = peg$c155;
+            s1 = peg$c156;
             peg$currPos++;
           } else {
             s1 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c156); }
+            if (peg$silentFails === 0) { peg$fail(peg$c157); }
           }
         }
       } else {
@@ -43591,21 +43819,21 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       s1 = [];
-      if (peg$c177.test(input.charAt(peg$currPos))) {
+      if (peg$c179.test(input.charAt(peg$currPos))) {
         s2 = input.charAt(peg$currPos);
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c178); }
+        if (peg$silentFails === 0) { peg$fail(peg$c180); }
       }
       while (s2 !== peg$FAILED) {
         s1.push(s2);
-        if (peg$c177.test(input.charAt(peg$currPos))) {
+        if (peg$c179.test(input.charAt(peg$currPos))) {
           s2 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c178); }
+          if (peg$silentFails === 0) { peg$fail(peg$c180); }
         }
       }
       if (s1 !== peg$FAILED) {
@@ -43616,7 +43844,7 @@ module.exports = (function() {
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c179); }
+          if (peg$silentFails === 0) { peg$fail(peg$c181); }
         }
         peg$silentFails--;
         if (s3 === peg$FAILED) {
@@ -43639,21 +43867,21 @@ module.exports = (function() {
       if (s0 === peg$FAILED) {
         s0 = peg$currPos;
         s1 = [];
-        if (peg$c177.test(input.charAt(peg$currPos))) {
+        if (peg$c179.test(input.charAt(peg$currPos))) {
           s2 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c178); }
+          if (peg$silentFails === 0) { peg$fail(peg$c180); }
         }
         while (s2 !== peg$FAILED) {
           s1.push(s2);
-          if (peg$c177.test(input.charAt(peg$currPos))) {
+          if (peg$c179.test(input.charAt(peg$currPos))) {
             s2 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s2 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c178); }
+            if (peg$silentFails === 0) { peg$fail(peg$c180); }
           }
         }
         if (s1 !== peg$FAILED) {
@@ -43666,21 +43894,21 @@ module.exports = (function() {
           }
           if (s2 !== peg$FAILED) {
             s3 = [];
-            if (peg$c180.test(input.charAt(peg$currPos))) {
+            if (peg$c182.test(input.charAt(peg$currPos))) {
               s4 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s4 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c181); }
+              if (peg$silentFails === 0) { peg$fail(peg$c183); }
             }
             while (s4 !== peg$FAILED) {
               s3.push(s4);
-              if (peg$c180.test(input.charAt(peg$currPos))) {
+              if (peg$c182.test(input.charAt(peg$currPos))) {
                 s4 = input.charAt(peg$currPos);
                 peg$currPos++;
               } else {
                 s4 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c181); }
+                if (peg$silentFails === 0) { peg$fail(peg$c183); }
               }
             }
             if (s3 !== peg$FAILED) {
@@ -43707,49 +43935,49 @@ module.exports = (function() {
         if (s0 === peg$FAILED) {
           s0 = peg$currPos;
           s1 = [];
-          if (peg$c177.test(input.charAt(peg$currPos))) {
+          if (peg$c179.test(input.charAt(peg$currPos))) {
             s2 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s2 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c178); }
+            if (peg$silentFails === 0) { peg$fail(peg$c180); }
           }
           while (s2 !== peg$FAILED) {
             s1.push(s2);
-            if (peg$c177.test(input.charAt(peg$currPos))) {
+            if (peg$c179.test(input.charAt(peg$currPos))) {
               s2 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s2 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c178); }
+              if (peg$silentFails === 0) { peg$fail(peg$c180); }
             }
           }
           if (s1 !== peg$FAILED) {
             if (input.charCodeAt(peg$currPos) === 13) {
-              s2 = peg$c182;
+              s2 = peg$c184;
               peg$currPos++;
             } else {
               s2 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c183); }
+              if (peg$silentFails === 0) { peg$fail(peg$c185); }
             }
             if (s2 === peg$FAILED) {
               s2 = null;
             }
             if (s2 !== peg$FAILED) {
               if (input.charCodeAt(peg$currPos) === 10) {
-                s3 = peg$c184;
+                s3 = peg$c186;
                 peg$currPos++;
               } else {
                 s3 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c185); }
+                if (peg$silentFails === 0) { peg$fail(peg$c187); }
               }
               if (s3 !== peg$FAILED) {
                 if (input.charCodeAt(peg$currPos) === 13) {
-                  s4 = peg$c182;
+                  s4 = peg$c184;
                   peg$currPos++;
                 } else {
                   s4 = peg$FAILED;
-                  if (peg$silentFails === 0) { peg$fail(peg$c183); }
+                  if (peg$silentFails === 0) { peg$fail(peg$c185); }
                 }
                 if (s4 === peg$FAILED) {
                   s4 = null;
@@ -43790,7 +44018,7 @@ module.exports = (function() {
 
 
 
-      let Type = __webpack_require__(9);
+      let Type = __webpack_require__(10);
 
       var indent = '';
       var indents = [];
@@ -43851,7 +44079,7 @@ module.exports = (function() {
 
 
 const assert = __webpack_require__(1);
-const Template = __webpack_require__(111);
+const Template = __webpack_require__(112);
 
 // TODO(sjmiles): should be elsewhere
 // TODO(sjmiles): using Node syntax to import custom-elements in strictly-browser context
@@ -43963,7 +44191,12 @@ class DomContext {
     return innerSlotById;
   }
   _eventMapper(eventHandler, node, eventName, handlerName) {
-    node.addEventListener(eventName, () => {
+    node.addEventListener(eventName, event => {
+      // TODO(sjmiles): we have an extremely minimalist approach to events here, this is useful IMO for
+      // finding the smallest set of features that we are going to need.
+      // First problem: click event firing multiple times as it bubbles up the tree, minimalist solution
+      // is to enforce a 'first listener' rule by executing `stopPropagation`.
+      event.stopPropagation();
       eventHandler({
         handler: handlerName,
         data: {
@@ -44199,7 +44432,7 @@ module.exports = DomSlot;
 
 const InnerPec = __webpack_require__(232);
 const MessageChannel = __webpack_require__(233);
-const Loader = __webpack_require__(113);
+const Loader = __webpack_require__(59);
 
 // TODO: Make this generic so that it can also be used in-browser, or add a
 // separate in-process browser pec-factory.
@@ -44225,7 +44458,7 @@ module.exports = function(id) {
 
 
 const assert = __webpack_require__(1);
-const Type = __webpack_require__(9);
+const Type = __webpack_require__(10);
 
 // TODO: relation identifier should incorporate key/value identifiers
 class Identifier {
@@ -44262,23 +44495,31 @@ module.exports = Identifier;
  */
 
 
-const Type = __webpack_require__(9);
+const Type = __webpack_require__(10);
 const viewlet = __webpack_require__(120);
-const define = __webpack_require__(44).define;
+const define = __webpack_require__(45).define;
 const assert = __webpack_require__(1);
-const PECInnerPort = __webpack_require__(109).PECInnerPort;
-const ParticleSpec = __webpack_require__(43);
+const PECInnerPort = __webpack_require__(110).PECInnerPort;
+const ParticleSpec = __webpack_require__(44);
 const Schema = __webpack_require__(21);
 
 class RemoteView {
   constructor(id, type, port, pec, name, version) {
     this._id = id;
-    this.type = type;
+    this._type = type;
     this._port = port;
     this._pec = pec;
     this.name = name;
     this._version = version;
     this.state = 'outOfDate';
+  }
+
+  get id() {
+    return this._id;
+  }
+
+  get type() {
+    return this._type;
   }
 
   generateID() {
@@ -44345,6 +44586,12 @@ class InnerPEC {
       return new RemoteView(identifier, Type.fromLiteral(viewType), this._apiPort, this, name, version);
     };
 
+    this._apiPort.onCreateViewCallback = ({viewType, identifier, id, name, callback}) => {
+      var view = new RemoteView(id, Type.fromLiteral(viewType), this._apiPort, this, name, 0);
+      Promise.resolve().then(() => callback(view));
+      return view;
+    }
+
     this._apiPort.onDefineParticle = ({particleDefinition, particleFunction}) => {
       var particle = define(particleDefinition, eval(particleFunction));
       this._loader.registerParticle(particle);
@@ -44359,9 +44606,9 @@ class InnerPEC {
     this._apiPort.onInstantiateParticle =
       ({spec, views}) => this._instantiateParticle(spec, views);
 
-    this._apiPort.onViewCallback = ({callback, data}) => callback(data);
+    this._apiPort.onSimpleCallback = ({callback, data}) => callback(data);
 
-    this._apiPort.onParticleCallback = ({callback}) => callback();
+    this._apiPort.onConstructArcCallback = ({callback, arc}) => callback(arc);
 
     this._apiPort.onAwaitIdle = ({version}) =>
       this.idle.then(a => this._apiPort.Idle({version, relevance: this.relevance}));
@@ -44428,15 +44675,35 @@ class InnerPEC {
     return `${this._idBase}:${this._nextLocalID++}`;
   }
 
-  innerArcHandle() {
-    return {};
+  innerArcHandle(arcId) {
+    var pec = this;
+    return {
+      createView: function(viewType, name) {
+        return new Promise((resolve, reject) =>
+          pec._apiPort.ArcCreateView({arc: arcId, viewType, name, callback: view => {
+            var v = viewlet.viewletFor(view, view.type.isView, true, true);
+            v.entityClass = new Schema(view.type.isView ? view.type.primitiveType().entitySchema : view.type.entitySchema).entityClass();
+            resolve(v);
+          }}));
+      },
+      loadRecipe: function(recipe) {
+        // TODO: do we want to return a promise on completion?
+        return new Promise((resolve, reject) =>
+          pec._apiPort.ArcLoadRecipe({arc: arcId, recipe, callback: a => {
+            if (a == undefined)
+              resolve();
+            else
+              reject(a);
+          }}));
+      }
+    };
   }
 
   defaultCapabilitySet() {
     return {
       constructInnerArc: particle => {
         return new Promise((resolve, reject) =>
-          this._apiPort.ConstructInnerArc({ callback: () => {resolve(this.innerArcHandle())}, particle }));
+          this._apiPort.ConstructInnerArc({ callback: arcId => {resolve(this.innerArcHandle(arcId))}, particle }));
       }
     }
   }
@@ -45379,13 +45646,13 @@ module.exports = {
     '936': 'cp936',
     'cp936': {
         type: '_dbcs',
-        table: function() { return __webpack_require__(59) },
+        table: function() { return __webpack_require__(60) },
     },
 
     // GBK (~22000 chars) is an extension of CP936 that added user-mapped chars and some other.
     'gbk': {
         type: '_dbcs',
-        table: function() { return __webpack_require__(59).concat(__webpack_require__(115)) },
+        table: function() { return __webpack_require__(60).concat(__webpack_require__(115)) },
     },
     'xgbk': 'gbk',
     'isoir58': 'gbk',
@@ -45397,7 +45664,7 @@ module.exports = {
     // http://www.khngai.com/chinese/charmap/tblgbk.php?page=0
     'gb18030': {
         type: '_dbcs',
-        table: function() { return __webpack_require__(59).concat(__webpack_require__(115)) },
+        table: function() { return __webpack_require__(60).concat(__webpack_require__(115)) },
         gb18030: function() { return __webpack_require__(247) },
         encodeSkipVals: [0x80],
         encodeAdd: {'€': 0xA2E3},
@@ -45555,7 +45822,7 @@ InternalCodec.prototype.decoder = InternalDecoder;
 //------------------------------------------------------------------------------
 
 // We use node.js internal decoder. Its signature is the same as ours.
-var StringDecoder = __webpack_require__(37).StringDecoder;
+var StringDecoder = __webpack_require__(38).StringDecoder;
 
 if (!StringDecoder.prototype.end) // Node v0.8 doesn't have this method.
     StringDecoder.prototype.end = function() {};
@@ -47352,7 +47619,7 @@ if (false) {
     console.error("iconv-lite warning: javascript files are loaded not with utf-8 encoding. See https://github.com/ashtuchkin/iconv-lite/wiki/Javascript-source-file-encodings for more info.");
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
 
 /***/ }),
 /* 254 */
@@ -47756,7 +48023,7 @@ function isNumber (x) {
 /* 257 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(process) {var path = __webpack_require__(91);
+/* WEBPACK VAR INJECTION */(function(process) {var path = __webpack_require__(92);
 var fs = __webpack_require__(53);
 var _0777 = parseInt('0777', 8);
 
@@ -47855,7 +48122,7 @@ mkdirP.sync = function sync (p, opts, made) {
     return made;
 };
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
 
 /***/ }),
 /* 258 */
@@ -47868,16 +48135,16 @@ mkdirP.sync = function sync (p, opts, made) {
  * a request API compatible with window.fetch
  */
 
-var parse_url = __webpack_require__(41).parse;
-var resolve_url = __webpack_require__(41).resolve;
+var parse_url = __webpack_require__(42).parse;
+var resolve_url = __webpack_require__(42).resolve;
 var http = __webpack_require__(57);
 var https = __webpack_require__(182);
 var zlib = __webpack_require__(146);
 var stream = __webpack_require__(16);
 
-var Body = __webpack_require__(60);
+var Body = __webpack_require__(61);
 var Response = __webpack_require__(260);
-var Headers = __webpack_require__(61);
+var Headers = __webpack_require__(62);
 var Request = __webpack_require__(259);
 var FetchError = __webpack_require__(116);
 
@@ -48146,9 +48413,9 @@ Fetch.Request = Request;
  * Request class contains server only options
  */
 
-var parse_url = __webpack_require__(41).parse;
-var Headers = __webpack_require__(61);
-var Body = __webpack_require__(60);
+var parse_url = __webpack_require__(42).parse;
+var Headers = __webpack_require__(62);
+var Body = __webpack_require__(61);
 
 module.exports = Request;
 
@@ -48228,8 +48495,8 @@ Request.prototype.clone = function() {
  */
 
 var http = __webpack_require__(57);
-var Headers = __webpack_require__(61);
-var Body = __webpack_require__(60);
+var Headers = __webpack_require__(62);
+var Body = __webpack_require__(61);
 
 module.exports = Response;
 
@@ -48293,7 +48560,7 @@ var parseArgs = __webpack_require__(256);
 
 module.exports = parseArgs(process.argv.slice(2));
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(5)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(7)))
 
 /***/ }),
 /* 262 */
@@ -48313,16 +48580,19 @@ module.exports = parseArgs(process.argv.slice(2));
 
 const PEC = __webpack_require__(263);
 const assert = __webpack_require__(1);
-const PECOuterPort = __webpack_require__(109).PECOuterPort;
+const PECOuterPort = __webpack_require__(110).PECOuterPort;
+const Manifest = __webpack_require__(31);
+
+// TODO: fix
+const Loader = __webpack_require__(59);
 
 class OuterPEC extends PEC {
-  constructor(port, slotComposer) {
+  constructor(port, slotComposer, arc) {
     super();
     this._particles = [];
     this._apiPort = new PECOuterPort(port);
+    this._arc = arc;
     this._nextIdentifier = 0;
-    this._idMap = new Map();
-    this._reverseIdMap = new Map();
     this.slotComposer = slotComposer;
 
     this._apiPort.onRender = ({particle, slotName, content}) => {
@@ -48337,16 +48607,16 @@ class OuterPEC extends PEC {
       } else {
         var model = view.toList();
       }
-      this._apiPort.ViewCallback({callback: modelCallback, data: model}, target);
-      view.on(type, data => this._apiPort.ViewCallback({callback, data}), target);
+      this._apiPort.SimpleCallback({callback: modelCallback, data: model}, target);
+      view.on(type, data => this._apiPort.SimpleCallback({callback, data}), target);
     };
 
     this._apiPort.onViewGet = ({view, callback}) => {
-      this._apiPort.ViewCallback({callback, data: view.get()});
+      this._apiPort.SimpleCallback({callback, data: view.get()});
     }
 
     this._apiPort.onViewToList = ({view, callback}) => {
-      this._apiPort.ViewCallback({callback, data: view.toList()});
+      this._apiPort.SimpleCallback({callback, data: view.toList()});
     }
 
     this._apiPort.onViewSet = ({view, data}) => view.set(data);
@@ -48362,7 +48632,36 @@ class OuterPEC extends PEC {
     }
 
     this._apiPort.onConstructInnerArc = ({callback, particle}) => {
-      this._apiPort.ParticleCallback({callback});
+      var arc = {};
+      this._apiPort.ConstructArcCallback({callback, arc});
+    }
+
+    this._apiPort.onArcCreateView = ({callback, arc, viewType, name}) => {
+      var view = this._arc.createView(viewType, name);
+      this._apiPort.CreateViewCallback(view, {viewType, name, callback, id: view.id});
+    }
+
+    this._apiPort.onArcLoadRecipe = async ({arc, recipe, callback}) => {
+      let manifest = await Manifest.parse(recipe, {loader: this._arc._loader, fileName: ''});
+      let error = undefined
+      var recipe = manifest.recipes[0];
+      if (recipe) {
+        for (var view of recipe.views) {
+          view.mapToView(this._arc.findViewById(view.id));
+        }
+        if (recipe.normalize()) {
+          if (recipe.isResolved()) {
+            this._arc.instantiate(recipe);
+          } else {
+            error = "Recipe is not resolvable";
+          }
+        } else {
+          error = "Recipe could not be normalized";
+        }
+      } else {
+        error = "No recipe defined";
+      }
+      this._apiPort.SimpleCallback({callback, data: error})
     }
   }
 
@@ -49068,7 +49367,7 @@ module.exports = Slot;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-var Type = __webpack_require__(9);
+var Type = __webpack_require__(10);
 var assert = __webpack_require__(1);
 
 class TypeChecker {
@@ -49127,15 +49426,18 @@ class TypeChecker {
       supertype = supertype.primitiveType();
     }
 
-    if (subtype.isEntity && supertype.isEntity) {
-      var t = subtype.entitySchema;
-      while (t) {
-        if (t == supertype.entitySchema)
+    function checkSuper(schema) {
+      if (!schema)
+        return false;
+      if (schema == supertype.entitySchema)
+        return true;
+      for (let parent of schema.parents)
+        if (checkSuper(parent))
           return true;
-        t = t.parent;
-      }
+      return false;
     }
-    return false;
+
+    return checkSuper(subtype.entitySchema);
   }
 
   // left, right: {type, direction, connection}
@@ -49282,6 +49584,12 @@ class ViewConnection {
     return this._rawType;
   }
   get direction() { return this._direction; } // in/out
+  get isInput() {
+    return this.direction == "in" || this.direction == "inout";
+  }
+  get isOutput() {
+    return this.direction == "out" || this.direction == "inout";
+  }
   get view() { return this._view; } // View?
   get particle() { return this._particle; } // never null
 
@@ -49402,14 +49710,17 @@ class View {
     this._localName = undefined;
     this._tags = [];
     this._type = undefined;
-    this._fate = "?";
+    this._fate = null;
+    // TODO: replace originalFate with more generic mechanism for tracking
+    // how and from what the recipe was generated.
+    this._originalFate = null;
     this._connections = [];
     this._mappedType = undefined;
   }
 
   _copyInto(recipe) {
     var view = undefined;
-    if (this._id !== null && ['map', 'use', 'copy'].includes(this._fate))
+    if (this._id !== null && ['map', 'use', 'copy'].includes(this.fate))
       view = recipe.findView(this._id);
 
     if (view == undefined) {
@@ -49418,6 +49729,7 @@ class View {
       view._tags = [...this._tags];
       view._type = this._type;
       view._fate = this._fate;
+      view._originalFate = this._originalFate;
       view._mappedType = this._mappedType;
 
       // the connections are re-established when Particles clone their
@@ -49447,13 +49759,19 @@ class View {
     if ((cmp = util.compareStrings(this._localName, other._localName)) != 0) return cmp;
     if ((cmp = util.compareArrays(this._tags, other._tags, util.compareStrings)) != 0) return cmp;
     // TODO: type?
-    if ((cmp = util.compareStrings(this._fate, other._fate)) != 0) return cmp;
+    if ((cmp = util.compareStrings(this.fate, other.fate)) != 0) return cmp;
     return 0;
   }
 
   // a resolved View has either an id or create=true
-  get fate() { return this._fate; }
-  set fate(fate) { this._fate = fate; }
+  get fate() { return this._fate || "?"; }
+  set fate(fate) {
+    if (!this._originalFate) {
+      this._originalFate = this._fate;
+    }
+    this._fate = fate;
+  }
+  get originalFate() { return this._originalFate || "?"; }
   get recipe() { return this._recipe; }
   get tags() { return this._tags; } // only tags owned by the view
   set tags(tags) { this._tags = tags; }
@@ -49500,7 +49818,7 @@ class View {
       }
       return false;
     }
-    switch (this._fate) {
+    switch (this.fate) {
       case "?": {
         if (options) {
           options.details = "missing fate";
@@ -49519,9 +49837,9 @@ class View {
         return true;
       default: {
         if (options) {
-          options.details = `invalid fate ${this._fate}`;
+          options.details = `invalid fate ${this.fate}`;
         }
-        assert(false, `Unexpected fate: ${this._fate}`);
+        assert(false, `Unexpected fate: ${this.fate}`);
       }
     }
   }
@@ -49529,7 +49847,7 @@ class View {
   toString(nameMap, options) {
     // TODO: type? maybe output in a comment
     let result = [];
-    result.push(this._fate);
+    result.push(this.fate);
     if (this.id) {
       result.push(`'${this.id}'`);
     }
@@ -49564,8 +49882,8 @@ module.exports = View;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-var Strategizer = __webpack_require__(7).Strategizer;
-var Recipe = __webpack_require__(6);
+var Strategizer = __webpack_require__(6).Strategizer;
+var Recipe = __webpack_require__(4);
 var assert = __webpack_require__(1);
 
 class WalkerBase extends Strategizer.Walker {
@@ -49786,14 +50104,14 @@ module.exports = Speculator;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let Recipe = __webpack_require__(6);
-let RecipeWalker = __webpack_require__(11);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
 
 class AddUseViews extends Strategy {
   // TODO: move generation to use an async generator.
   async generate(strategizer) {
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onRecipe(recipe) {
         // Don't add use views while there are outstanding constraints
         if (recipe.connectionConstraints.length > 0)
@@ -49835,11 +50153,11 @@ module.exports = AddUseViews;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let RecipeWalker = __webpack_require__(11);
-let Recipe = __webpack_require__(6);
+let {Strategy} = __webpack_require__(6);
+let RecipeWalker = __webpack_require__(8);
+let Recipe = __webpack_require__(4);
 let RecipeUtil = __webpack_require__(17);
-let ViewMapperBase = __webpack_require__(64);
+let ViewMapperBase = __webpack_require__(65);
 let Schema = __webpack_require__(21);
 
 let assert = __webpack_require__(1);
@@ -49874,11 +50192,11 @@ module.exports = AssignRemoteViews;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let RecipeWalker = __webpack_require__(11);
-let Recipe = __webpack_require__(6);
+let {Strategy} = __webpack_require__(6);
+let RecipeWalker = __webpack_require__(8);
+let Recipe = __webpack_require__(4);
 let RecipeUtil = __webpack_require__(17);
-let ViewMapperBase = __webpack_require__(64);
+let ViewMapperBase = __webpack_require__(65);
 
 let assert = __webpack_require__(1);
 
@@ -49912,9 +50230,70 @@ module.exports = AssignViewsByTagAndType;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let Recipe = __webpack_require__(6);
-let RecipeWalker = __webpack_require__(11);
+let assert = __webpack_require__(1);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
+
+module.exports = class CombinedStrategy extends Strategy {
+  constructor(strategies) {
+    super();
+    assert(strategies.length > 1, 'Strategies must contain at least 2 elements.');
+    this._strategies = strategies;
+    this._strategies.forEach(strategy => assert(strategy.walker));
+    assert(this._strategies[0].getResults);
+  }
+  _getLeaves(results) {
+    // Only use leaf recipes.
+    let recipeByParent = new Map();
+    let resultsList = [...results.values()];
+    resultsList.forEach(r => {
+      r.derivation.forEach(d => {
+        if (d.parent) {
+          recipeByParent.set(d.parent, r);
+        }
+      });
+    });
+    return resultsList.filter(r => !recipeByParent.has(r));
+  }
+  async generate(strategizer) {
+    let results = this._strategies[0].getResults(strategizer);
+    let totalResults = new Map();
+    for (let strategy of this._strategies) {
+      results = Recipe.over(results, strategy.walker, strategy);
+      results = await Promise.all(results.map(async result => {
+        if (result.hash) {
+          result.hash = await result.hash;
+        }
+        if (!totalResults.has(result.hash)) {
+          // TODO: deduping of results is already done in strategizer.
+          // It should dedup the intermeditate derivations as well.
+          totalResults.set(result.hash, result);
+        }
+        return result;
+      }));
+      results = this._getLeaves(totalResults);
+    }
+
+    return { results, generate: null };
+  }
+};
+
+
+/***/ }),
+/* 278 */
+/***/ (function(module, exports, __webpack_require__) {
+
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
 let RecipeUtil = __webpack_require__(17);
 
 class ConvertConstraintsToConnections extends Strategy {
@@ -49924,7 +50303,7 @@ class ConvertConstraintsToConnections extends Strategy {
   }
   async generate(strategizer) {
     var affordance = this.affordance;
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onRecipe(recipe) {
         var particles = new Set();
         var views = new Set();
@@ -49975,6 +50354,7 @@ class ConvertConstraintsToConnections extends Strategy {
                 var recipeView = recipeMap[view];
                 if (recipeView == null) {
                   recipeView = recipe.newView();
+                  recipeView.fate = 'create';
                   recipeMap[view] = recipeView;
                 }
                 if (recipeViewConnection.view == null)
@@ -49996,7 +50376,7 @@ module.exports = ConvertConstraintsToConnections;
 
 
 /***/ }),
-/* 278 */
+/* 279 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50006,11 +50386,11 @@ module.exports = ConvertConstraintsToConnections;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let RecipeWalker = __webpack_require__(11);
-let Recipe = __webpack_require__(6);
+let {Strategy} = __webpack_require__(6);
+let RecipeWalker = __webpack_require__(8);
+let Recipe = __webpack_require__(4);
 let RecipeUtil = __webpack_require__(17);
-let ViewMapperBase = __webpack_require__(64);
+let ViewMapperBase = __webpack_require__(65);
 let Schema = __webpack_require__(21);
 
 let assert = __webpack_require__(1);
@@ -50035,7 +50415,61 @@ module.exports = CopyRemoteViews;
 
 
 /***/ }),
-/* 279 */
+/* 280 */
+/***/ (function(module, exports, __webpack_require__) {
+
+
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+let assert = __webpack_require__(1);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
+
+class FallbackFate extends Strategy {
+  async generate(strategizer) {
+    assert(strategizer);
+    let generated = strategizer.generated.filter(result => !result.result.isResolved());
+    let terminal = strategizer.terminal;
+    var results = Recipe.over([...generated, ...terminal], new class extends RecipeWalker {
+      onView(recipe, view) {
+        // Only apply this strategy only to user query based recipes with resolved tokens.
+        if (!recipe.search || (recipe.search.resolvedTokens.length == 0)) {
+          return;
+        }
+
+        // Only apply to views whose fate is set, but wasn't explicitly defined in the recipe.
+        if (view.isResolved() || view.fate == "?" || view.originalFate != "?") {
+          return;
+        }
+
+        let hasOutConns = view.connections.some(vc => vc.isOutput);
+        let newFate = hasOutConns ? "copy" : "map";
+        if (view.fate == newFate) {
+          return;
+        }
+
+        return (recipe, clonedView) => {
+          clonedView.fate = newFate;
+          return 0;
+        };
+      }
+    }(RecipeWalker.Permuted), this);
+
+    return { results, generate: null };
+  }
+}
+
+module.exports = FallbackFate;
+
+
+/***/ }),
+/* 281 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50045,7 +50479,127 @@ module.exports = CopyRemoteViews;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
+let assert = __webpack_require__(1);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
+
+module.exports = class GroupViewConnections extends Strategy {
+  constructor() {
+    super();
+
+    this._walker = new class extends RecipeWalker {
+      onRecipe(recipe) {
+        // Only apply this strategy if ALL view connections are named and have types.
+        if (recipe.viewConnections.find(vc => !vc.type || !vc.name)) {
+          return;
+        }
+        // Find all unique types used in the recipe that have unbound view connections.
+        let types = new Set();
+        recipe.viewConnections.forEach(vc => {
+          if (!vc.view && !Array.from(types).find(t => t.equals(vc.type))) {
+            types.add(vc.type);
+          }
+        });
+
+        let groupsByType = new Map();
+        types.forEach(type => {
+          // Find the particle with the largest number of unbound connections of the same type.
+          let countConnectionsByType = (connections) => Object.values(connections).filter(conn => {
+            return !conn.view && type.equals(conn.type);
+          }).length;
+          let sortedParticles = [...recipe.particles].sort((p1, p2) => {
+            return countConnectionsByType(p2.connections) - countConnectionsByType(p1.connections);
+          }).filter(p => countConnectionsByType(p.connections) > 0);
+          assert(sortedParticles.length > 0);
+
+          // View connections of the same particle cannot be bound to the same view. Iterate on view connections of the particle
+          // with the most connections of the given type, and group each of them with same typed view connections of other particles.
+          let particleWithMostConnectionsOfType = sortedParticles[0];
+          let groups = new Map();
+          groupsByType.set(type, groups);
+          let allTypeViewConnections = recipe.viewConnections.filter(c => {
+            return !c.view && type.equals(c.type) && (c.particle != particleWithMostConnectionsOfType);
+          });
+
+          let iteration = 0;
+          while(allTypeViewConnections.length > 0) {
+            Object.values(particleWithMostConnectionsOfType.connections).forEach(viewConnection => {
+              if (!type.equals(viewConnection.type)) {
+                return;
+              }
+              if (!groups.has(viewConnection)) {
+                groups.set(viewConnection, []);
+              }
+              let group = groups.get(viewConnection);
+
+              // filter all connections where this particle is already in a group.
+              let possibleConnections = allTypeViewConnections.filter(c => !group.find(gc => gc.particle == c.particle));
+              let selectedConn = possibleConnections.find(c => viewConnection.isInput != c.isInput || viewConnection.isOutput != c.isOutput);
+              // TODO: consider tags.
+              // TODO: Slots view restrictions should also be accounted for when grouping.
+              if (!selectedConn) {
+                if (possibleConnections.length == 0 || iteration == 0) {
+                  // During first iteration only bind opposite direction connections ("in" with "out" and vice versa)
+                  // to ensure each group has both direction connections as much as possible.
+                  return;
+                }
+                selectedConn = possibleConnections[0];
+              }
+              group.push(selectedConn);
+              allTypeViewConnections = allTypeViewConnections.filter(c => c != selectedConn);
+            });
+            iteration++;
+          }
+          // Remove groups where no connections were bound together.
+          groups.forEach((otherConns, conn) => {
+            if (otherConns.length == 0) {
+              groups.delete(conn);
+            } else {
+              otherConns.push(conn);
+            }
+          });
+        });
+
+        return recipe => {
+          groupsByType.forEach((groups, type) => {
+            groups.forEach(group => {
+              let recipeView = recipe.newView();
+              group.forEach(conn => {
+                let cloneConn = recipe.updateToClone({conn}).conn;
+                cloneConn.connectToView(recipeView)
+              });
+            });
+          });
+          // TODO: score!
+        };
+      }
+    }(RecipeWalker.Permuted);
+  }
+  get walker() {
+    return this._walker;
+  }
+  async generate(strategizer) {
+    return {
+      results: Recipe.over(this.getResults(strategizer), this.walker, this),
+      generate: null,
+    };
+  }
+};
+
+
+/***/ }),
+/* 282 */
+/***/ (function(module, exports, __webpack_require__) {
+
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+let {Strategy} = __webpack_require__(6);
 
 class InitPopulation extends Strategy {
   constructor(arc) {
@@ -50090,7 +50644,7 @@ module.exports = InitPopulation;
 
 
 /***/ }),
-/* 280 */
+/* 283 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50100,8 +50654,8 @@ module.exports = InitPopulation;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-const {Strategy} = __webpack_require__(7);
-const Recipe = __webpack_require__(6);
+const {Strategy} = __webpack_require__(6);
+const Recipe = __webpack_require__(4);
 const assert = __webpack_require__(1);
 
 module.exports = class InitSearch extends Strategy {
@@ -50137,7 +50691,7 @@ module.exports = class InitSearch extends Strategy {
 
 
 /***/ }),
-/* 281 */
+/* 284 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50147,14 +50701,14 @@ module.exports = class InitSearch extends Strategy {
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let Recipe = __webpack_require__(6);
-let RecipeWalker = __webpack_require__(11);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
 let RecipeUtil = __webpack_require__(17);
 
 class MapConsumedSlots extends Strategy {
   async generate(strategizer) {
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onSlotConnection(recipe, slotConnection) {
         if (slotConnection.targetSlot)
           return;
@@ -50202,7 +50756,7 @@ module.exports = MapConsumedSlots;
 
 
 /***/ }),
-/* 282 */
+/* 285 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50212,9 +50766,9 @@ module.exports = MapConsumedSlots;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let Recipe = __webpack_require__(6);
-let RecipeWalker = __webpack_require__(11);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
 let RecipeUtil = __webpack_require__(17);
 
 class MapRemoteSlots extends Strategy {
@@ -50224,7 +50778,7 @@ class MapRemoteSlots extends Strategy {
   }
   async generate(strategizer) {
     var remoteSlots = this.remoteSlots;
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onSlotConnection(recipe, slotConnection) {
         if (slotConnection.targetSlot && slotConnection.targetSlot.id)
           return;
@@ -50288,7 +50842,7 @@ module.exports = MapRemoteSlots;
 
 
 /***/ }),
-/* 283 */
+/* 286 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50298,9 +50852,9 @@ module.exports = MapRemoteSlots;
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let Recipe = __webpack_require__(6);
-let RecipeWalker = __webpack_require__(11);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
 
 module.exports = class MatchParticleByVerb extends Strategy {
   constructor(arc) {
@@ -50310,7 +50864,7 @@ module.exports = class MatchParticleByVerb extends Strategy {
 
   async generate(strategizer) {
     var arc = this._arc;
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onParticle(recipe, particle) {
         if (particle.name) {
           // Particle already has explicit name.
@@ -50339,7 +50893,7 @@ module.exports = class MatchParticleByVerb extends Strategy {
 
 
 /***/ }),
-/* 284 */
+/* 287 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50349,19 +50903,19 @@ module.exports = class MatchParticleByVerb extends Strategy {
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let Recipe = __webpack_require__(6);
-let RecipeWalker = __webpack_require__(11);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
 
 module.exports = class NameUnnamedConnections extends Strategy {
   async generate(strategizer) {
-    var results = Recipe.over(strategizer.generated, new class extends RecipeWalker {
+    var results = Recipe.over(this.getResults(strategizer), new class extends RecipeWalker {
       onViewConnection(recipe, viewConnection) {
         if (viewConnection.name)
           return;   // it is already named.
 
         if (!viewConnection.particle.spec)
-          return;   // it is already named.
+          return;   // the particle doesn't have spec yet.
 
         let possibleSpecConns = viewConnection.particle.spec.connections.filter(specConn => {
           // filter specs with matching types that don't have views bound to the corresponding view connection.
@@ -50384,7 +50938,7 @@ module.exports = class NameUnnamedConnections extends Strategy {
 
 
 /***/ }),
-/* 285 */
+/* 288 */
 /***/ (function(module, exports, __webpack_require__) {
 
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -50394,9 +50948,10 @@ module.exports = class NameUnnamedConnections extends Strategy {
 // subject to an additional IP rights grant found at
 // http://polymer.github.io/PATENTS.txt
 
-let {Strategy} = __webpack_require__(7);
-let Recipe = __webpack_require__(6);
-let RecipeWalker = __webpack_require__(11);
+let assert = __webpack_require__(1);
+let {Strategy} = __webpack_require__(6);
+let Recipe = __webpack_require__(4);
+let RecipeWalker = __webpack_require__(8);
 
 module.exports = class SearchTokensToParticles extends Strategy {
   constructor(arc) {
@@ -50412,16 +50967,9 @@ module.exports = class SearchTokensToParticles extends Strategy {
         this._addParticle(verb, particle);
       }
     }
-  }
-  _addParticle(token, particle) {
-    this._byToken[token] = this._byToken[token] || [];
-    this._byToken[token].push(particle);
-  }
-  async generate(strategizer) {
+
     let findParticles = token => this._byToken[token] || [];
-    let generated = strategizer.generated.filter(result => !result.result.isResolved());
-    let terminal = strategizer.terminal;
-    var results = Recipe.over([...generated, ...terminal], new class extends RecipeWalker {
+    class Walker extends RecipeWalker {
       onRecipe(recipe) {
         if (!recipe.search || !recipe.search.unresolvedTokens.length) {
           return;
@@ -50458,10 +51006,28 @@ module.exports = class SearchTokensToParticles extends Strategy {
           };
         });
       }
-    }(RecipeWalker.Permuted), this);
+    };
+    this._walker = new Walker(RecipeWalker.Permuted);
+  }
 
+  get walker() {
+    return this._walker;
+  }
+
+  getResults(strategizer) {
+    assert(strategizer);
+    let generated = super.getResults(strategizer).filter(result => !result.result.isResolved());
+    let terminal = strategizer.terminal;
+    return [...generated, ...terminal];
+  }
+
+  _addParticle(token, particle) {
+    this._byToken[token] = this._byToken[token] || [];
+    this._byToken[token].push(particle);
+  }
+  async generate(strategizer) {
     return {
-      results,
+      results: Recipe.over(this.getResults(strategizer), this.walker, this),
       generate: null,
     };
   }
@@ -50469,19 +51035,19 @@ module.exports = class SearchTokensToParticles extends Strategy {
 
 
 /***/ }),
-/* 286 */
+/* 289 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 287 */
+/* 290 */
 /***/ (function(module, exports) {
 
 /* (ignored) */
 
 /***/ }),
-/* 288 */
+/* 291 */
 /***/ (function(module, exports) {
 
 /* (ignored) */

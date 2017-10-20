@@ -2580,35 +2580,6 @@ process.umask = function() { return 0; };
 
 /***/ }),
 /* 4 */
-/***/ (function(module, exports) {
-
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    ctor.prototype = Object.create(superCtor.prototype, {
-      constructor: {
-        value: ctor,
-        enumerable: false,
-        writable: true,
-        configurable: true
-      }
-    });
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    ctor.super_ = superCtor
-    var TempCtor = function () {}
-    TempCtor.prototype = superCtor.prototype
-    ctor.prototype = new TempCtor()
-    ctor.prototype.constructor = ctor
-  }
-}
-
-
-/***/ }),
-/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2646,7 +2617,7 @@ function addType(name, tag, args) {
           data[args[i]] = arguments[i];
         return new Type(tag, data);
       }});
-    for (var arg of args) {
+    for (let arg of args) {
       var upperArg = arg[0].toUpperCase() + arg.substring(1);
       Object.defineProperty(Type.prototype, `${lowerName}${upperArg}`, {
         get: function() {
@@ -2676,11 +2647,10 @@ class Type {
     this.data = data;
   }
 
-  // TODO: Replace these static functions with operations on Types directly.
-  // Replaces 'prevariable' types with 'variable'+id types .
+  // Replaces variableReference types with variable types .
   assignVariableIds(variableMap) {
     if (this.isVariableReference) {
-      var name = this.data.name;
+      var name = this.data;
       var id = variableMap.get(name);
       if (id == undefined) {
         id = nextVariableId++;
@@ -2693,10 +2663,16 @@ class Type {
       return this.primitiveType().assignVariableIds(variableMap).viewOf();
     }
 
+    if (this.isShape) {
+      var shape = this.shapeShape.clone();
+      shape._typeVars.map(({object, field}) => object[field] = object[field].assignVariableIds(variableMap));
+      return Type.newShape(shape, this.shapeDisambiguation);
+    }
+
     return this;
   }
 
-  // Replaces raw strings with resolved schemas.
+  // Replaces entityReference types with resolved schemas.
   resolveSchemas(resolveSchema) {
     if (this.isEntityReference) {
       // TODO: This should probably all happen during type construction so that
@@ -2746,6 +2722,14 @@ class Type {
     return Type.newView(this);
   }
 
+  hasProperty(property) {
+    if (property(this))
+      return true;
+    if (this.isView)
+      return this.viewType.hasProperty(property);
+    return false;
+  }
+
   toString() {
     if (this.isView)
       return `[${this.primitiveType().toString()}]`;
@@ -2757,16 +2741,22 @@ class Type {
   toPrettyString() {
     if (this.isRelation)
       return JSON.stringify(this.data);
-    if (this.isView)
-      return `${this.primitiveType().toString()} List`;
+    if (this.isView) {
+      return `${this.primitiveType().toPrettyString()} List`;
+    }
     if (this.isVariable)
       return `[${this.variableName}]`;
     if (this.isVariableReference)
       return `[${this.variableReferenceName}]`;
     if (this.isEntity)
-      return this.entitySchema.name;
+      // Spit MyTypeFOO to My Type FOO
+      return this.entitySchema.name.replace(/([^A-Z])([A-Z])/g, "$1 $2").replace(/([A-Z][^A-Z])/g, " $1").trim();
     if (this.isEntityReference)
       return this.entityReferenceName;
+    if (this.isShapeReference)
+      return this.shapeReferenceName;
+    if (this.isShape)
+      return this.shapeShape.toPrettyString();
   }
 }
 
@@ -2776,8 +2766,39 @@ addType('VariableReference', 'variableReference', ['name']);
 addType('Variable', 'variable', ['name', 'id']);
 addType('View', 'list', ['type']);
 addType('Relation', 'relation', ['entities']);
+addType('ShapeReference', 'shapeReference', ['name']);
+addType('Shape', 'shape', ['shape', 'disambiguation'])
 
 module.exports = Type;
+
+
+/***/ }),
+/* 5 */
+/***/ (function(module, exports) {
+
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
 
 
 /***/ }),
@@ -2831,7 +2852,7 @@ module.exports = Duplex;
 
 /*<replacement>*/
 var util = __webpack_require__(7);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 var Readable = __webpack_require__(34);
@@ -3065,7 +3086,7 @@ exports.PassThrough = __webpack_require__(69);
 module.exports = Stream;
 
 var EE = __webpack_require__(16).EventEmitter;
-var inherits = __webpack_require__(4);
+var inherits = __webpack_require__(5);
 
 inherits(Stream, EE);
 Stream.Readable = __webpack_require__(8);
@@ -4085,7 +4106,7 @@ Url.prototype.parseHost = function() {
 
 const assert = __webpack_require__(1);
 const Symbols = __webpack_require__(15);
-const Type = __webpack_require__(5);
+const Type = __webpack_require__(4);
 
 class Entity {
   constructor() {
@@ -4959,7 +4980,7 @@ Writable.WritableState = WritableState;
 
 /*<replacement>*/
 var util = __webpack_require__(7);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -6992,7 +7013,7 @@ init();
 
 const runtime = __webpack_require__(45);
 const {ParticleDescription, ConnectionDescription} = __webpack_require__(88);
-const Type = __webpack_require__(5);
+const Type = __webpack_require__(4);
 const assert = __webpack_require__(1);
 
 class ConnectionSpec {
@@ -7163,13 +7184,13 @@ module.exports = ParticleSpec;
 
 const Entity = __webpack_require__(13);
 const assert = __webpack_require__(1);
-const Type = __webpack_require__(5);
+const Type = __webpack_require__(4);
 
 class Schema {
   constructor(model) {
     this._model = model;
     this.name = model.name;
-    this.parent = model.parent ? new Schema(model.parent) : null;
+    this.parents = (model.parents || []).map(parent => new Schema(parent));
     this._normative = {};
     this._optional = {};
     assert(model.sections);
@@ -7191,15 +7212,19 @@ class Schema {
   }
 
   get normative() {
-    var dict = this.parent ? this.parent.normative : {};
-    Object.assign(dict, this._normative);
-    return dict;
+    var normative = {};
+    for (var parent of this.parents)
+      Object.assign(normative, parent.normative);
+    Object.assign(normative, this._normative);
+    return normative;
   }
 
   get optional() {
-    var dict = this.parent ? this.parent.optional : {};
-    Object.assign(dict, this._optional);
-    return dict;
+    var optional = {};
+    for (var parent of this.parents)
+      Object.assign(optional, parent.optional);
+    Object.assign(optional, this._optional);
+    return optional;
   }
 
   entityClass() {
@@ -7718,7 +7743,7 @@ function _isUint8Array(obj) {
 
 /*<replacement>*/
 var util = __webpack_require__(7);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 /*<replacement>*/
@@ -8736,7 +8761,7 @@ var Duplex = __webpack_require__(6);
 
 /*<replacement>*/
 var util = __webpack_require__(7);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 util.inherits(Transform, Duplex);
@@ -9266,7 +9291,7 @@ __webpack_require__(22).inherits(FetchError, Error);
 
 const assert = __webpack_require__(1);
 const Entity = __webpack_require__(13);
-const Type = __webpack_require__(5);
+const Type = __webpack_require__(4);
 const Symbols = __webpack_require__(15);
 
 // TODO: Should relations normalized by another layer, or here?
@@ -9308,13 +9333,14 @@ const view = __webpack_require__(46);
 const Symbols = __webpack_require__(15);
 const Entity = __webpack_require__(13);
 const Schema = __webpack_require__(28);
-const Type = __webpack_require__(5);
+const Type = __webpack_require__(4);
 const Relation = __webpack_require__(44);
 
 function testEntityClass(type) {
   return new Schema({
     name: type,
     sections: [],
+    parents: [],
   }).entityClass();
 }
 
@@ -9676,7 +9702,7 @@ module.exports = class BrowserLoader extends Loader {
  */
 
 
-const Type = __webpack_require__(5);
+const Type = __webpack_require__(4);
 const viewlet = __webpack_require__(121);
 const define = __webpack_require__(14).define;
 const assert = __webpack_require__(1);
@@ -9687,12 +9713,20 @@ const Schema = __webpack_require__(28);
 class RemoteView {
   constructor(id, type, port, pec, name, version) {
     this._id = id;
-    this.type = type;
+    this._type = type;
     this._port = port;
     this._pec = pec;
     this.name = name;
     this._version = version;
     this.state = 'outOfDate';
+  }
+
+  get id() {
+    return this._id;
+  }
+
+  get type() {
+    return this._type;
   }
 
   generateID() {
@@ -9759,6 +9793,12 @@ class InnerPEC {
       return new RemoteView(identifier, Type.fromLiteral(viewType), this._apiPort, this, name, version);
     };
 
+    this._apiPort.onCreateViewCallback = ({viewType, identifier, id, name, callback}) => {
+      var view = new RemoteView(id, Type.fromLiteral(viewType), this._apiPort, this, name, 0);
+      Promise.resolve().then(() => callback(view));
+      return view;
+    }
+
     this._apiPort.onDefineParticle = ({particleDefinition, particleFunction}) => {
       var particle = define(particleDefinition, eval(particleFunction));
       this._loader.registerParticle(particle);
@@ -9773,9 +9813,9 @@ class InnerPEC {
     this._apiPort.onInstantiateParticle =
       ({spec, views}) => this._instantiateParticle(spec, views);
 
-    this._apiPort.onViewCallback = ({callback, data}) => callback(data);
+    this._apiPort.onSimpleCallback = ({callback, data}) => callback(data);
 
-    this._apiPort.onParticleCallback = ({callback}) => callback();
+    this._apiPort.onConstructArcCallback = ({callback, arc}) => callback(arc);
 
     this._apiPort.onAwaitIdle = ({version}) =>
       this.idle.then(a => this._apiPort.Idle({version, relevance: this.relevance}));
@@ -9842,15 +9882,35 @@ class InnerPEC {
     return `${this._idBase}:${this._nextLocalID++}`;
   }
 
-  innerArcHandle() {
-    return {};
+  innerArcHandle(arcId) {
+    var pec = this;
+    return {
+      createView: function(viewType, name) {
+        return new Promise((resolve, reject) =>
+          pec._apiPort.ArcCreateView({arc: arcId, viewType, name, callback: view => {
+            var v = viewlet.viewletFor(view, view.type.isView, true, true);
+            v.entityClass = new Schema(view.type.isView ? view.type.primitiveType().entitySchema : view.type.entitySchema).entityClass();
+            resolve(v);
+          }}));
+      },
+      loadRecipe: function(recipe) {
+        // TODO: do we want to return a promise on completion?
+        return new Promise((resolve, reject) =>
+          pec._apiPort.ArcLoadRecipe({arc: arcId, recipe, callback: a => {
+            if (a == undefined)
+              resolve();
+            else
+              reject(a);
+          }}));
+      }
+    };
   }
 
   defaultCapabilitySet() {
     return {
       constructInnerArc: particle => {
         return new Promise((resolve, reject) =>
-          this._apiPort.ConstructInnerArc({ callback: () => {resolve(this.innerArcHandle())}, particle }));
+          this._apiPort.ConstructInnerArc({ callback: arcId => {resolve(this.innerArcHandle(arcId))}, particle }));
       }
     }
   }
@@ -17281,7 +17341,7 @@ var Transform = __webpack_require__(35);
 
 /*<replacement>*/
 var util = __webpack_require__(7);
-util.inherits = __webpack_require__(4);
+util.inherits = __webpack_require__(5);
 /*</replacement>*/
 
 util.inherits(PassThrough, Transform);
@@ -17588,7 +17648,7 @@ module.exports = __webpack_require__(19);
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(Buffer, global, process) {var capability = __webpack_require__(39)
-var inherits = __webpack_require__(4)
+var inherits = __webpack_require__(5)
 var response = __webpack_require__(75)
 var stream = __webpack_require__(8)
 var toArrayBuffer = __webpack_require__(77)
@@ -17901,7 +17961,7 @@ var unsafeHeaders = [
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process, Buffer, global) {var capability = __webpack_require__(39)
-var inherits = __webpack_require__(4)
+var inherits = __webpack_require__(5)
 var stream = __webpack_require__(8)
 
 var rStates = exports.readyStates = {
@@ -18528,10 +18588,15 @@ function extend() {
 var supportedTypes = ["Text", "URL"];
 
 class JsonldToManifest {
-  static convert(jsonld) {
+  static convert(jsonld, theClass) {
     var obj = JSON.parse(jsonld);
     var classes = {};
     var properties = {};
+
+    if (!obj['@graph']) {
+      obj['@graph'] = [obj];
+    }
+
     for (var item of obj['@graph']) {
       if (item["@type"] == "rdf:Property")
         properties[item["@id"]] = item;
@@ -18541,16 +18606,27 @@ class JsonldToManifest {
         item.superclass = null;
       }
     }
+
     for (var clazz of Object.values(classes)) {
       if (clazz['rdfs:subClassOf'] !== undefined) {
-        var superclass = clazz['rdfs:subClassOf']['@id'];
-        classes[superclass].subclasses.push(clazz);
-        clazz.superclass = classes[superclass];
+        if (clazz['rdfs:subClassOf'].length == undefined)
+          clazz['rdfs:subClassOf'] = [clazz['rdfs:subClassOf']];
+        for (let subClass of clazz['rdfs:subClassOf']) {
+          var superclass = subClass['@id'];
+          if (clazz.superclass == undefined)
+            clazz.superclass = [];
+          if (classes[superclass]) {
+            classes[superclass].subclasses.push(clazz);
+            clazz.superclass.push(classes[superclass]);
+          } else {
+            clazz.superclass.push({'@id': superclass});
+          }
+        }
       }
     }
-    var theClass = null;
+
     for (var clazz of Object.values(classes)) {
-      if (clazz.subclasses.length == 0) {
+      if (clazz.subclasses.length == 0 && theClass == undefined) {
         theClass = clazz;
       }
     }
@@ -18558,12 +18634,16 @@ class JsonldToManifest {
     var relevantProperties = [];
     for (var property of Object.values(properties)) {
       var domains = property['schema:domainIncludes'];
+      if (!domains)
+        domains = {'@id': theClass['@id']};
       if (!domains.length)
         domains = [domains];
       domains = domains.map(a => a['@id']);
       if (domains.includes(theClass['@id'])) {
         var name = property['@id'].split(':')[1];
         var type = property['schema:rangeIncludes'];
+        if (!type)
+          console.log(property);
         if (!type.length)
           type = [type];
 
@@ -18575,15 +18655,15 @@ class JsonldToManifest {
     }
 
     var className = theClass['@id'].split(':')[1];
-    var superName = theClass.superclass ? theClass.superclass['@id'].split(':')[1] : null;
+    var superNames = theClass.superclass ? theClass.superclass.map(a => a['@id'].split(':')[1]) : [];
 
     var s = '';
-    if (superName !== null)
+    for (let superName of superNames)
       s += `import 'https://schema.org/${superName}'\n\n`
 
     s += `schema ${className}`
-    if (superName !== null)
-      s += ` extends ${superName}`
+    if (superNames.length > 0)
+      s += ` extends ${superNames.join(', ')}`
 
     if (relevantProperties.length > 0) {
       s += '\n  optional';
@@ -18622,6 +18702,7 @@ module.exports = JsonldToManifest;
 
 const assert = __webpack_require__(1);
 const ParticleSpec = __webpack_require__(27);
+const Type = __webpack_require__(4);
 
 class ThingMapper {
   constructor(prefix) {
@@ -18843,7 +18924,7 @@ class PECOuterPort extends APIPort {
       {spec: this.ByLiteral(ParticleSpec), views: this.Map(this.Direct, this.Mapped)});
 
     this.registerCall("UIEvent", {particle: this.Mapped, slotName: this.Direct, event: this.Direct});
-    this.registerCall("ViewCallback", {callback: this.Direct, data: this.Direct});
+    this.registerCall("SimpleCallback", {callback: this.Direct, data: this.Direct});
     this.registerCall("AwaitIdle", {version: this.Direct});
     this.registerCall("StartRender", {particle: this.Mapped, slotName: this.Direct, contentTypes: this.List(this.Direct)});
     this.registerCall("StopRender", {particle: this.Mapped, slotName: this.Direct});
@@ -18861,7 +18942,12 @@ class PECOuterPort extends APIPort {
     this.registerHandler("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
     this.registerHandler("ConstructInnerArc", {callback: this.Direct, particle: this.Mapped});
-    this.registerCall("ParticleCallback", {callback: this.Direct});
+    this.registerCall("ConstructArcCallback", {callback: this.Direct, arc: this.LocalMapped});
+
+    this.registerHandler("ArcCreateView", {callback: this.Direct, arc: this.LocalMapped, viewType: this.ByLiteral(Type), name: this.Direct});
+    this.registerInitializer("CreateViewCallback", {callback: this.Direct, viewType: this.Direct, name: this.Direct, id: this.Direct});
+
+    this.registerHandler("ArcLoadRecipe", {arc: this.LocalMapped, recipe: this.Direct, callback: this.Direct});
   }
 }
 
@@ -18878,7 +18964,7 @@ class PECInnerPort extends APIPort {
       {spec: this.ByLiteral(ParticleSpec), views: this.Map(this.Direct, this.Mapped)});
 
     this.registerHandler("UIEvent", {particle: this.Mapped, slotName: this.Direct, event: this.Direct});
-    this.registerHandler("ViewCallback", {callback: this.LocalMapped, data: this.Direct});
+    this.registerHandler("SimpleCallback", {callback: this.LocalMapped, data: this.Direct});
     this.registerHandler("AwaitIdle", {version: this.Direct});
     this.registerHandler("StartRender", {particle: this.Mapped, slotName: this.Direct, contentTypes: this.Direct});
     this.registerHandler("StopRender", {particle: this.Mapped, slotName: this.Direct});
@@ -18896,7 +18982,12 @@ class PECInnerPort extends APIPort {
     this.registerCall("Idle", {version: this.Direct, relevance: this.Map(this.Mapped, this.Direct)});
 
     this.registerCall("ConstructInnerArc", {callback: this.LocalMapped, particle: this.Mapped});
-    this.registerHandler("ParticleCallback", {callback: this.LocalMapped});
+    this.registerHandler("ConstructArcCallback", {callback: this.LocalMapped, arc: this.Direct});
+
+    this.registerCall("ArcCreateView", {callback: this.LocalMapped, arc: this.Direct, viewType: this.ByLiteral(Type), name: this.Direct});
+    this.registerInitializerHandler("CreateViewCallback", {callback: this.LocalMapped, viewType: this.Direct, name: this.Direct, id: this.Direct});
+
+    this.registerCall("ArcLoadRecipe", {arc: this.Direct, recipe: this.Direct, callback: this.LocalMapped});
   }
 }
 
@@ -19040,7 +19131,7 @@ else
 
 
 var assert = __webpack_require__(1);
-var Type = __webpack_require__(5);
+var Type = __webpack_require__(4);
 
 function getSuggestion(recipe, arc, relevance) {
   let options = createSuggestionsOptions({arc, relevance});
@@ -19072,7 +19163,7 @@ function joinSuggestions(recipe, suggestions) {
   return desc;
 }
 
-function getViewDescription(view   /* Connection*/, arc, relevance) {
+function getViewDescription(view, arc, relevance) {
   assert(view);
   let options = createViewDescriptionOptions({arc, relevance});
   let viewConnection = _selectViewConnection(view, options) || view.connections[0];
@@ -19129,9 +19220,9 @@ class Description {
   }
   _initTokens(pattern) {
     while (pattern.length  > 0) {
-      let tokens = pattern.match(/\${[a-zA-Z0-9::~\.\[\]]+}/g);
+      let tokens = pattern.match(/\${[a-zA-Z0-9::~\.\[\]_]+}/g);
       if (tokens) {
-        var firstToken = pattern.match(/\${[a-zA-Z0-9::~\.\[\]]+}/g)[0];
+        var firstToken = pattern.match(/\${[a-zA-Z0-9::~\.\[\]_]+}/g)[0];
         var tokenIndex = pattern.indexOf(firstToken);
       } else {
         var firstToken = "";
@@ -19165,11 +19256,14 @@ class ValueToken {
     let parts = this._token.split(".");
     this._viewName = parts[0];
     switch(parts[1]) {
-      case "type":
+      case "_type_":
         this._useType = true;
         break;
-      case "values":
+      case "_values_":
         this._values = true;
+        break;
+      case "_name_":
+        this._excludeValues = true;
         break;
       default:
         this._property = parts;
@@ -19186,7 +19280,7 @@ class ValueToken {
     } else if (this._values) {  // view values
       // Use view values (eg "How to draw book, Hockey stick")
       result.push(this._formatViewValue(view));
-    } else if (this._property.length > 0) {
+    } else if (this._property && this._property.length > 0) {
       assert(!view.type.isView, `Cannot return property ${this._property.join(",")} for set-view`);
       // Use singleton value's property (eg. "09/15" for person's birthday)
       let viewVar = view.get();
@@ -19227,7 +19321,7 @@ class ValueToken {
         result.push(chosenConnection.type.toPrettyString().toLowerCase());
       }
 
-      if (options.includeViewValues !== false) {
+      if (options.includeViewValues !== false && !this._excludeValues) {
         let viewValues = this._formatViewValue(view);
         if (viewValues) {
           if (!view.type.isView && !chosenConnectionSpec.description.hasPattern()) {
@@ -19255,16 +19349,20 @@ class ValueToken {
     }
     if (view.type.isView) {
       let viewList = view.toList();
-      if (viewList) {
-        if (viewList.length > 2) {
-          // TODO: configurable view display format.
-          return `<b>${viewList[0].rawData.name}</b> plus <b>${viewList.length-1}</b> other items`;
+      if (viewList && viewList.length > 0) {
+        if (viewList[0].rawData.name) {
+          if (viewList.length > 2) {
+            // TODO: configurable view display format.
+            return `<b>${viewList[0].rawData.name}</b> plus <b>${viewList.length-1}</b> other items`;
+          }
+          return viewList.map(v => `<b>${v.rawData.name}</b>`).join(", ");
+        } else {
+          return `<b>${viewList.length}</b> items`;
         }
-        return viewList.map(v => `<b>${v.rawData.name}</b>`).join(", ");
       }
     } else {
       let viewVar = view.get();
-      if (viewVar) {
+      if (viewVar && viewVar.rawData.name) {
         return `<b>${viewVar.rawData.name}</b>`;  // TODO: use type's Entity instead
       }
     }
@@ -19349,7 +19447,7 @@ Object.assign(module.exports, {
 
 
 const assert = __webpack_require__(1);
-const Type = __webpack_require__(5);
+const Type = __webpack_require__(4);
 
 // TODO: relation identifier should incorporate key/value identifiers
 class Identifier {
@@ -19413,7 +19511,6 @@ class Loader {
   }
 
   loadResource(file) {
-    console.log(file);
     if (/^https?:\/\//.test(file))
       return this._loadURL(file);
     return this._loadFile(file);
@@ -19431,8 +19528,12 @@ class Loader {
   }
 
   _loadURL(url) {
-    if (/\/\/schema.org\//.test(url))
+    if (/\/\/schema.org\//.test(url)) {
+      if (url.endsWith('/Thing')) {
+        return fetch("https://schema.org/Product.jsonld").then(res => res.text()).then(data => JsonldToManifest.convert(data, {'@id': 'schema:Thing'}));
+      }
       return fetch(url + ".jsonld").then(res => res.text()).then(data => JsonldToManifest.convert(data));
+    }
     return fetch(url).then(res => res.text());
   }
 
@@ -19455,6 +19556,7 @@ class Loader {
       importScripts: s => null //console.log(`(skipping browser-space import for [${s}])`)
     };
     script.runInNewContext(self);
+    assert(result.length > 0 && typeof result[0] == 'function', `Error while instantiating particle implementation from ${fileName}`);
     return this.unwrapParticle(result[0]);
   }
 
