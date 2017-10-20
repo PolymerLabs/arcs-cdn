@@ -292,7 +292,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         containerKind: config.containerKind
       });
       // Arc!
-      let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap: config.urlMap, slotComposer, context: manifest});
+      let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap: config.urlMap, slotComposer, context: manifest, loader: this._loader});
       // for debugging only
       window.arc = arc;
       if (!config.nokey) {

@@ -10,13 +10,13 @@
 
 // ad-hoc (for now) utilities
 let utils = {
-  createArc: ({id, urlMap, slotComposer, context}) => {
+  createArc: ({id, urlMap, slotComposer, context, loader}) => {
     // worker paths are relative to worker location, remap urls from there to here
     let remap = Arcs.utils._expandUrls(urlMap);
     // Configure worker factory
     let pecFactory = Arcs.utils._createPecWorker.bind(null, urlMap[`worker-entry-cdn.js`], remap);
     // create an arc
-    return new Arcs.Arc({id, pecFactory, slotComposer, context});
+    return new Arcs.Arc({id, pecFactory, slotComposer, context, loader});
   },
   _expandUrls: urlMap => {
     let remap = {};
