@@ -14,6 +14,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <link rel="import" href="arc-shell.html">
 <link rel="import" href="arc-view.html">
 <link rel="import" href="arc-footer.html">
+<link rel="import" href="arc-store.html">
+<link rel="import" href="arc-auth.html">
 <link rel="import" href="arc-metadata.html">
 
 <template>
@@ -65,9 +67,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
   <toolbar>
     <app-toolbar>
-      <i style="color: gray;" on-click="_onNavClick">donut_large</i>
-      <i on-click="_onNewClick">open_in_new</i>
+      <i style="color: #9c27b0;" on-click="_onNavClick">donut_small</i>
       <span arc-title style%="{{titleStatic}}" on-click="_onStartEditingTitle" unsafe-html="{{title}}"></span>
+      <i on-click="_onNewClick">note_add</i>
       <!--<select on-change="_onUserSelected">{{usersOptions}}</select>-->
       <i on-click="_onProfileClick">{{profileStateIcon}}</i>
       <i on-click="_onShareClick">{{sharedStateIcon}}</i>
@@ -75,16 +77,19 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     </app-toolbar>
   </toolbar>
 
-  <arc-store key="{{key}}" on-key="_onKey"></arc-store>
+  <arc-auth on-auth="_onAuth"></arc-auth>
+
   <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
+  <arc-store key="{{key}}" on-key="_onKey" on-data="_onMetadata"></arc-store>
+  <arc-metadata plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep"></arc-metadata>
   <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
 
-  <arc-shell user="{{user}}" config="{{config}}" ready="{{ready}}" on-arc="_onArc" on-plans="_onPlans">
+  <arc-shell user="{{user}}" config="{{config}}" ready="{{ready}}" plan="{{plan}}" on-arc="_onArc" on-planner="_onPlanner" on-plans="_onPlans">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-shell>
 
-  <arc-footer suggestions="{{suggestions}}"></arc-footer>
+  <arc-footer suggestions="{{plans}}"></arc-footer>
 
 </template>
 
@@ -100,6 +105,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _getInitialState() {
       let cdnPath = ArcApp.module.URL.split('/').slice(0, -3).join('/');
       return {
+        title: 'Sample Arc',
         cdnPath,
         icons: {
           profileStateIcon: `person_outline`,
@@ -118,56 +124,67 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     _didMount() {
-      this._meta = document.createElement('arc-metadata');
+      this._meta = this.host.querySelector('arc-metadata');
       this._store = this.host.querySelector('arc-store');
+    }
+    _update(props, state) {
+      if (state.auth && state.needPlans && state.planner) {
+        state.planner();
+        state.needPlans = false;
+      }
+      super._update(props, state);
     }
     _render(props, state) {
       return [
         state.icons,
-        state,
-        {
-          title: 'Sample Arc',
-          ready: Boolean(state.view)
-        }
+        state.auth ? state : null
       ];
     }
-    _onConfig(e, config) {
-      if (!config.key && !config.soloPath) {
-        config.soloPath = 'launcher.manifest';
-      }
-      this._setState({config: config, key: config.key});
-    }
-    async _onArc(e, arc) {
-      this._setState({arc: arc});
-    }
-    _onKey(e, key) {
-      this._setState({key: key});
-    }
-    _onArcsView(e, view) {
-      ArcApp.log('ArcsView', view);
-      if (this._state.view !== view) {
-        this._setState({view: view});
-      }
+    _onAuth(e, auth) {
+      this._setState({auth});
     }
     _onNewClick(e, view) {
       open(`${location.origin}${location.pathname}`, `_blank`);
     }
-    _onPlans(e, plans) {
-      this._setState({suggestions: plans});
-      /*
-      */
-      if (!this._state.plan) {
-        let planInfo = e.detail;
-        if (planInfo && planInfo.length) {
-          let {plan} = planInfo[0];
-          this._setState({plan});
-          let steps = this._meta.createStep(plan, plans.generations);
-          this._store.store('steps', steps);
-          this._store.dump();
-        }
+    _onConfig(e, config) {
+      if (!config.key && !config.soloPath) {
+        config.soloPath = 'launcher.manifest';
+        config.launcher = true;
       }
-      /*
-      */
+      this._setState({config, key: config.key});
+    }
+    _onKey(e, key) {
+      this._setState({key});
+    }
+    _onArc(e, arc) {
+      this._setState({arc});
+    }
+    _onPlanner(e, planner) {
+      if (!this._state.planner) {
+        this._setState({planner});
+      }
+    }
+    _onArcsView(e, view) {
+      ArcApp.log('ArcsView', view);
+      if (this._state.view !== view) {
+        this._setState({view, needPlans: true});
+      }
+    }
+    _onPlans(e, plans) {
+      this._setState({plans});
+      let {config, plan} = this._state;
+      if (config.launcher && !plan && plans) {
+        this._setState({plan: plans[0].plan});
+      }
+    }
+    _onStep(e, step) {
+      if (step) {
+        this._setState({plan: step.plan});
+      }
+    }
+    _onMetadata(e, data) {
+      let {steps} = data;
+      this._setState({steps});
     }
     _synthesizeArcsViewData() {
       let icons = ['settings','movie','new_releases','high_quality','room_service','casino','child_care','spa','kitchen'];
@@ -186,7 +203,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           description: description,
           icon: icons[Math.floor(Math.random()*icons.length)],
           color: colors[Math.floor(Math.random()*colors.length)],
-          //href: `javascript:void(0)` //${location.origin}${location.pathname}?amkey=${k}`
           href: `${location.origin}${location.pathname}?arc=${k}`
         };
       });

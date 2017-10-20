@@ -36,6 +36,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       if (props.plan && lastProps.plan !== props.plan) {
         this._applySuggestion(state.arc, props.plan);
+        this._beginPlanning(state.arc);
+      }
+    }
+    _update(props, state) {
+      if (state.arc) {
+        this._fire('planner', () => this._beginPlanning(state.arc));
       }
     }
     async _applyConfig(config) {

@@ -28,14 +28,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
   </style>
   <arc-store key="{{key}}" on-key="_onKey"></arc-store>
-  <arc-host config="{{config}}" user="{{user}}" plan="{{plan}}" planning="{{ready}}" on-arc="_onArc" on-plans="_onPlans">
+  <arc-host config="{{config}}" user="{{user}}" plan="{{plan}}" planning="{{ready}}" on-arc="_onPropagate" on-planner="_onPropagate" on-plans="_onPropagate">
     <slot></slot>
   </arc-host>
 </template>
 
 <script>
   class ArcShell extends XenBase {
-    static get observedAttributes() { return ['config', 'user', 'key', 'ready']};
+    static get observedAttributes() { return ['config', 'user', 'key', 'ready', 'plan']};
     _render(props, state) {
       let {user, key, config, ready, plan} = props;
       if (config) {
@@ -47,11 +47,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       ArcShell.log('created arc key', key);
       this._setState({key: key});
     }
-    _onArc(e, arc) {
-      this._fire('arc', arc);
-    }
-    _onPlans(e, plans) {
-      this._fire('plans', plans);
+    _onPropagate(e, plans) {
+      this._fire(e.type, e.detail);
     }
   }
   ArcShell.module = document.currentImport;
