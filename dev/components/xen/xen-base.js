@@ -1,6 +1,6 @@
 class XenBase extends XenState(XenElement) {
   get template() {
-    // TODO(sjmiles): null check module and template
+    // TODO(sjmiles): null check module?
     return this.constructor.module.querySelector('template');
   }
   get host() {
@@ -11,14 +11,19 @@ class XenBase extends XenState(XenElement) {
     this._invalidate();
   }
   _stamp() {
-    this._dom = Xen.stamp(this.template).events(this).appendTo(this.host);
+    let template = this.template;
+    if (template) {
+      this._dom = Xen.stamp(this.template).events(this).appendTo(this.host);
+    }
   }
   _update(props, state) {
     let model = this._render(props, state);
-    if (Array.isArray(model)) {
-      model = model.reduce((sum, value) => Object.assign(sum, value), Object.create(null));
+    if (this._dom) {
+      if (Array.isArray(model)) {
+        model = model.reduce((sum, value) => Object.assign(sum, value), Object.create(null));
+      }
+      this._dom.set(model);
     }
-    this._dom.set(model);
   }
   _render(props, state) {
   }
