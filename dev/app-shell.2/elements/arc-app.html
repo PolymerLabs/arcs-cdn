@@ -1,0 +1,215 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!-- component dependencies -->
+<link rel="import" href="../../components/xen/xen.html">
+<link rel="import" href="arc-config.html">
+<link rel="import" href="arc-shell.html">
+<link rel="import" href="arc-view.html">
+<link rel="import" href="arc-footer.html">
+<link rel="import" href="arc-store.html">
+<link rel="import" href="arc-auth.html">
+<link rel="import" href="arc-metadata.html">
+
+<template>
+  <style>
+    arc-app, [arc-app] {
+      display: block;
+    }
+    i {
+      font-family: 'Material Icons';
+      font-size: 24px;
+      font-style: normal;
+      -webkit-font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+      vertical-align: middle;
+      cursor: pointer;
+    }
+    toolbar {
+      display: block;
+      height: 40px;
+    }
+    app-toolbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      padding-left: 12px;
+      /*padding: 0 8px;*/
+      box-sizing: border-box;
+      background-color: whitesmoke;
+      z-index: 1000;
+      transform: translate(0,0,0); /* makes it a layer so other layers scroll underneath, is there a better way? */
+    }
+    app-toolbar > * {
+      padding-right: 12px;
+    }
+    [arc-title] {
+      flex: 1;
+      min-height: 0.6em;
+      padding-top: 0.1em;
+    }
+    arc-footer {
+      height: 40px;
+    }
+  </style>
+
+  <toolbar>
+    <app-toolbar>
+      <i style="color: #9c27b0;" on-click="_onNavClick">donut_small</i>
+      <span arc-title style%="{{titleStatic}}" on-click="_onStartEditingTitle" unsafe-html="{{title}}"></span>
+      <i on-click="_onNewClick">note_add</i>
+      <!--<select on-change="_onUserSelected">{{usersOptions}}</select>-->
+      <i on-click="_onProfileClick">{{profileStateIcon}}</i>
+      <i on-click="_onShareClick">{{sharedStateIcon}}</i>
+      <i on-click="_onCastClick">{{castIcon}}</i>
+    </app-toolbar>
+  </toolbar>
+
+  <arc-auth on-auth="_onAuth"></arc-auth>
+
+  <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
+  <arc-store key="{{key}}" on-key="_onKey" on-data="_onMetadata"></arc-store>
+  <arc-metadata plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep"></arc-metadata>
+  <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
+
+  <arc-shell user="{{user}}" config="{{config}}" ready="{{ready}}" plan="{{plan}}" on-arc="_onArc" on-planner="_onPlanner" on-plans="_onPlans">
+    <div slotid="toproot"></div>
+    <div slotid="root"></div>
+  </arc-shell>
+
+  <arc-footer suggestions="{{plans}}"></arc-footer>
+
+</template>
+
+<script>
+  class ArcApp extends XenBase {
+    get host() {
+      // TODO(sjmiles): override shadow-root generation so that
+      // old-timey systems (e.g. TradingView widgets) can find
+      // various bits in `document` when used in Particles.
+      // Using light-dom opens up style leakage concerns.
+      return this;
+    }
+    _getInitialState() {
+      let cdnPath = ArcApp.module.URL.split('/').slice(0, -3).join('/');
+      return {
+        title: 'Sample Arc',
+        cdnPath,
+        icons: {
+          profileStateIcon: `person_outline`,
+          sharedStateIcon: `link`,
+          castIcon: `cast`
+        },
+        user: 'Scott',
+        arcsViewOptions: {
+          manifestPath: `${cdnPath}/app-shell.2/artifacts/arc-types.manifest`,
+          typeName: 'ArcMetadata',
+          name: 'ArcMetadata',
+          tags: ['#arcmetadata','#nosync']
+        },
+        arcsViewData: this._synthesizeArcsViewData(),
+        launcher: true
+      }
+    }
+    _didMount() {
+      this._meta = this.host.querySelector('arc-metadata');
+      this._store = this.host.querySelector('arc-store');
+    }
+    _update(props, state) {
+      if (state.auth && state.needPlans && state.planner) {
+        state.planner();
+        state.needPlans = false;
+      }
+      super._update(props, state);
+    }
+    _render(props, state) {
+      return [
+        state.icons,
+        state.auth ? state : null
+      ];
+    }
+    _onAuth(e, auth) {
+      this._setState({auth});
+    }
+    _onNewClick(e, view) {
+      open(`${location.origin}${location.pathname}`, `_blank`);
+    }
+    _onConfig(e, config) {
+      if (!config.key && !config.soloPath) {
+        config.soloPath = 'launcher.manifest';
+        config.launcher = true;
+      }
+      this._setState({config, key: config.key});
+    }
+    _onKey(e, key) {
+      this._setState({key});
+    }
+    _onArc(e, arc) {
+      this._setState({arc});
+    }
+    _onPlanner(e, planner) {
+      if (!this._state.planner) {
+        this._setState({planner});
+      }
+    }
+    _onArcsView(e, view) {
+      ArcApp.log('ArcsView', view);
+      if (this._state.view !== view) {
+        this._setState({view, needPlans: true});
+      }
+    }
+    _onPlans(e, plans) {
+      this._setState({plans});
+      let {config, plan} = this._state;
+      if (config.launcher && !plan && plans) {
+        this._setState({plan: plans[0].plan});
+      }
+    }
+    _onStep(e, step) {
+      if (step) {
+        this._setState({plan: step.plan});
+      }
+    }
+    _onMetadata(e, data) {
+      let {steps} = data;
+      this._setState({steps});
+    }
+    _synthesizeArcsViewData() {
+      let icons = ['settings','movie','new_releases','high_quality','room_service','casino','child_care','spa','kitchen'];
+      let colors = ['darkred','darkblue','darkgreen','darkorange','black'];
+      let arcs = {
+        a: {description: 'Alpha'},
+        b: {description: 'Beta'},
+        c: {description: 'Gamma'},
+        d: {description: 'Delta'},
+        e: {description: 'Epsilon'}
+      };
+      arcs = Object.keys(arcs).map(k => {
+        let description = arcs[k].description;
+        return {
+          key: k,
+          description: description,
+          icon: icons[Math.floor(Math.random()*icons.length)],
+          color: colors[Math.floor(Math.random()*colors.length)],
+          href: `${location.origin}${location.pathname}?arc=${k}`
+        };
+      });
+      return arcs;
+    }
+  }
+  ArcApp.module = document.currentImport;
+  ArcApp.log = XenBase.logFactory('ArcApp', '#673AB7');
+  customElements.define('arc-app', ArcApp);
+</script>

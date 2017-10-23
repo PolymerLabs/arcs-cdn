@@ -49,6 +49,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script>
   class ArcExplorer extends XenBase {
     static get observedAttributes() { return ['username']; }
+    get host() {
+      return this;
+    }
     _wouldChangeProp() {
       return true;
     }

@@ -72,7 +72,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._tab = tab;
       let pages = this.pages;
       pages.forEach((page, i) => {
-        page.style.display = (i !== tab) ? 'none' : 'initial';
+        page.style.display = (i !== tab) ? 'none' : '';
       });
       this._render();
     }
