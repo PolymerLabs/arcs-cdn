@@ -9,12 +9,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 -->
 <script>
   class ArcView extends XenState(XenElement) {
-    static get observedAttributes() { return ['arc', 'options', 'data', 'manifestpath']; }
+    static get observedAttributes() { return ['arc', 'options', 'data']; }
     _update(props, state, lastProps) {
       let {arc, options, data} = props;
       if (arc && !state.view) {
-        if (!state.manifest && options && options.manifestPath) {
-          Arcs.Manifest.load(options.manifestPath, arc.loader).then(manifest => this._setState({manifest}));
+        if (!state.manifest && options && options.schemas) {
+          Arcs.Manifest.load(options.schemas, arc.loader).then(manifest => this._setState({manifest}));
         }
         if (state.manifest && options) {
           state.view = this._createView(arc, state.manifest, options, data);
@@ -27,26 +27,30 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._updateView(state.view, data, arc);
       }
     }
-    _createView(arc, manifest, {name, tags, typeName}, data) {
-      let schema = manifest.findSchemaByName(typeName);
-      //
-      // view in manifest for `map`, `copy`, `?`
-      //let view = manifest.newView(schema.type.viewOf(), 'Identities', arc.generateID(), ['#identities']);
-      //
-      // view in arc suitable for `use`, `?`
-      let view = arc.createView(schema.type.viewOf(), name, arc.generateID(), tags);
+    _createView(arc, manifest, {name, tags, type}, data) {
+      let viewOf = false;
+      if (type[0] == '[') {
+        viewOf = true;
+        type = type.slice(1, -1);
+      }
+      let schema = manifest.findSchemaByName(type);
+      let typeOf = viewOf ? schema.type.viewOf() : schema.type;
+      // manifest-view, for `map`, `copy`, `?`
+      //let view = manifest.newView(type, name, arc.generateID(), ['#identities']);
+      // arc-view, suitable for `use`, `?`
+      let view = arc.createView(typeOf, name, arc.generateID(), tags);
       // populate
       if (data) {
         this._updateView(view, data, arc);
       }
       // observe view
       view.on('change', change => {
-        ArcView.log('arcsView change detected', change);
+        //ArcView.log('arcsView change detected', change);
       }, {});
       return view;
     }
     _updateView(view, data, arc) {
-      ArcView.log('updateView: arcs', data);
+      ArcView.log(`updateView: [${view.name}]`, data);
       view.toList().forEach(entity => {
         view.remove(entity.id);
       });
@@ -56,6 +60,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
   }
   ArcView.module = document.currentImport;
-  ArcView.log = XenBase.logFactory('ArcView', '#b4004e');
+  ArcView.log = XenBase.logFactory('ArcView', '#c6a700');
   customElements.define('arc-view', ArcView);
 </script>

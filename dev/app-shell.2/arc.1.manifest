@@ -1,0 +1,33 @@
+#import '../../../arc-stories/0.2/PlaidAccounts/PlaidAccounts.recipes'
+#import '../../../arc-stories/0.2/Finance/Finance.recipes'
+#import '../../../arc-stories/0.2/Arcs/Arcs.recipes'
+
+import '../../../arc-stories/0.2/Identity/Identity.recipes'
+
+import '../../../arc-stories/0.2/PlaidAccounts/PlaidAccount.schema'
+view PlaidAccounts of [PlaidAccount] in '../../../arc-stories/0.2/PlaidAccounts/accounts.json'
+
+import '../../../arc-stories/0.2/PlaidAccounts/PlaidTransaction.schema'
+view PlaidTransactions of [PlaidTransaction] in '../../../arc-stories/0.2/PlaidAccounts/transactions.json'
+
+import '../../../arc-stories/0.2/PlaidAccounts/PlaidAccountsMasterDetail.manifest'
+import '../../../arc-stories/0.2/PlaidAccounts/PlaidAccountsList.manifest'
+import '../../../arc-stories/0.2/PlaidAccounts/PlaidAccountsDetail.manifest'
+
+import '../../../arc-stories/0.2/Finance/MarketOverview.manifest'
+import '../../../arc-stories/0.2/Finance/Ticker.manifest'
+
+recipe
+  copy PlaidAccounts as accounts
+  copy PlaidTransactions as transactions
+  create as selected
+  PlaidAccountsMasterDetail
+    selected = selected
+  PlaidAccountsList
+    list <- accounts
+    selected = selected
+  PlaidAccountsDetail
+    selected <- selected
+    transactions <- transactions
+  Ticker
+  MarketOverview

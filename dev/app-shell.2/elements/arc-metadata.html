@@ -42,21 +42,33 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           ArcMetadata.log("createStep", step);
           steps.push(step);
           applied[step.hash] = true;
-          //this._setState({steps});
+          this._fire('steps', steps);
         }
       }
       return this._state.steps;
     }
     _providePlanStep(steps, plans, applied) {
+      let candidates = steps.filter(s => !applied[s.hash]);
+      for (let step of candidates) {
+        let planStep = this._findPlanForStep(step, plans);
+        if (planStep) {
+          ArcMetadata.log('found a suggestion matching a step:', planStep);
+          this._state.applied[step.hash] = true;
+          this._fire('step', planStep)
+          return;
+        }
+      }
+      /*
       let step = steps.find(s => !applied[s.hash]);
       if (step) {
         let planStep = this._findPlanForStep(step, plans);
-        ArcMetadata.log('found a suggestion matching a step:', planStep);
         if (planStep) {
+          ArcMetadata.log('found a suggestion matching a step:', planStep);
           this._state.applied[step.hash] = true;
           this._fire('step', planStep)
         }
       }
+      */
     }
     _findPlanForStep(step, plans) {
       for (let plan of plans) {

@@ -59,6 +59,9 @@
         suggestions
       }
     }
+    _onPlanSelected(e, suggestion) {
+      this._fire('suggest', suggestion);
+    }
   }
   ArcFooter.module = document.currentImport;
   ArcFooter.log = XenBase.logFactory('ArcFooter', '#673AB7');

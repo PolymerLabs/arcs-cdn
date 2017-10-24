@@ -45,7 +45,7 @@
     }
     _credential(user) {
       ArcAuth.log('credentials: ', user)
-      this._fire('auth', true);
+      this._fire('auth', user);
     }
   }
   ArcAuth.module = document.currentImport;

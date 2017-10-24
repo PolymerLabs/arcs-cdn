@@ -25,23 +25,31 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script>
   class ArcHost extends XenBase {
     static get observedAttributes() {
-      return ['config','plan','user','planning'];
+      return ['config','plans','plan'];
+    }
+    _getInitialState() {
+      return {
+        invalid: 0
+      };
     }
     _willReceiveProps(props, state, lastProps) {
       if (!lastProps.config && props.config) {
         this._applyConfig(props.config)
       }
-      if (props.planning && props.planning !== lastProps.planning) {
-        this._beginPlanning(state.arc);
-      }
       if (props.plan && lastProps.plan !== props.plan) {
         this._applySuggestion(state.arc, props.plan);
-        this._beginPlanning(state.arc);
+        //this._fire('plans', null);
+        //this._beginPlanning(state.arc);
       }
     }
-    _update(props, state) {
-      if (state.arc) {
-        this._fire('planner', () => this._beginPlanning(state.arc));
+    async _update(props, state) {
+      if (state.arc && !props.plans) {
+        state.invalid = true;
+        if (!state.planning) {
+          state.planning = true;
+          await this._beginPlanning(state);
+          state.planning = false;
+        }
       }
     }
     async _applyConfig(config) {
@@ -50,8 +58,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({arc});
       this._fire('arc', arc)
     }
-    async _beginPlanning(arc) {
-      this._fire('plans', await this._plan(arc));
+    async _beginPlanning(state) {
+      let plans;
+      while (state.invalid) {
+        state.invalid = false;
+        plans = await this._plan(state.arc);
+      }
+      this._fire('plans', plans);
     }
     async _createArc(config) {
       // make an id
@@ -117,25 +130,27 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return {folder, content};
     }
     async _plan(arc) {
-      console.groupCollapsed(...ArcHost.pre, 'planning');
-      this._planning = true;
+      //ArcHost.groupCollapsed('planning');
+      //ArcHost.log('planning');
+      //debugger;
+      //this._setState({planning: true});
       let plans;
       try {
-        let didApplyStep;
-        do {
-          plans && ArcHost.log(`plans`, plans);
+        //let didApplyStep;
+        //do {
+          //plans && ArcHost.log(`plans`, plans);
           plans = await Arcs.utils.makePlans(arc, 5000);
           //didApplyStep = await SharingTools.applyAcceptedSteps(plans);
-        } while(didApplyStep);
+        //} while(didApplyStep);
         //document.dispatchEvent(new CustomEvent('generations', {detail: plans.generations}));
-        this._setState({plans});
+        //this._setState({plans});
         //this.searchPlans();
       } finally {
-        this._planning = false;
-        console.groupEnd();
+        //this._setState({planning: false});
+        //console.groupEnd();
         ArcHost.log(`plans`, plans);
       }
-      return plans;
+      return plans || [];
     }
     async _applySuggestion(arc, plan) {
       // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
@@ -153,8 +168,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       });
     }
   }
-  ArcHost.pre = [`%cArcHost`, `background: #007ac1; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
-  ArcHost.log = console.log.bind(console, ...ArcHost.pre);
   ArcHost.module = document.currentImport;
+  ArcHost.log = XenBase.logFactory('ArcHost', '#007ac1');
+  ArcHost.groupCollapsed = XenBase.logFactory('ArcHost', '#007ac1', 'groupCollapsed');
   customElements.define('arc-host', ArcHost);
 </script>

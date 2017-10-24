@@ -27,11 +27,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     messagingSenderId: "779656349412"
   };
 
-  console.log("calling firebase.initialzeApp()...");
   let db = firebase.initializeApp(firebaseConfig/*, 'arcs-storage'*/).database().ref(db_version);
 
   class ArcStore extends XenBase {
-    static get observedAttributes() { return ['key']; }
+    static get observedAttributes() { return ['key','metadata']; }
+    _didMount() {
+      this._watchArcs();
+    }
     _update(props, state, lastProps) {
       if ('key' in props && props.key === null) {
         this._createKey();
@@ -39,9 +41,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (props.key && props.key !== lastProps.key) {
         this._watch();
       }
+      if (props.metadata && lastProps.metadata !== props.metadata) {
+        this._store('', props.metadata);
+      }
     }
     _createKey() {
-      let key =  this._arcsChild.push().key;
+      let defaults = {
+        description: Arcs.utils.randomName()
+      };
+      let key = this._arcsChild.push(defaults).key;
       ArcStore.log('createKey', key);
       this.dispatchEvent(new CustomEvent('key', {detail: key}));
     }
@@ -57,7 +65,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _child(path) {
       return path ? this._arcChild.child(path) : this._arcChild;
     }
-    store(path, data) {
+    _store(path, data) {
       ArcStore.log('store', path, data);
       this._child(path).set(data);
     }
@@ -77,10 +85,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       ArcStore.log(`watching`, this._props.key);
       let handle = node.on('value', snap => {
         let data = snap.val();
-        ArcStore.log(`watch: observed [${this._props.key}]`, data);
-        data && this._fire('data', data);
+        ArcStore.log(`arc [${this._props.key}]`, data);
+        data && this._fire('metadata', data);
       });
       this._off = () => node.off(handle);
+    }
+    //
+    _watchArcs() {
+      this._arcsOff && this._arcsOff();
+      let node = this._arcsChild;
+      ArcStore.log(`watching arcs`);
+      let handle = node.on('value', snap => {
+        let data = snap.val();
+        ArcStore.log(`arcs value`, data);
+        data && this._fire('arcs', data);
+      });
+      this._arcsOff = () => node.off(handle);
     }
   }
 

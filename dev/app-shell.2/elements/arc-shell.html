@@ -27,32 +27,27 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       vertical-align: middle;
     }
   </style>
-  <arc-store key="{{key}}" on-key="_onKey"></arc-store>
-  <arc-host config="{{config}}" user="{{user}}" plan="{{plan}}" planning="{{ready}}" on-arc="_onPropagate" on-planner="_onPropagate" on-plans="_onPropagate">
+  <!--<arc-store key="{{key}}" on-key="_onKey"></arc-store>-->
+  <arc-host config="{{config}}" user="{{user}}" plans="{{plans}}" plan="{{plan}}" planning="{{ready}}" on-arc="_onPropagate" on-planner="_onPropagate" on-plans="_onPropagate">
     <slot></slot>
   </arc-host>
 </template>
 
 <script>
   class ArcShell extends XenBase {
-    static get observedAttributes() { return ['config', 'user', 'key', 'ready', 'plan']};
+    static get observedAttributes() { return ['config', 'user', 'ready', 'plans', 'plan']};
     _render(props, state) {
-      let {user, key, config, ready, plan} = props;
+      let {user, key, config, ready, plans, plan} = props;
       if (config) {
         let title = 'Sample Arc';
-        return {title, user, key, config, plan, ready};
+        return {title, user, key, config, plans, plan, ready};
       }
-    }
-    _onKey(e, key) {
-      ArcShell.log('created arc key', key);
-      this._setState({key: key});
     }
     _onPropagate(e, plans) {
       this._fire(e.type, e.detail);
     }
   }
   ArcShell.module = document.currentImport;
-  ArcShell.pre = [`%cArcHost`, `background: #673AB7; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
-  ArcShell.log = console.log.bind(console, ...ArcHost.pre);
+  ArcShell.log = XenBase.logFactory('ArcHost', '#673AB7');
   customElements.define('arc-shell', ArcShell);
 </script>
