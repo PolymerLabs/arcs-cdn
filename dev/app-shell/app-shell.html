@@ -245,8 +245,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     set search(search) {
       this._search = search;
       this._setState({searchText: search});
-      if (this._plans) {
-        this.searchPlans(this._plans, search);
+
+      let searchString = this.search === '*' ? null : search;
+      if (!searchString || searchString.length > 2) {
+        let originalSearch = this.arc.search;
+        this.arc.search = searchString;
+        if (this.arc.search != originalSearch) {
+          this.searchChanged();
+        } else {
+          this.searchPlans();
+        }
       }
     }
     _setState(state) {
@@ -404,23 +412,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({suggestions});
     }
     _searchPlans(plans, term) {
-      let results;
-      if (plans && term) {
-        if (term === '*') {
-          results = plans;
-        } else if (term.length > 2) {
-          results = plans.filter(p => {
-            let desc = p.description.toLowerCase();
-            return desc.indexOf(term) >= 0;
-          });
-        }
-      } else if (plans) {
+      if (plans && !term) {
         // empty string = show suggestions matching current slots, i.e.
         // suggestions furthering current flow, but not those just appending
         // TODO(seefeld): Also add suggestions based on in-arc views?
-        results = plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
+        return plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
       }
-      return results || [];
+      return plans || [];
     }
     async applySuggestion(plan) {
       // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
@@ -467,6 +465,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     stepsChanged() {
       log('stepsChanged');
+      this._invalidatePlanning();
+    }
+    searchChanged() {
+      log('searchChanged: ', this._search);
       this._invalidatePlanning();
     }
     _invalidatePlanning() {
