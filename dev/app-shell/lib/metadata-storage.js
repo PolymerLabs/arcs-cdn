@@ -79,11 +79,26 @@
       // the view still exists in the context.
       notifier && notifier();
     }
+
+    // Returns a Type object given a serialized type stored in Firebase.
+    _getRealType(type) {
+      // This logic should be moved somewhere more appropriate.
+      if (type.tag == 'entity') {
+        let schema = this._arc.context.findSchemaByName(type.data.name);
+        if (schema && schema.type) {
+          return schema.type;
+        }
+      }
+      if (type.tag == 'list') {
+        return new Arcs.Type(type.tag, self._getRealType(type.data));
+      }
+      return new Arcs.Type(type.tag, type.data);
+    }
+
     _watchView(snapshot, key, user, owner, isProfile, inFriendProfile) {
       // get view `metadata`
       let metadata = snapshot.child('metadata').val();
-      // construct type object
-      let type = new Arcs.Type(metadata.type.tag, metadata.type.data);
+      let type = this._getRealType(metadata.type);
       // construct id
       let viewId = this._getContextViewId(type, metadata.tags, key, isProfile);
       // only watch each viewId once
