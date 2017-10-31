@@ -90,7 +90,7 @@
         }
       }
       if (type.tag == 'list') {
-        return new Arcs.Type(type.tag, self._getRealType(type.data));
+        return new Arcs.Type(type.tag, this._getRealType(type.data));
       }
       return new Arcs.Type(type.tag, type.data);
     }
