@@ -244,9 +244,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     set search(search) {
       this._search = search;
-      this._setState({searchText: search});
-      if (this._plans) {
-        this.searchPlans(this._plans, search);
+      if (search && search[search.length - 1] == ' ') {  // trigger planner
+        this.arc._search = search;
+        this.searchChanged();
+      } else {  // filter existing plans
+        this._setState({searchText: search});
+        if (this._plans) {
+          this.searchPlans(this._plans, search);
+        }
       }
     }
     _setState(state) {
@@ -409,9 +414,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         if (term === '*') {
           results = plans;
         } else if (term.length > 2) {
+          let terms = term.match(/\b(\w+)\b/g);
           results = plans.filter(p => {
             let desc = p.description.toLowerCase();
-            return desc.indexOf(term) >= 0;
+            let searchPhrase = p.plan.search ? p.plan.search.phrase : '';
+            // TODO: don't match words like "and" etc.
+            // TODO: highlight the matching terms in the description in suggestion UI
+            return terms.some(t => (desc.indexOf(t) >= 0) || (searchPhrase.indexOf(t) >= 0));
           });
         }
       } else if (plans) {
@@ -467,6 +476,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     stepsChanged() {
       log('stepsChanged');
+      this._invalidatePlanning();
+    }
+    searchChanged() {
+      log('searchChanged');
       this._invalidatePlanning();
     }
     _invalidatePlanning() {
