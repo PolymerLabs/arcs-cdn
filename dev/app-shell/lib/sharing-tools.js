@@ -10,7 +10,7 @@
 
 (function(scope) {
 
-const pre = [`%cSharingTools`, `background: #005b4f; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
+const pre = Arcs.utils.prettyLogPrefix('SharingTools', '#005b4f');
 const log = console.log.bind(console, ...pre);
 
 /*
@@ -78,7 +78,7 @@ SharingTools = {
       this._watchProfileArcs(user, watches);
       // Setup the watches
       log(`watchSharedArcs `, watches);
-      StorageTools.shared.watchAll(watches, () => this._shell.viewsChanged());      
+      StorageTools.shared.watchAll(watches, () => this._shell.viewsChanged());
       ProfileWatcher.watch(user, () => this._shell.viewsChanged());
     }
   },

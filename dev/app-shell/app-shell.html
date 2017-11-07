@@ -192,7 +192,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 </template>
 
 <script>
-  const logPre = [`%cAppShell`, `background: #007ac1; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`];
+  const logPre = Arcs.utils.prettyLogPrefix('AppShell', '#007ac1');
   const log = console.log.bind(console, ...logPre);
 
   class AppShell extends HTMLElement {

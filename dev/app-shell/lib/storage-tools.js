@@ -10,7 +10,7 @@
 
 ((scope) => {
 
-const pre = [`%cStorageTools`, `background: #280680; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
+const pre = Arcs.utils.prettyLogPrefix('StorageTools', '#280680');
 const log = console.log.bind(console, ...pre);
 const warn = console.warn.bind(console, ...pre);
 

@@ -10,8 +10,8 @@
 
 (() => {
 
-const castLog = `background: #f57f17; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
-const log = console.log.bind(console, '%cCastTools', castLog);
+const pre = Arcs.utils.prettyLogPrefix('CastTools', '#f57f17');
+const log = console.log.bind(console, ...pre);
 
 let CastTools = {
   async init() {
