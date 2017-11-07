@@ -10,8 +10,8 @@
 
 (function(scope) {
 
-const userLog = `background: #20AA20; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
-const log = console.log.bind(console, '%cUserTools', userLog);
+const pre = Arcs.utils.prettyLogPrefix('UserTools', '#20AA20');
+const log = console.log.bind(console, ...pre);
 
 UserTools = {
   async init(config, arc, loader) {

@@ -76,6 +76,9 @@ let utils = {
     let url = new URL(document.location.href);
     url.searchParams.set(name, value);
     window.history.replaceState({}, "", decodeURIComponent(url.href));
+  },
+  prettyLogPrefix(moduleName, backgroundColor) {
+    return [`%c${moduleName}`, `background: ${backgroundColor}; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
   }
 };
 
