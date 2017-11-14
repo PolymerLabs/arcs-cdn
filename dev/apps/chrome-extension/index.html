@@ -123,6 +123,7 @@
               }
 
               const schema = schemas.get(fqTypeName);
+              const validSchemaKeys = Object.keys(schema.optional).concat(Object.keys(schema.normative));
               const shortTypeName = schema.name;
               const entityClass = schemas.get(fqTypeName).entityClass();
 
@@ -138,25 +139,21 @@
               // There are some fields that don't make sense in arcs, and
               // there are some values that aren't in the right format. Let's
               // fix all that up.
-              let filteredEntities = entities.map(entity=>
-                  new Map(Object.entries(entity)
-                    .filter(([key, value]) => key!='@type')));
-
-              debugger;
+              let filteredEntities = entities.map(entity => Object.entries(entity)
+                  .filter(entry => validSchemaKeys.includes(entry[0]))
+                  .reduce((result,current) => {
+                    result[current[0]] = current[1];
+                    return result;
+                  }, {})
+              );
               filteredEntities.forEach(entity => view.store({id: arc.generateID(), rawData: entity}));
-              console.log(view);
-              // filteredEntities.forEach(entity => view.store(new entityClass(entity)));
             });
-
-            // XXX or findSuggestions() again? or something else?
-            self.dispatchEvent(new CustomEvent('manifests-change'));
           });
         }, false);
 
         // in case the message was sent & discarded, request sending of entities
         window.postMessage({method: 'pleaseInjectArcsData'}, '*');
       }
-
     }
 
     customElements.define('extension-app-shell', ExtensionAppShell);
