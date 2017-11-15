@@ -9,9 +9,7 @@
  */
 
 (function(scope) {
-
-  //const storeLog = `background: #c43e00; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
-  const pre = [`%cMetadataStorage`, `background: #c43e00; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
+  const pre = Arcs.utils.prettyLogPrefix('MetadataStorage', '#c43e00');
   const log = console.log.bind(console, ...pre);
   const assert = console.assert.bind(console, ...pre);
   const warn = console.warn.bind(console, ...pre);
