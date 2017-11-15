@@ -10,7 +10,8 @@
 
 (function(scope) {
 
-  const pre = Arcs.utils.prettyLogPrefix('MetadataStorage', '#c43e00');
+  //const storeLog = `background: #c43e00; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`;
+  const pre = [`%cMetadataStorage`, `background: #c43e00; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
   const log = console.log.bind(console, ...pre);
   const assert = console.assert.bind(console, ...pre);
   const warn = console.warn.bind(console, ...pre);
@@ -71,6 +72,8 @@
         a.views.forEach(viewData => {
           viewData.node.off();
           this._watchedViews.delete(viewData.id);
+          this._clearView(viewData.id);
+          this._clearView(viewData.syntheticId);
         });
       });
       delete this._watchedArcs[key];
@@ -93,7 +96,23 @@
       }
       return new Arcs.Type(type.tag, type.data);
     }
-
+    _getListType(type) {
+      if (type.isView) {
+        return type;
+      }
+      return new Arcs.Type('list', type);
+    }
+    _clearView(viewId) {
+      if (!viewId) {
+        return;
+      }
+      let v = this._arc.context.findViewById(viewId);
+      if (v.toList) {
+        v.toList().forEach(e => {
+          v.remove(e.id);
+        });
+      }
+    }
     _watchView(snapshot, key, user, owner, isProfile, inFriendProfile) {
       // get view `metadata`
       let metadata = snapshot.child('metadata').val();
@@ -110,16 +129,32 @@
       let viewDescription = this._getViewDescription(metadata.name, metadata.tags, user, owner);
       // find or create a view in the arc context
       let localView = this._getContextView(type, metadata.name, viewId, metadata.tags, viewDescription);
+      let syntheticView = undefined;
+      if (isProfile || inFriendProfile) {
+        let tags = [...(metadata.tags || [])].map(t => { return "#ALL_" + t.substring(1) });
+        let syntheticType = this._getListType(type);
+        let id = this._getContextViewId(syntheticType, tags, key, true);
+        syntheticView = this._getContextView(syntheticType, metadata.name, id, tags, '');
+      }
+
       // get view `values`
       let remoteView = snapshot.child('values').ref;
       if (localView.type.isView) {
         // One-way syncing. Whenever a new entity is added / removed in the remote
         // view it should get reflected in the context.
         remoteView.on('child_added', function (data) {
-          localView.store(data.val());
+          let e = data.val();
+          localView.store(e);
+          if (syntheticView) {
+            e.rawData.owner = owner;
+            syntheticView.store(e);
+          }
         });
         remoteView.on('child_removed', function (data) {
           localView.remove(data.val().id);
+          if (syntheticView) {
+            syntheticView.remove(data.val().id);
+          }
         });
       } else if (localView.type.isEntity || localView.type.isVariable) {
         remoteView.on('value', snapshot => {
@@ -130,7 +165,8 @@
           }
         });
       }
-      return {id: viewId, node: remoteView};
+      return {id: viewId, node: remoteView, owner: owner,
+        syntheticId: syntheticView ? syntheticView.id : undefined };
     }
     // Creates or returns a context view for the given params.
     _getContextView(type, name, viewId, tags, description) {
