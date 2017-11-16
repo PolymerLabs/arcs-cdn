@@ -1,0 +1,2 @@
+import '../../artifacts/People/Person.schema'
+import '../../artifacts/Products/Product.schema'
