@@ -14,9 +14,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (props.arc) {
         let slots = props.arc.pec.slotComposer._slots;
         slots.forEach(slot => {
-          let root = slot.context._context;
-          let {_name, _particle} = slot._consumeConn;
-          root.setAttribute('particle-host', `${_name}::${_particle._name}`);
+          if (slot.context) {
+            let root = slot.context._context;
+            let {_name, _particle} = slot._consumeConn;
+            root.setAttribute('particle-host', `${_name}::${_particle._name}`);
+          }
         });
       }
     }
