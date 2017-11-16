@@ -18,7 +18,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _update(props, state, lastProps) {
       if (props.plans && props.plan !== lastProps.plan) {
-        ArcSteps.log('update:', 'adding step');
+        ArcSteps.log('adding step from host');
         this._addStep(props.plan, props.plans.generations, state.steps, state.applied);
       }
       if (props.steps) {
@@ -28,14 +28,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._providePlanStep(state.steps, props.plans, state.applied);
       }
       if (props.step) {
-        ArcSteps.log('update:', 'consumed step');
+        ArcSteps.log('host consumed a step');
         state.applied[props.step.hash] = true;
       }
     }
     _addStep(plan, generations, steps, applied) {
       let step = this._createStep(plan, generations);
       if (step && !steps.find(s => s.hash === step.hash)) {
-        ArcSteps.log("createStep", step);
+        //ArcSteps.log("createStep", step);
         steps.push(step);
         applied[step.hash] = true;
         this._fire('steps', steps);
@@ -47,10 +47,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       for (let step of candidates) {
         let planStep = this._findPlanForStep(step, plans);
         if (planStep) {
-          ArcSteps.log('found a suggestion matching a step:', planStep);
+          ArcSteps.log('found suggestion for step'); //, planStep);
           this._state.applied[step.hash] = true;
           this._fire('step', planStep)
           return;
+        } else {
+          ArcSteps.log('rejecting step'); //, step);
         }
       }
     }
