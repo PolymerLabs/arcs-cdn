@@ -45,42 +45,18 @@
   <script>
     class ExtensionAppShell extends AppShell {
 
-      /*
-      _configure(obj) {
-        let config = super._configure(obj);
-        var appShell = this;
-
-        let manifests = (new URL(document.location)).searchParams.getAll('manifest');
-        config.additionalManifests = manifests.filter(elem => elem!=config.manifestPath);
-        return config;
-      }
-      */
-
-      async _fetchManifestList() {
-        let manifests = await super._fetchManifestList();
+      async _extendManifestList(manifests) {
         if (this._config.additionalManifests) {
-          manifests.push(...this._config.additionalManifests);
+          this._config.additionalManifests.forEach(manifest => {
+            manifests.includes(manifest) || manifests.push(manifest);
+            manifests.remotes.includes(manifest) || manifests.remotes.push(manifest);
+          });
         }
-        return manifests;
       }
-
-      /*
-      async _loadAdditionalManifests(additionalManifests) {
-        let futureManifests = additionalManifests.map(manifestPath => {
-          return Arcs.Manifest.load(manifestPath, this._loader);
-        });
-        let manifests = await Promise.all(futureManifests);
-        this.arc._context._imports.push(...manifests);
-      }
-      */
 
       async _start(config) {
         await super._start(config);
         var appshell = this;
-        /*
-        //// always take the browser arc public
-        //StorageTools.saveProfileState(true);
-        */
 
         window.addEventListener('message', event => {
           if (event.source != window || event.data.method != 'injectArcsData') {
@@ -94,7 +70,7 @@
           let dataByType = Object.entries(event.data.entities).reduce( (accumulator, [key, value]) => {
             console.log('a', key, value);
             value.forEach(entry => {
-              // XXX need to dedup in here as well
+              // TODO(smalls) need to dedup in here as well
               let type = entry['@type'];
               accumulator[type] ? accumulator[type].push(entry) : accumulator[type] = [entry];
             });
@@ -103,9 +79,9 @@
 
           if (dataByType['text/x-arcs-manifest']) {
             config.additionalManifests = dataByType['text/x-arcs-manifest'].map(m => m.url);
+            console.log('loading additional manifests', config.additionalManifests);
           }
 
-          // appshell._loadAdditionalManifests(config.additionalManifests).then(() => {
           appshell.reloadManifests().then(() => {
             // gather Arcs schemas for all known types
             var schemas = new Map(Object.entries(dataByType).map( ([fqTypeName, unused]) => {
