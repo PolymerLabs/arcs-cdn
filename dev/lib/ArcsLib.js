@@ -20578,7 +20578,13 @@ let _set = function(node, property, value, controller) {
   } else if (property === 'unsafe-html') {
     node.innerHTML = value || '';
   } else {
-    node[property] = value;
+    // TODO(sjmiles): this is an ugly hack which is worsened by being in this low-level module
+    if (property === 'scrollTop') {
+      // give the element a chance to render *before* setting scrollTop
+      setTimeout(() => node[property] = value, 50);
+    } else {
+      node[property] = value;
+    }
   }
 };
 
