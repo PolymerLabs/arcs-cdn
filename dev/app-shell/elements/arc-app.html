@@ -128,7 +128,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <persistent-views arc="{{arc}}" key="{{key}}"></persistent-views>
     <remote-profile-views arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-views>
     <remote-shared-views arc="{{arc}}" friends="{{friends}}"></remote-shared-views>
-    <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}"></remote-friends-profiles-views>
+    <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-views>
 
     <!-- only for launcher -->
     <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
@@ -211,8 +211,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         identityViewOptions: {
           schemas: `${typesPath}/identity-types.manifest`,
           type: 'Person',
-          name: 'Identity',
-          tags: ['#identity']
+          name: 'User',
+          tags: ['#user']
         },
         identitiesViewOptions: {
           schemas: `${typesPath}/identity-types.manifest`,
@@ -257,6 +257,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (state.key) {
         Arcs.utils.setUrlParam('arc', state.key);
       }
+      if (state.newSteps) {
+        this._updateMetadata({state: state.newSteps});
+        state.newSteps = null;
+      }
       super._update(props, state);
     }
     _render(props, state) {
@@ -270,7 +274,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // unpack arc metadata for rendering
       if (state.metadata) {
         state.description = state.metadata.description;
-        state.steps =  state.metadata.steps;
+        state.steps = state.metadata.steps;
       }
       // unpack user for rendering
       if (state.user) {
@@ -507,7 +511,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     _onSteps(e, steps) {
-      this._updateMetadata({steps});
+      this._setState({newSteps: steps})
+      //this._updateMetadata({steps});
     }
     _onPlans(e, plans) {
       if (this._setIfDirty({plans})) {
