@@ -10,13 +10,11 @@
 
 // ad-hoc (for now) utilities
 let utils = {
-  createArc: ({id, urlMap, slotComposer, context, loader}) => {
+  createArc: ({id, urlMap, slotComposer, context}) => {
     // worker paths are relative to worker location, remap urls from there to here
     let remap = Arcs.utils._expandUrls(urlMap);
-    // Configure worker factory
     let pecFactory = Arcs.utils._createPecWorker.bind(null, urlMap[`worker-entry-cdn.js`], remap);
-    // create an arc
-    return new Arcs.Arc({id, pecFactory, slotComposer, context, loader});
+    return new Arcs.Arc({id, pecFactory, slotComposer, context});
   },
   _expandUrls: urlMap => {
     let remap = {};
@@ -34,7 +32,6 @@ let utils = {
   },
   _createPecWorker: (path, map, id) => {
     let channel = new MessageChannel();
-    //let worker = new Worker(path);
     let worker = new Worker(URL.createObjectURL(new Blob([`importScripts("${path}");`])));
     worker.postMessage({id: `${id}:inner`, base: map}, [channel.port1]);
     return channel.port2;
@@ -60,25 +57,117 @@ let utils = {
     return plans;
   },
   async parseManifest(fileName, content, loader) {
-    return await Arcs.Manifest.parse(content, {
-      id: null,
-      fileName,
-      loader,
-      registry: null,
-      position: {line: 1, column: 0}
-    });
-  },
-  // TODO: move this randomId to the backend.
-  randomId() {
-    return Date.now().toString(36).substr(2) + Math.random().toString(36).substr(2);
+    return await Arcs.Manifest.parse(content,
+      {id: null, fileName, loader, registry: null, position: {line: 1, column: 0}});
   },
   setUrlParam(name, value) {
     let url = new URL(document.location.href);
     url.searchParams.set(name, value);
     window.history.replaceState({}, "", decodeURIComponent(url.href));
   },
-  prettyLogPrefix(moduleName, backgroundColor) {
-    return [`%c${moduleName}`, `background: ${backgroundColor}; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`];
+  // TODO: move this randomId to the backend.
+  randomId() {
+    return Date.now().toString(36).substr(2) + Math.random().toString(36).substr(2);
+  },
+  randomName() {
+    const adjectives = ["adamant", "adroit", "amatory", "animistic", "antic", "arcadian", "baleful", "bellicose", "bilious", "boorish", "calamitous", "caustic", "cerulean", "comely", "concomitant", "contumacious", "corpulent", "crapulous", "defamatory", "didactic", "dilatory", "dowdy", "efficacious", "effulgent", "egregious", "endemic", "equanimous", "fastidious", "feckless", "friable", "fulsome", "garrulous", "guileless", "gustatory", "heuristic", "histrionic", "hubristic", "incendiary", "insidious", "insolent", "intransigent", "inveterate", "invidious", "irksome", "jejune", "jocular", "judicious", "lachrymose", "limpid", "loquacious", "luminous", "mannered", "mendacious", "meretricious", "minatory", "mordant", "munificent", "nefarious", "noxious", "obtuse", "parsimonious", "pendulous", "pernicious", "pervasive", "petulant", "platitudinous", "precipitate", "propitious", "puckish", "querulous", "quiescent", "rebarbative", "recalcitrant", "redolent", "rhadamanthine", "risible", "ruminative", "sagacious", "salubrious", "sartorial", "sclerotic", "serpentine", "spasmodic", "strident", "taciturn", "tenacious", "tremulous", "trenchant", "turbulent", "turgid", "ubiquitous", "uxorious", "verdant", "voluble", "voracious", "wheedling", "withering", "zealous"];
+    const nouns = ["ninja", "chair", "pancake", "statue", "unicorn", "rainbows", "laser", "senor", "bunny", "captain", "nibblets", "cupcake", "carrot", "gnomes", "glitter", "potato", "salad", "marjoram", "curtains", "beets", "toiletries", "exorcism", "stick figures", "mermaid eggs", "sea barnacles", "dragons", "jellybeans", "snakes", "dolls", "bushes", "cookies", "apples", "ice cream", "ukulele", "kazoo", "banjo", "opera singer", "circus", "trampoline", "carousel", "carnival", "locomotive", "hot air balloon", "praying mantis", "animator", "artisan", "artist", "colorist", "inker", "coppersmith", "director", "designer", "flatter", "stylist", "leadman", "limner", "make-up artist", "model", "musician", "penciller", "producer", "stenographer", "set decorator", "silversmith", "teacher", "auto mechanic", "beader", "bobbin boy", "clerk of the chapel", "filling station attendant", "foreman", "maintenance engineering", "mechanic", "miller", "moldmaker", "panel beater", "patternmaker", "plant operator", "plumber", "sawfiler", "shop foreman", "soaper", "stationary engineer", "wheelwright", "woodworkers"];
+    let rl = list => list[Math.floor(Math.random()*list.length)];
+    return `${rl(adjectives)}-${rl(nouns)}`.replace(/ /g, '-');
+  },
+  describeArc(arc) {
+    let combinedSuggestion = Arcs.Description.getSuggestion(arc._activeRecipe, arc, null);
+    if (combinedSuggestion) {
+      let tags = Object.keys(arc._tags).filter(t => ['#nosync','#arcmetadata','#identity','#identities'].indexOf(t) < 0);
+      return `${combinedSuggestion}${tags.length ? ` (${tags.join(", ")})` : ''}`;
+    }
+    return '';
+  },
+  removeUndefined(object) {
+    return JSON.parse(JSON.stringify(object));
+  },
+  /*
+  undefinedToNull(object) {
+    for (var n in object) {
+      if (object[n] === undefined) {
+        object[n] = null;
+      }
+    }
+  },
+  */
+  // Returns the context view id for the given params.
+  getContextViewId(type, tags, amkey, isProfile) {
+    return ''
+      + `${isProfile ? `PROFILE/` : `AMKEY${amkey}/`}`
+      + `${type.toString().replace(' ', '-')}/`
+      + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : '')
+      ;
+  },
+  /*
+  // Returns a Type object given a serialized type stored in Firebase.
+  oldGetTypeFromMetadata(arc, metaType) {
+    let {tag, data} = metaType;
+    // This logic should be moved somewhere more appropriate.
+    if (tag == 'entity') {
+      let schema = arc.context.findSchemaByName(data.name);
+      if (schema && schema.type) {
+        return schema.type;
+      }
+    }
+    if (tag == 'list') {
+      data = Arcs.utils.getTypeFromMetadata(arc, data);
+    }
+    return new Arcs.Type(tag, data);
+  },
+  */
+  metaTypeFromType(type) {
+    return JSON.stringify(type ? type.toLiteral() : null);
+  },
+  typeFromMetaType(metaType) {
+    return Arcs.Type.fromLiteral(JSON.parse(metaType));
+  },
+  isViewDirty(view, data) {
+    if (view.toList) {
+      // list is dirty if the length has changed
+      return (view._items.size !== data.length) ||
+        // ... or there is a record that doesn't exist in the original list (by id)
+        // TOOD(sjmiles): if an entity can mutate without changing id, we may have to do additional
+        // dirty checking here (entity version check would be a nice alternative to full equality testing).
+        data.some(datum => !view._items.has(datum.id));
+    } else {
+      return view.id !== data.id;
+    }
+  },
+  getViewData(view) {
+    return view.toList ? view.toList() : {id: view.id, rawData: view._stored && view._stored.rawData || {}};
+  },
+  clearView(view) {
+    if (view.toList) {
+      view.toList().forEach(e => view.remove(e.id));
+    } else {
+      // TODO(sjmiles): necessary? correct semantics?
+      view.clear();
+    }
+  },
+  addViewData(view, data) {
+    if (view.toList) {
+      data && data.forEach(e => view.store(e));
+    } else {
+      view.set(data);
+    }
+  },
+  setViewData(view, data) {
+    this.clearView(view);
+    this.addViewData(view, data);
+  },
+  getUserProfileKeys(user) {
+    // TODO(sjmiles): database has no referential integrity, so
+    // `user.profiles` may contain dead keys. The actual profile
+    // set is the intersection of `user.arcs` and `user.profiles`.
+    if (user.arcs && user.profiles) {
+      return Object.keys(user.arcs).filter(key => Boolean(user.profiles[key]));
+    }
+    return [];
   }
 };
 

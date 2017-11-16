@@ -146,15 +146,20 @@ let annotateElementNode = function(node, key, notes) {
   }
 };
 
-let annotateMustache = function(node, key, notes, property, value) {
-  if (value.slice(0, 2) === '{{') {
+let annotateMustache = function(node, key, notes, property, mustache) {
+  if (mustache.slice(0, 2) === '{{') {
     if (property === 'class') {
       property = 'className';
     }
-    let n = value.slice(2, -2);
-    takeNote(notes, key, 'mustaches', property, n);
-    if (n[0] === '$') {
-      takeNote(notes, 'xlate', n, true);
+    let value = mustache.slice(2, -2);
+    let override = value.split(':');
+    if (override.length === 2) {
+      property = override[0];
+      value = override[1];
+    }
+    takeNote(notes, key, 'mustaches', property, value);
+    if (value[0] === '$') {
+      takeNote(notes, 'xlate', value, true);
     }
     return true;
   }
@@ -303,7 +308,7 @@ let stamp = function(template, opts) {
       return this.root.querySelector(slctr);
     },
     set: function(scope) {
-      set(notes, map, scope, this.controller);
+      scope && set(notes, map, scope, this.controller);
       return this;
     },
     events: function(controller) {

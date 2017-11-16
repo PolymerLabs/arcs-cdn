@@ -9,7 +9,7 @@
  */
 (scope => {
 
-class XenElement extends HTMLElement {
+let XenElement = Base => class extends Base {
   constructor() {
     super();
     this._mounted = false;
@@ -71,9 +71,9 @@ class XenElement extends HTMLElement {
   }
   _didMount() {
   }
-  _fire(eventName, detail) {
+  _fire(eventName, detail, node) {
     let event = new CustomEvent(eventName, {detail: detail});
-    this.dispatchEvent(event);
+    (node || this).dispatchEvent(event);
     return event.detail;
   }
 }

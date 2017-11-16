@@ -52,8 +52,8 @@ let StaterMixin = Base => class extends Base {
   }
   _async(fn) {
     // TODO(sjmiles): SystemJS throws unless `Promise` is `window.Promise`
-    return Promise.resolve().then(fn.bind(this));
-    //return setTimeout(fn.bind(this), 10);
+    //return Promise.resolve().then(fn.bind(this));
+    return setTimeout(fn.bind(this), 10);
   }
   _invalidate() {
     if (!this._validator) {
@@ -69,13 +69,13 @@ let StaterMixin = Base => class extends Base {
       Object.assign(this._props, this._pendingProps);
       if (this._propsInvalid) {
         // TODO(sjmiles): should/can have different timing from rendering?
-        this._willReceiveProps(this._props, this._state, this._lastProps);
+        this._willReceiveProps(this._props, this._state, this._lastProps, this._lastState);
         this._propsInvalid = false;
       }
       if (this._shouldUpdate(this._props, this._state, this._lastProps, this._lastState)) {
         // TODO(sjmiles): consider throttling render to rAF
         this._ensureMount();
-        this._update(this._props, this._state, this._lastProps);
+        this._update(this._props, this._state, this._lastProps, this._lastState);
       }
     } catch(x) {
       console.error(x);
@@ -86,8 +86,8 @@ let StaterMixin = Base => class extends Base {
     // save the old props and state
     // TODO(sjmiles): don't need to create these for default _shouldUpdate
     this._lastProps = Object.assign(nob(), this._props);
-    //this._lastState = Object.assign(nob(), this._state);
-    this._didUpdate(this._props, this._state);
+    this._lastState = Object.assign(nob(), this._state);
+    this._didUpdate(this._props, this._state, this._lastProps, this._lastState);
   }
   _ensureMount() {
   }
@@ -97,12 +97,12 @@ let StaterMixin = Base => class extends Base {
   _willReceiveState(props, state) {
   }
   */
-  _shouldUpdate(props, state, lastProps) {
+  _shouldUpdate(props, state, lastProps, lastState) {
     return true;
   }
-  _update(props, state) {
+  _update(props, state, lastProps, lastState) {
   }
-  _didUpdate(props, state) {
+  _didUpdate(props, state, lastProps, lastState) {
   }
 };
 

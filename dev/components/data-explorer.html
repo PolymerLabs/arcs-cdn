@@ -22,7 +22,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 </template>
 
 <script>
-  class DataExplorer extends XenState(XenElement) {
+  class DataExplorer extends XenBase {
     static get observedAttributes() { return ['object']; }
     _doMount() {
       this._itemTemplate = DataExplorer.module.querySelector('[data-item]');
@@ -49,13 +49,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           } else if (typeof v === 'function') {
             v = '(function)';
           } else if (typeof v === 'object') {
+            /*
             let proto = Object.getPrototypeOf(v);
-            //v = `object: {${Object.keys(v).join(', ')}}`;
             if (proto && proto !== Object.prototype) {
               v = `non-POJO: {${Object.keys(v).join(', ')}}`;
-              //v = '(not pojo) ' + v;
             }
-            //v = '(object)';
+            */
           }
         }
         return {

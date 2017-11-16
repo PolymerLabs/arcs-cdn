@@ -1,1 +1,14 @@
-import '../../../../arc-stories/0.2/arc.manifest'
+#import '../../../../arc-stories/0.3/Arcs/Arcs.recipes'
+
+import '../../../../arc-stories/0.3/Events/Events.recipes'
+import '../../../../arc-stories/0.3/Finance/Finance.recipes'
+import '../../../../arc-stories/0.3/Identity/Identity.recipes'
+
+import '../../../../arc-stories/0.3/Messages/Messages.recipes'
+import '../../../../arc-stories/0.3/People/People.recipes'
+
+import '../../../../arc-stories/0.3/Places/Places.recipes'
+import '../../../../arc-stories/0.3/PlaidAccounts/PlaidAccounts.recipes'
+import '../../../../arc-stories/0.3/Products/Products.recipes'
+import '../../../../arc-stories/0.3/Restaurants/Restaurants.recipes'
+

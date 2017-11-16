@@ -1,4 +1,4 @@
-class XenBase extends XenState(XenElement) {
+class XenBase extends XenElement(XenState(HTMLElement)) {
   get template() {
     // TODO(sjmiles): null check module?
     return this.constructor.module.querySelector('template');
@@ -13,11 +13,22 @@ class XenBase extends XenState(XenElement) {
   _stamp() {
     let template = this.template;
     if (template) {
-      this._dom = Xen.stamp(this.template).events(this).appendTo(this.host);
+      // TODO(sjmiles): can just do `events(this)` for default listener (`events(this)`), but we use a custom listener
+      // so we can append (props, state) to handler signature. All we are really altering is the delegation,
+      // not the listening, maybe there could be another customization point just for that. Perhaps the default
+      // listener could invoke a delegator if it exists, then fallback to original behavior.
+      this._dom = Xen.stamp(this.template).events(this._listener.bind(this)).appendTo(this.host);
     }
   }
-  _update(props, state) {
-    let model = this._render(props, state);
+  _listener(node, name, handler) {
+    node.addEventListener(name, e => {
+      if (this[handler]) {
+        return this[handler](e, e.detail, this._props, this._state);
+      }
+    });
+  }
+  _update(props, state, lastProps, lastState) {
+    let model = this._render(props, state, lastProps, lastState);
     if (this._dom) {
       if (Array.isArray(model)) {
         model = model.reduce((sum, value) => Object.assign(sum, value), Object.create(null));
@@ -25,7 +36,12 @@ class XenBase extends XenState(XenElement) {
       this._dom.set(model);
     }
   }
-  _render(props, state) {
+  _render(/*props, state, lastProps, lastState*/) {
+  }
+  _didUpdate(props, state, lastProps, lastState) {
+    this._didRender(props, state, lastProps, lastState);
+  }
+  _didRender(/*props, state, lastProps, lastState*/) {
   }
 }
 XenBase.logFactory = (preamble, color, log='log') => console[log].bind(console, `%c${preamble}`, `background: ${color}; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`);

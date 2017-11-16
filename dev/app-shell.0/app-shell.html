@@ -1,0 +1,596 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<link rel="import" href="imports.html">
+
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 0;
+    background-image: url(assets/linen.png);
+    overflow-x: hidden;
+    overflow-y: scroll;
+  }
+</style>
+
+<template>
+  <style>
+    [app-shell] {
+      display: block;
+      overflow: hidden;
+      padding-top: 40px;
+      padding-bottom: 64px;
+      background-color: white;
+    }
+    [arc-panel] {
+      min-height: calc(100vh - 96px);
+      background-color: inherit;
+    }
+    app-tools {
+      display: none;
+      background-color: white;
+    }
+    app-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      padding: 0 8px;
+      box-sizing: border-box;
+      background-color: whitesmoke;
+      z-index: 1000;
+      transform: translate(0,0,0); /* makes it a layer, is there a better way? */
+    }
+    .material-icons {
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    app-header select {
+      border: none;
+      background-color: transparent;
+      outline: none;
+      height: 100%;
+    }
+    x-toast {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: white;
+    }
+    [hidebydefault] {
+      display: none;
+    }
+    [show] {
+      display: initial;
+    }
+    [search] {
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-bottom: 1px dotted silver;
+    }
+    [search] input {
+      flex: 1;
+      padding: 7px;
+      border: none;
+      outline: none;
+    }
+    [arc-title] {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      font-size: medium;
+      cursor: text;
+    }
+    [arc-title-edit] {
+      background-color: #155c70;
+      border: none;
+      outline: none;
+      color: white;
+      font-size: medium;
+      font-family: sans-serif;
+      padding: 5px;
+      /*margin: -5px;*/
+      border-radius: 3px;
+    }
+    #particles {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      overflow: auto;
+      overflow-x: hidden;
+    }
+    /**/
+    app-shell, app-header, [app-footer] {
+      min-width: 320px;
+    }
+    /* wider-than-mobile */
+    @media (min-width: 500px) {
+      app-shell, app-header, [app-footer] {
+        box-sizing: border-box;
+        margin: 0 auto;
+        max-width: 700px;
+      }
+      app-shell[expanded], [expanded] app-header, [expanded] [app-footer] {
+        margin: 0;
+        width: 414px;
+        max-width: 414px;
+      }
+      [expanded] app-tools {
+        display: block;
+        position: fixed;
+        left: 414px;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        overflow: auto;
+        border-left: 1px solid silver;
+      }
+    }
+  </style>
+
+  <!-- arc panel -->
+  <div arc-panel>
+    <!-- header -->
+    <app-header>
+      <i class="material-icons" style="color: gray;" on-click="_onNavClick">donut_large&nbsp;</i>
+      <span arc-title style="flex: 1; display: none; min-height: 0.6em;" style%={{titleStatic}} on-click="_onStartEditingTitle" unsafe-html="{{title}}"></span>
+      <input arc-title-edit style="flex: 1; display: none;" style%={{titleEditing}} value="{{titleText}}" on-input="_onEditingTitle" on-change="_onEndEditingTitle" on-keypress="_onMaybeEndEditingTitle"/>
+      <span hidebydefault show$="{{usersShown}}" style="height: 100%;">
+        <!--<i class="material-icons">person</i>-->
+        <select on-change="_onUserSelected">{{usersOptions}}</select>
+        <i class="material-icons" on-click="_onProfileClick">{{profileStateIcon}}</i>
+        <i class="material-icons" on-click="_onShareClick">{{sharedStateIcon}}</i>
+      </span>
+      <i class="material-icons" style="padding-left: 4px;" on-click="_onCastClick">{{castIcon}}</i>
+    </app-header>
+    <!-- particles -->
+    <div id="particles">
+      <div slotid="toproot"></div>
+      <div slotid="root"></div>
+    </div>
+    <!-- footer -->
+    <x-toast app-footer open="{{toastOpen}}" suggestion-container>
+      <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
+      <div search>
+        <input value="{{searchText}}" on-input="_onSearch">
+        <i class="material-icons" on-click="_onSearchClick">search</i>
+      </div>
+      <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
+    </x-toast>
+  </div>
+  <!-- config panel -->
+  <app-tools>
+    <simple-tabs>
+      <user-data title="User Sharing" user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>
+      <!--<arc-list user="{{user}}" users="{{users}}"></arc-list>-->
+      <arc-explorer title="Shared Arcs" username="{{user}}"></arc-explorer>
+      <div title="Manifests">
+        <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
+        <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-manifests-change="_onManifestsChange"></manifest-data>
+      </div>
+    </simple-tabs>
+  </app-tools>
+  <!-- sub-templates -->
+  <template users-options>
+    <option value="{{value}}" selected="{{selected}}">{{user}}</option>
+  </template>
+</template>
+
+<script>
+  const logPre = [`%cAppShell`, `background: #007ac1; color: white; padding: 1px 6px 2px 8px; border-radius: 6px;`];
+  const log = console.log.bind(console, ...logPre);
+
+  class AppShell extends HTMLElement {
+    get template() {
+      return AppShell.module.querySelector('template');
+    }
+    async connectedCallback() {
+      if (!this._mounted) {
+        this._mounted = true;
+        this.setAttribute('app-shell', '');
+        this._initHotKeys();
+        this._dom = Xen.stamp(this.template).events(this).appendTo(this);
+        this._setState({dotsActive: true, toastOpen: true, mainActive: true});
+        try {
+          // get configuration
+          let config = this._configure(window);
+          // hook for outer scope modification of `config`
+          document.dispatchEvent(new CustomEvent('configure', {detail: config}));
+          log(`configuration`, config);
+          // reflect config to UI
+          this._setState({localManifest: config.manifestPath || config.soloPath});
+          // start application
+          await this._start(config);
+        } catch(x) {
+          this._setState({dotsDisabled: true});
+          throw x;
+        }
+      }
+    }
+    _initHotKeys() {
+      addEventListener('keydown', e => {
+        if (e.ctrlKey && this.arc && !{input:1, textArea:1}[e.target.localName] && this.hotkey(e.key, e)) {
+          e.preventDefault();
+        }
+      });
+    }
+    hotkey(key, e) {
+      switch(key) {
+        case 's':
+          this.findSuggestions();
+          break;
+        default:
+          return false;
+      }
+      return true;
+    }
+    get search() {
+      return this._search;
+    }
+    set search(search) {
+      this._search = search;
+      this._setState({searchText: search});
+      if (this._plans) {
+        this.searchPlans(this._plans, search);
+      }
+    }
+    _setState(state) {
+      if (this._dom) {
+        this._dom.set(state);
+      }
+    }
+    // TODO(sjmiles): make easier to override
+    _configure({urls, manifest}) {
+      let appShellPath = AppShell.module.URL.split('/').slice(0, -2).join('/');
+      let params = (new URL(document.location)).searchParams;
+      return {
+        affordance: 'dom',
+        root: params.get('root') || appShellPath,
+        manifestPath: params.get('manifest'),
+        soloPath: params.get('solo'),
+        user: params.get('user') || localStorage.getItem('currentUser'),
+        nokey: params.has('nokey'),
+        nosync: params.has('nosync'),
+        shared: params.getAll('shared'),
+        search: params.get('search'),
+        container: this._dom.$('#particles'),
+        arcsDevTools: localStorage.getItem('arcs-dev-tools'),
+        urls
+      };
+    }
+    async _start(config) {
+      this._config = config;
+      // TODO(sjmiles): misuing this semaphore to block planning (fix!)
+      this.planning = true;
+      // UI config
+      if (config.arcsDevTools === 'open') {
+        this.setAttribute('expanded', '');
+      }
+      // create a system loader
+      this._loader = this._marshalLoader(config);
+      // load manifest
+      let manifest = await this.loadManifest();
+      // composer
+      let slotComposer = new Arcs.SlotComposer({
+        rootContext: config.container,
+        affordance: config.affordance,
+        containerKind: config.containerKind
+      });
+      // Arc!
+      let arc = this.arc = Arcs.utils.createArc({id: 'demo-' + Arcs.utils.randomId(), urlMap: config.urlMap, slotComposer, context: manifest, loader: this._loader});
+      // for debugging only
+      window.arc = arc;
+      if (!config.nokey) {
+        // configure sharing
+        SharingTools.init(this);
+        // configure storage
+        await StorageTools.init(arc, config, this._loader);
+        // configure (chrome)-casting
+        CastTools.init();
+        this._setState({castIcon: 'cast'});
+      }
+      // configure users
+      await UserTools.init(config, arc, this._loader);
+      manifest.imports.push(UserTools.identityManifest);
+      // configure current user
+      await this._setCurrentUser(config.user);
+      // done for now, syncSteps() will trigger planner
+      this._setState({dotsDisabled: true});
+      // configure search
+      this.search = config.search;
+      // stop blocking planning
+      this.planning = false;
+      if (!config.nokey) {
+        // set initial title and watch for updates of description
+        StorageTools.syncDescription((computed, userGenerated) => this._onNewDescription(computed, userGenerated));
+        this._updateTitle();
+        // watch for steps, until turned off
+        StorageTools.syncSteps();
+      } else {
+        this.findSuggestions();
+      }
+    }
+    _marshalLoader(config) {
+      // create default URL map
+      let urlMap = Arcs.utils.createUrlMap(config.root);
+      // create a system loader
+      // TODO(sjmiles): `pecFactory` can create loader objects (via worker-entry*.js) for the innerPEC,
+      // but we have to create one by hand for manifest loading
+      let loader = new Arcs.BrowserLoader(urlMap);
+      // add `urls` to `urlMap` after a resolve pass
+      if (config.urls) {
+        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
+      }
+      config.urlMap = urlMap;
+      return loader;
+    }
+    async _setCurrentUser(user) {
+      UserTools.currentUser = user;
+      if (user) {
+        //Arcs.utils.setUrlParam('user', user);
+      }
+      // update ui
+      this._shared = StorageTools.loadSharedState();
+      this._isProfile = StorageTools.loadProfileState();
+      this._updateUserSelectWidget();
+      this._updateSharedStateIcon();
+      this._updateProfileStateIcon();
+      this._setState({user: UserTools.currentUser, users: UserTools.users});
+      // update sharing
+      await StorageTools.updateArcsView();
+      this.watchSharedArcs();
+      UserTools.enableTracking();
+    }
+    async loadManifest() {
+      let manifests = await this._fetchManifestList();
+      return await ManifestTools.loadManifest(this._config, this._loader, manifests);
+    }
+    async _fetchManifestList() {
+      let manifests = await ManifestTools.fetchManifestList();
+      this._setState({
+        remotes: manifests.remotes,
+        exclusions: manifests.exclusions
+      });
+      return manifests;
+    }
+    watchSharedArcs() {
+      if (!this._config.nokey) {
+        SharingTools.watchSharedArcs();
+      }
+    }
+    async findSuggestions() {
+      console.groupCollapsed(...logPre, 'planning');
+      try {
+        this.planning = true;
+        this._setState({dotsActive: true, suggestions: []});
+        let plans, max_iterations = 3, didApplyStep;
+        do {
+          plans = await Arcs.utils.makePlans(this.arc, 5000);
+          log(`plans`, plans, 'iterations left:', max_iterations);
+          didApplyStep = await SharingTools.applyAcceptedSteps(plans);
+        } while(didApplyStep); //(SharingTools.applyAcceptedSteps(plans) && --max_iterations > 0);
+        // TODO(sjmiles): we need to makePlans if SharingTools applied a step, but applyAcceptedSteps
+        // never returns true. Until we fix it, we'll just plan one more time.
+        //plans = await Arcs.utils.makePlans(this.arc, 5000);
+        log(`plans`, plans, 'iterations left:', max_iterations);
+        // TODO(sjmiles): ^
+        document.dispatchEvent(new CustomEvent('generations', {detail: plans.generations}));
+        this._setState({dotsDisabled: plans && plans.length === 0});
+        this._plans = plans;
+        this.searchPlans();
+      } finally {
+        this.planning = false;
+        this._setState({dotsActive: false});
+        console.groupEnd();
+      }
+    }
+    searchPlans() {
+      let suggestions = this._searchPlans(this._plans, this._search) || [];
+      this._setState({suggestions});
+    }
+    _searchPlans(plans, term) {
+      let results;
+      if (plans && term) {
+        if (term === '*') {
+          results = plans;
+        } else if (term.length > 2) {
+          results = plans.filter(p => {
+            let desc = p.description.toLowerCase();
+            return desc.indexOf(term) >= 0;
+          });
+        }
+      } else if (plans) {
+        // empty string = show suggestions matching current slots, i.e.
+        // suggestions furthering current flow, but not those just appending
+        // TODO(seefeld): Also add suggestions based on in-arc views?
+        results = plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
+      }
+      return results || [];
+    }
+    async applySuggestion(plan) {
+      // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
+      // we need some additional signals in combination with a more robust system for invalidating
+      // suggestions. Currently, most of the asynchrony is what I'll _short-term_, such that a simple
+      // timeout here is likely to catch the vast majority of the work. This is just a temporary solution,
+      // since it's a just another race-condition in actuality (I've merely slowed one of the racers).
+      // The timeout value is a magic number.
+      this.arc.instantiate(plan);
+      return new Promise((resolve, reject) => {
+        setTimeout(resolve, 200);
+      }).then(() => {
+        StorageTools.syncStorage();
+        document.dispatchEvent(new CustomEvent('apply', {detail: {plan, arc: this.arc}}));
+      });
+    }
+    async _onPlanSelected(e) {
+      let {plan} = e.detail;
+      this._setState({toastOpen: false});
+      // Reset search, unless it was '*'
+      // This will reduce suggestions to those matching open slots by default
+      if (this.search != '*') {
+        this.search = '';
+        this._setState({searchText: ''});
+      }
+      await this.applySuggestion(plan);
+      this.addAcceptedStep(plan);
+      this.findSuggestions();
+    }
+    addAcceptedStep(plan) {
+      SharingTools.addAcceptedStep(plan, this._plans.generations);
+      this._computedDescription = this._describeArc();
+      this._updateTitle();
+      StorageTools.saveComputedDescription(this._computedDescription);
+    }
+    _describeArc() {
+      let combinedSuggestion = Arcs.Description.getSuggestion(this.arc._activeRecipe, this.arc, null);
+      let tags = Object.keys(this.arc._tags);
+      return tags.join(", ") + " – " + combinedSuggestion;
+    }
+    viewsChanged() {
+      log('viewsChanged');
+      this._invalidatePlanning();
+    }
+    stepsChanged() {
+      log('stepsChanged');
+      this._invalidatePlanning();
+    }
+    _invalidatePlanning() {
+      if (!this.planning) {
+        clearTimeout(this.validator);
+        this.validator = setTimeout(() => this.findSuggestions(), 100);
+      }
+    }
+    async reloadManifests() {
+      this._setState({dotsActive: true});
+      this.arc._context = await this.loadManifest();
+      this.arc._context.imports.push(UserTools.identityManifest);
+      this.watchSharedArcs();
+      this.findSuggestions();
+    }
+    _updateSharedStateIcon() {
+      let icon = !UserTools.currentUser ? '' : this._shared ? "supervisor_account" : "link";
+      this._setState({sharedStateIcon: icon});
+    }
+    _updateProfileStateIcon() {
+      let icon = !UserTools.currentUser ? '' : this._isProfile ? "person" : "person_outline"
+      this._setState({profileStateIcon: icon});
+    }
+    _updateUserSelectWidget() {
+      let users = UserTools.users || [];
+      let userName = UserTools.currentUser;
+      this._setState({
+        usersShown: users.length > 0,
+        usersOptions: {
+          $template: 'users-options',
+          models: [...users].map(user => {
+            return {
+              user: user.name,
+              selected: user.name == userName
+            }
+          })
+        }
+      })
+    }
+    _updateTitle() {
+      this._setState({
+        title: this._userGeneratedDescription || this._computedDescription || ' ',
+        titleStatic: { display: this._editingTitle ? "none" : "initial" },
+        titleEditing: { display: this._editingTitle ? "initial" : "none" }
+      });
+    }
+    _onNewDescription(computed, userGenerated) {
+      this._computedDescription = computed;
+      this._userGeneratedDescription = userGenerated;
+      this._updateTitle();
+    }
+    _onStartEditingTitle(e) {
+      this._editingTitle = true;
+      this._setState({titleText: this._userGeneratedDescription || this._computedDescription || ""});
+      this._updateTitle();
+      let inputElement = e.currentTarget.nextElementSibling;
+      inputElement.select();
+      window.setTimeout(() => inputElement.focus(), 50);
+    }
+    _onEndEditingTitle(e) {
+      let description = e.target.value;
+      this._editingTitle = false;
+      e.target.blur();
+      this._userGeneratedDescription = description;
+      this._updateTitle();
+      StorageTools.saveUserGeneratedDescription(description);
+    }
+    _onMaybeEndEditingTitle(e) {
+      let keyCode = e.keyCode || e.which;
+      if (keyCode == 13) this._onEndEditingTitle(e);
+    }
+    async _onPromoteManifest() {
+      let remotes = await ManifestTools.publishManifest(this._config);
+      this._setState({manifests: remotes, localManifest: ''});
+      this.reloadManifests();
+    }
+    _onUpdateManifest(e) {
+      let path = e.detail;
+      ManifestTools.updateManifestConfig(this._config, path);
+      this.reloadManifests();
+    }
+    _onManifestsChange(e) {
+      let exclusions = e.currentTarget.exclusions;
+      log(exclusions);
+      localStorage.setItem('exclusions', JSON.stringify(exclusions));
+      this.reloadManifests();
+    }
+    _onUserSelected(e) {
+      this._setCurrentUser(e.target.value);
+    }
+    async _onProfileClick() {
+      this._isProfile = !this._isProfile;
+      this._updateProfileStateIcon();
+      StorageTools.saveProfileState(this._isProfile);
+      await UserTools.loadUsers();
+      this._setState({user: UserTools.currentUser, users: UserTools.users});
+    }
+    async _onShareClick() {
+      this._shared = !this._shared;
+      this._updateSharedStateIcon();
+      await StorageTools.saveSharedState(this._shared);
+      await UserTools.loadUsers();
+      this._setState({user: UserTools.currentUser, users: UserTools.users});
+    }
+    _onSearch(e) {
+      this.search = e.target.value.toLowerCase();
+    }
+    _onSearchClick(e) {
+      this.search = '*';
+    }
+    _onNavClick() {
+      // toggles boolean attribute `expanded` on `this`
+      Xen.setBoolAttribute(this, 'expanded');
+      localStorage.setItem('arcs-dev-tools', this.hasAttribute('expanded') ? 'open' : 'closed');
+    }
+    _onCastClick() {
+      CastTools.cast();
+    }
+    _onUserDataChanged() {
+      UserTools.userDataChanged();
+      // update sharing
+      this.watchSharedArcs();
+    }
+  }
+  AppShell.module = document.currentScript.ownerDocument;
+  customElements.define('app-shell', AppShell);
+</script>
