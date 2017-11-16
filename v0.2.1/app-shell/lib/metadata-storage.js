@@ -105,7 +105,7 @@
         return;
       }
       let v = this._arc.context.findViewById(viewId);
-      if (v.toList) {
+      if (v && v.toList) {
         v.toList().forEach(e => {
           v.remove(e.id);
         });
