@@ -1,0 +1,58 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<script>
+  class RemoteProfileViews extends XenBase {
+    static get observedAttributes() { return ['arc', 'user']; }
+    _update(props, state, lastProps) {
+      if (props.user && props.user !== lastProps.user) {
+        state.user = props.user;
+      }
+      if (props.arc && state.user) {
+        state.user = null;
+        state.friends = null;
+        state.dispose && state.dispose();
+        state.dispose = this._watchProfileViews(props.user, props.arc);
+      }
+    }
+    _watchProfileViews(user, arc) {
+      RemoteProfileViews.log(`watching user's profiles`, user);
+      let remotes = Arcs.utils.getUserProfileKeys(user).map(key =>
+        this._createRemoteView({arc, key, profiles: true}, e =>
+          this._remoteViewChanged(arc, e.detail.view, e.detail.data)
+        )
+      );
+      return () => remotes.forEach(r => r.dispose());
+    }
+    _createRemoteView(config, handler) {
+      let remote = new RemoteViews();
+      remote.addEventListener('view', handler);
+      remote.dispose = () => remote.removeEventListener('view', handler);
+      Object.assign(remote, config);
+      return remote;
+    }
+    _remoteViewChanged(arc, view, data) {
+      Arcs.utils.setViewData(view, data);
+      RemoteProfileViews.log(`remoteViewChanged`, view.id);
+      if (!this._state.friends && view.id == 'PROFILE/[Person]/friends/') {
+        this._state.friends = view;
+        view.on('change', this._friendsViewChanged.bind(this, view), this);
+        this._friendsViewChanged(view);
+      }
+    }
+    _friendsViewChanged(view) {
+      let data = Arcs.utils.getViewData(view);
+      RemoteProfileViews.log('FRIENDS changed:', data);
+      this._fire('friends', data);
+    }
+  }
+  RemoteProfileViews.module = document.currentImport;
+  RemoteProfileViews.log = XenBase.logFactory('RemoteProfileViews', '#003c8f');
+  customElements.define('remote-profile-views', RemoteProfileViews);
+</script>

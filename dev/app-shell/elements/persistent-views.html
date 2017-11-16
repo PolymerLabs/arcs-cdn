@@ -1,0 +1,114 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<script>
+  class PersistentViews extends XenBase {
+    static get observedAttributes() { return ['arc','key']; }
+    get _db() {
+      return db.child(`arcs/${this._props.key}`);
+    }
+    _update(props, state, lastProps) {
+      if (props.key && props.arc) { //} != lastProps.arc) {
+        this._watchViews(props.arc);
+      }
+    }
+    _watchViews(arc) {
+      //PersistentViews.log('resyncing views...', arc._viewTags);
+      let state = this._state;
+      if (state.watchers) {
+        state.watchers.forEach(w => w && w());
+      }
+      state.watching = new Set();
+      //state.watchers = [...arc._viewTags].map((tags, view) => {
+      state.watchers = [...arc._viewTags].map(([view, tags]) => {
+        if (!tags || !tags.has('#nosync')) {
+          return this._syncView(arc, tags, view);
+        }
+      });
+    }
+    _syncView(arc, tags, view) {
+      let watching = this._state.watching;
+      let viewId = this._getViewId(tags, view);
+      // Make sure we only synchronize each view at most once.
+      if (!watching.has(viewId)) {
+        watching.add(viewId);
+        // db node
+        let node = this._db.child(`views/${viewId}`);
+        // force latest metadata
+        let metadata = {
+          type: Arcs.utils.metaTypeFromType(view.type),
+          name: view.name || null,
+          tags: [...tags]
+        };
+        node.update({metadata});
+        // watch the db
+        node = node.child('values');
+        let off = this._watchView(node, view, data => {
+          if (!data || (!data.length && !data.rawData)) {
+          } else {
+            // TODO(sjmiles): the `changedHere` gambit worked in previous versions that
+            // watched for Firebase node add/remove signals instead of bluntly using `values`.
+            // The blunt version appeals because of less bookkeeping and less modality,
+            // but `changedHere` only works if we know which records changed, because a view
+            // could contain records originating from multiple arcs
+            // (hence the check fails when implemented as `at least one of these originated here`).
+
+            // only store if change DID NOT originate here
+            //if (!changedHere(data)) {
+              //PersistentViews.log(`[${viewId}] REMOTE change, updating local`, data);
+
+            // only store if data doesn't match
+            if (Arcs.utils.isViewDirty(view, data)) {
+              PersistentViews.log(`[${viewId}] remote data differs from local, updating`, data);
+              Arcs.utils.setViewData(view, data);
+            }
+          }
+        });
+        // origination check
+        let fromHere = id => id.startsWith(arc.id);
+        let changedHere = data => data.length ? data.some(datum => fromHere(datum.id)) : fromHere(data.id);
+        // watch the local view
+        view.on('change', delta => {
+          //PersistentViews.log('TRIGGER[local-view]: view:', delta);
+          let change = delta.add || delta.remove || delta.data;
+          if (!change) {
+            // TODO(sjmiles): seems to get here when a Variable is `clear`ed,
+            // needs an issue ticket.
+            PersistentViews.log('`delta` has no add|remove|data', delta, view);
+          }
+          // only store if change originated here
+          if (!change || changedHere(change)) {
+            PersistentViews.log(`[${viewId}] LOCAL change, updating remote`, view, change);
+            node.set(Arcs.utils.removeUndefined(Arcs.utils.getViewData(view)));
+          }
+        }, this);
+        return off;
+      }
+    }
+    _watchView(node, view, cb) {
+      //PersistentViews.log('watching REMOTE view', node.toString());
+      let handle = node.on('value', snapshot => {
+        let data = snapshot.val();
+        //PersistentViews.log('TRIGGER[remote-fb]: view', String(node), data);
+        cb(data);
+      });
+      return () => node.off('value', handle);
+    }
+    _getViewId(tags, view) {
+      let viewid = view.type.toString().replace(/ /g, '-').replace(/[\[\]]/g, '!');
+      if (tags && [...tags].length) {
+        viewid += '-' + [...tags][0].replace(/#/g, '');
+      }
+      return viewid;
+    }
+  }
+  PersistentViews.module = document.currentImport;
+  PersistentViews.log = XenBase.logFactory('PersistentViews', '#aa00c7');
+  customElements.define('persistent-views', PersistentViews);
+</script>

@@ -1,0 +1,68 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<script>
+  class ArcView extends XenBase {
+    static get observedAttributes() { return ['arc', 'options', 'data']; }
+    _update(props, state, lastProps) {
+      let lastData = lastProps.data;
+      let {arc, options, data} = props;
+      if (arc && !state.view) {
+        if (!state.manifest && options && options.schemas) {
+          Arcs.Manifest.load(options.schemas, arc.loader).then(manifest => this._setState({manifest}));
+        }
+        if (state.manifest && options) {
+          state.view = this._createView(arc, state.manifest, options);
+        }
+        lastData = null;
+      }
+      if (state.view && data != lastData) {
+        // (re)populate
+        this._updateView(state.view, data, arc);
+        //this._fire('view', state.view);
+      }
+    }
+    _createView(arc, manifest, {name, tags, type, id, asContext}) {
+      let viewOf = false;
+      if (type[0] == '[') {
+        viewOf = true;
+        type = type.slice(1, -1);
+      }
+      let schema = manifest.findSchemaByName(type);
+      let typeOf = viewOf ? schema.type.setViewOf() : schema.type;
+      tags = ['#nosync'].concat(tags);
+      id = id || arc.generateID();
+      let view;
+      if (asContext) {
+        // manifest-view, for `map`, `copy`, `?`
+        view = arc.context.newView(typeOf, name, id, tags);
+      } else {
+        // arc-view, suitable for `use`, `?`
+        view = arc.createView(typeOf, name, id, tags);
+      }
+      // observe view
+      view.on('change', change => this._fire('view', view), this);
+      ArcView.log('created view', name, tags);
+      return view;
+    }
+    _updateView(view, data, arc) {
+      if (view.toList) {
+        data = Object.keys(data).map(key => {
+          return {id: arc.generateID(), rawData: data[key]};
+        });
+      } else {
+        data = {id: arc.generateID(), rawData: data};
+      }
+      Arcs.utils.setViewData(view, data);
+    }
+  }
+  ArcView.module = document.currentImport;
+  ArcView.log = XenBase.logFactory('ArcView', '#c6a700');
+  customElements.define('arc-view', ArcView);
+</script>

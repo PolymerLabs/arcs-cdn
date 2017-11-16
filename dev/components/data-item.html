@@ -29,7 +29,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     min-width: 40px;
     border-right: 1px solid gray;
     */
-    width: 64px;
+    width: 128px;
     background-color: whitesmoke;
   }
   data-item > right {
@@ -41,8 +41,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 </style>
 
 <template>
-  <left title="{{name}}">{{name}}</left>
+  <left title="{{name}}" on-click="_onExpandClick">{{name}}</left>
   <right>
+    <div hidden="{{hideexpand}}" on-click="_onExpandClick">+</div>
     <div hidden="{{notbool}}" title="{{name}}"><input type="checkbox" checked="{{value}}" on-click="_onCheckInput"></div>
     <div hidden="{{notstring}}" title="{{title}}">{{value}}</div>
     <data-explorer hidden="{{notobject}}" object="{{object}}"></data-explorer>
@@ -50,32 +51,37 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 </template>
 
 <script>
-  class DataItem extends XenState(XenElement) {
+  class DataItem extends XenBase {
     static get observedAttributes() { return ['name','value']; }
+    get host() {
+      return this;
+    }
     _onCheckInput(e) {
       e.stopPropagation();
       this.dispatchEvent(new CustomEvent('item-change', {detail: e.target.checked}));
     }
-    _doMount() {
-      this._dom = Xen.stamp(DataItem.module.querySelector('template')).events(this).appendTo(this);
-    }
-    _update(props, state) {
-      this._dom.set(this._render(props, state));
-    }
     _render(props, state) {
       let type = typeof props.value;
       let isobject = (type === 'object'), isstring = (type === 'string'), isbool = (type==='boolean');
+      if (!isNaN(Number(props.name))) {
+        state.expanded = true;
+      }
       return {
         name: props.name,
         notstring: !isstring,
-        notobject: !isobject,
         notbool: !isbool,
-        object: isobject ? props.value : null,
+        notobject: !isobject || !state.expanded,
+        object: isobject && state.expanded ? props.value : null,
+        hideexpand: state.expanded || !isobject,
         value: /*isstring ? props.value.slice(-54) :*/ props.value,
         title: isstring ? props.value : props.name
       };
     }
+    _onExpandClick(e) {
+      e.stopPropagation();
+      this._setState({expanded: !this._state.expanded});
+    }
   }
-  DataItem.module = document.currentScript.ownerDocument;
+  DataItem.module = document.currentImport;;
   window.customElements.define('data-item', DataItem);
 </script>

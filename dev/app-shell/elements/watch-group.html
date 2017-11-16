@@ -1,0 +1,47 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<script>
+  class WatchGroup extends XenBase {
+    static get observedAttributes() { return ['watches']; }
+    _getInitialState() {
+      return {
+        plugs: new Set()
+      };
+    }
+    _update(props, state, lastProps) {
+      if (props.watches !== lastProps.watches) {
+        this._unplug(state.plugs);
+        state.plugs.clear();
+        if (props.watches) {
+          this._watchAll(props.watches, state.plugs);
+        }
+      }
+    }
+    add(watches) {
+      this._watchAll(watches, this._state.plugs);
+    }
+    _unplug(plugs) {
+      plugs.forEach(pull => pull());
+      plugs.clear();
+    }
+    _watchAll(watches, plugs) {
+      for (let watch of watches) {
+        plugs.add(this._watch(watch.node, watch.handler));
+      }
+    }
+    _watch(node, handler) {
+      let handle = node.on('value', handler);
+      return () => node.off('value', handle);
+    }
+  }
+  WatchGroup.module = document.currentImport;
+  WatchGroup.log = XenBase.logFactory('WatchGroup', '#aa00c7');
+  customElements.define('watch-group', WatchGroup);
+</script>

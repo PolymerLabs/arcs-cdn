@@ -13,4 +13,3 @@ schema Thing
     Text description
     URL image
     Text identifier
-    Text owner

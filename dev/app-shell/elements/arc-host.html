@@ -1,0 +1,163 @@
+<!--
+@license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<template>
+  <style>
+    :host {
+      display: block;
+      /*border: 4px solid darkorange;*/
+      box-sizing: border-box;
+    }
+  </style>
+  <slot></slot>
+</template>
+
+<script>
+  class ArcHost extends XenBase {
+    static get observedAttributes() {
+      return ['config','plans','plan'];
+    }
+    _getInitialState() {
+      return {
+        invalid: 0
+      };
+    }
+    _willReceiveProps(props, state, lastProps) {
+      if (!lastProps.config && props.config) {
+        this._applyConfig(props.config)
+      }
+      if (props.plan && lastProps.plan !== props.plan) {
+        this._applySuggestion(state.arc, props.plan);
+        //this._fire('plans', null);
+        //this._beginPlanning(state.arc);
+      }
+    }
+    async _update(props, state) {
+      if (state.arc && !props.plans) {
+        // results obtained before now are invalid
+        state.invalid = true;
+        // only wait for one _beginPlanning at a time
+        if (!state.planning) {
+          state.planning = true;
+          // TODO(sjmiles): primitive attempt to throttle planning
+          setTimeout(async () => {
+            await this._beginPlanning(state)
+            state.planning = false;
+          }, 500);
+          //await this._beginPlanning(state);
+          //state.planning = false;
+        }
+      }
+    }
+    async _applyConfig(config) {
+      let arc = await this._createArc(config);
+      ArcHost.log('instantiated', arc);
+      this._setState({arc});
+      this._fire('arc', arc)
+    }
+    async _beginPlanning(state) {
+      let plans;
+      while (state.invalid) {
+        state.invalid = false;
+        plans = await this._plan(state.arc);
+      }
+      this._fire('plans', plans);
+    }
+    async _createArc(config) {
+      // make an id
+      let id = 'demo-' + Arcs.utils.randomId();
+      // create a system loader
+      let loader = this._marshalLoader(config);
+      // load manifest
+      let context = await this._loadManifest(config, loader);
+      // composer
+      let slotComposer = new Arcs.SlotComposer({
+        rootContext: this,
+        affordance: config.affordance,
+        containerKind: config.containerKind
+      });
+      // send urlMap to the Arc so worker-entry*.js can create mapping loaders
+      let urlMap = loader._urlMap;
+      // Arc!
+      let arc = Arcs.utils.createArc({id, urlMap, slotComposer, context});
+      // TODO(sjmiles): loader instance has to follow the arc, why is it not already this way?
+      arc.loader = loader;
+      return arc;
+    }
+    _marshalLoader(config) {
+      // create default URL map
+      let urlMap = Arcs.utils.createUrlMap(config.root);
+      // create a system loader
+      // TODO(sjmiles): `pecFactory` creates loader objects (via worker-entry*.js) for the innerPEC,
+      // but we have to create one by hand for manifest loading
+      let loader = new Arcs.BrowserLoader(urlMap);
+      // add `urls` to `urlMap` after a resolve pass
+      if (config.urls) {
+        Object.keys(config.urls).forEach(k => urlMap[k] = loader._resolve(config.urls[k]));
+      }
+      return loader;
+    }
+    async _loadManifest(config, loader) {
+      let {folder, content} = this._fetchManifestContent(config);
+      let manifest;
+      try {
+        manifest = await Arcs.utils.parseManifest(`${folder}/`, content, loader);
+      } catch(x) {
+        console.warn(x);
+        manifest = Arcs.utils.parseManifest(`${folder}/`, '', loader);
+      }
+      return manifest;
+    }
+    _fetchManifestContent(config) {
+      let manifests;
+      if (config.soloPath) {
+        manifests = [config.soloPath];
+      } else {
+        manifests = config.manifests ? config.manifests.slice() : [];
+        if (config.manifestPath) {
+          manifests.push(config.manifestPath);
+        }
+      }
+      let folder = '.';
+      //let path = './arcs.manifest';
+      //let folder = path.split('/').slice(0, -1).join('/') || '.';
+      let content = manifests.map(u => `import '${u}'`).join('\n');
+      return {folder, content};
+    }
+    async _plan(arc) {
+      //ArcHost.log('planning');
+      let plans;
+      try {
+        plans = await Arcs.utils.makePlans(arc, 5000);
+      } finally {
+        ArcHost.log(`plans`, plans);
+      }
+      return plans || [];
+    }
+    async _applySuggestion(arc, plan) {
+      // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
+      // we need some additional signals in combination with a more robust system for invalidating
+      // suggestions. Currently, most of the asynchrony is _short-term_, such that a simple
+      // timeout here is likely to catch the vast majority of the work. This is just a temporary solution,
+      // since it's a just another race-condition in actuality (I've merely slowed one of the racers).
+      // The timeout value is a magic number.
+      arc.instantiate(plan);
+      return new Promise((resolve, reject) => {
+        setTimeout(resolve, 200);
+      }).then(() => {
+        this._fire('applied', plan);
+      });
+    }
+  }
+  ArcHost.module = document.currentImport;
+  ArcHost.log = XenBase.logFactory('ArcHost', '#007ac1');
+  ArcHost.groupCollapsed = XenBase.logFactory('ArcHost', '#007ac1', 'groupCollapsed');
+  customElements.define('arc-host', ArcHost);
+</script>
