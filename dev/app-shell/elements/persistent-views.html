@@ -51,6 +51,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         node = node.child('values');
         let off = this._watchView(node, view, data => {
           if (!data || (!data.length && !data.rawData)) {
+            // If data is null it means the remote variable was cleared.
+            if (data === null && view.type.isEntity) {
+              PersistentViews.log(`[${viewId}] remote variable got cleared, updating`);
+              view.clear();
+            }
           } else {
             // TODO(sjmiles): the `changedHere` gambit worked in previous versions that
             // watched for Firebase node add/remove signals instead of bluntly using `values`.
@@ -78,12 +83,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           //PersistentViews.log('TRIGGER[local-view]: view:', delta);
           let change = delta.add || delta.remove || delta.data;
           if (!change) {
-            // TODO(sjmiles): seems to get here when a Variable is `clear`ed,
-            // needs an issue ticket.
-            PersistentViews.log('`delta` has no add|remove|data', delta, view);
-          }
-          // only store if change originated here
-          if (!change || changedHere(change)) {
+            PersistentViews.log('Clearing variable', view);
+            node.set(null);
+          } else if (changedHere(change)) {
+            // only store if change originated here
             PersistentViews.log(`[${viewId}] LOCAL change, updating remote`, view, change);
             node.set(Arcs.utils.removeUndefined(Arcs.utils.getViewData(view)));
           }
