@@ -86,15 +86,6 @@ let utils = {
   removeUndefined(object) {
     return JSON.parse(JSON.stringify(object));
   },
-  /*
-  undefinedToNull(object) {
-    for (var n in object) {
-      if (object[n] === undefined) {
-        object[n] = null;
-      }
-    }
-  },
-  */
   // Returns the context view id for the given params.
   getContextViewId(type, tags, amkey, isProfile) {
     return ''
@@ -103,23 +94,6 @@ let utils = {
       + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : '')
       ;
   },
-  /*
-  // Returns a Type object given a serialized type stored in Firebase.
-  oldGetTypeFromMetadata(arc, metaType) {
-    let {tag, data} = metaType;
-    // This logic should be moved somewhere more appropriate.
-    if (tag == 'entity') {
-      let schema = arc.context.findSchemaByName(data.name);
-      if (schema && schema.type) {
-        return schema.type;
-      }
-    }
-    if (tag == 'list') {
-      data = Arcs.utils.getTypeFromMetadata(arc, data);
-    }
-    return new Arcs.Type(tag, data);
-  },
-  */
   metaTypeFromType(type) {
     return JSON.stringify(type ? type.toLiteral() : null);
   },
