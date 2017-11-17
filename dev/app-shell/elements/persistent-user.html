@@ -70,16 +70,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             user.id = id;
           }
           PersistentUser.log('READING user (watchUser)', user, 'from', String(snap.ref));
-            /*
-          if (!user || !user.id) {
-            if (!user) {
-              user = {};
-            }
-            user.id = id;
-            PersistentUser.log('WRITING user (watchUser)', user);
-            snap.ref.set(Arcs.utils.removeUndefined(user));
-          }
-            */
           this._setState({user})
         }
       };
