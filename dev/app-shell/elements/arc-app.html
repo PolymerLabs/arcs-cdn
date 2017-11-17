@@ -258,7 +258,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         Arcs.utils.setUrlParam('arc', state.key);
       }
       if (state.newSteps) {
-        this._updateMetadata({state: state.newSteps});
+        this._updateMetadata({steps: state.newSteps});
         state.newSteps = null;
       }
       super._update(props, state);
