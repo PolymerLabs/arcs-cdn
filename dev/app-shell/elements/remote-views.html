@@ -23,31 +23,52 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     _watchViews(key, arc, areProfiles) {
-      let node = this._db.child(`arcs/${key}/views`);
-      this._off && this._off();
-      let handle = node.on('value', this._arcData.bind(this, arc, areProfiles));
-      this._off = () => node.off('value', handle);
+      let remoteViews = this._db.child(`arcs/${key}/views`);
+      this._off && this._off.forEach(w => w && w());
+      this._off = [];
+      this._state.watching = new Set();
+      // Listen to new views being added.
+      // TODO: remove views that are removed remotely.
+      let cb = remoteViews.on('child_added', snapshot => {
+        let metadata = snapshot.child('metadata').val();
+        let type = Arcs.utils.typeFromMetaType(metadata.type);
+        let id = Arcs.utils.getContextViewId(type, metadata.tags, snapshot.key, areProfiles);
+        if (this._state.watching.has(id)) {
+          return;
+        }
+        this._state.watching.add(id);
+        RemoteViews.log(`Listening to remote context view ${snapshot.key}`);
+        let localView = this._requireView(arc, type, metadata.name, id, metadata.tags);
+        this._off.push(this._watchView(arc, localView, snapshot.child('values').ref));
+      } );
+      this._off.push(() => remoteViews.off('child_added', cb));
     }
-    _arcData(arc, areProfiles, snap) {
-      let arcKey = '-key';
-      let views = snap.val();
-      RemoteViews.log('(incoming)', snap.key, views);
-      this._createOrUpdateViews(arc, snap.key, views, areProfiles);
-    }
-    _createOrUpdateViews(arc, key, views, areProfiles) {
-      views && Object.keys(views).forEach(key => {
-        let remote = views[key];
-        let meta = remote.metadata;
-        // construct type object
-        let type = Arcs.utils.typeFromMetaType(meta.type);
-        // construct id
-        let id = Arcs.utils.getContextViewId(type, meta.tags, key, areProfiles);
-        // find or create a view in the arc context
-        let view = this._requireView(arc, type, meta.name, id, meta.tags);
-        //Arcs.utils.setViewData(view, remote.values);
-        RemoteViews.log('created/updated view', id);
-        this._fire('view', {view, data: remote.values});
-      });
+    _watchView(arc, localView, remoteView) {
+      let off = []
+      if (localView.type.isSetView) {
+        let cb = remoteView.on('child_added', data => {
+          localView.store(data.val());
+          this._fire('view', {view: localView});
+        });
+        off.push(() => remoteView.off('child_added', cb));
+        cb = remoteView.on('child_removed', data => {
+          localView.remove(data.val().id);
+          this._fire('view', {view: localView});
+        });
+        off.push(() => remoteView.off('child_removed', cb));
+      } else if (localView.type.isEntity) {
+        let cb = remoteView.on('value', snapshot => {
+          if (snapshot.val()) {
+            localView.set(snapshot.val());
+            this._fire('view', {view: localView});
+          } else {
+            localView.clear();
+            this._fire('view', {view: localView});
+          }
+        });
+        off.push(() => remoteView.off('value', cb));
+      }
+      return () => off.forEach(w => w && w());
     }
     _requireView(arc, type, name, id, tags) {
       return arc.context.findViewById(id) || arc.context.newView(type, name, id, tags);

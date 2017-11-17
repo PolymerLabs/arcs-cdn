@@ -25,83 +25,102 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         state.watchers.forEach(w => w && w());
       }
       state.watching = new Set();
-      //state.watchers = [...arc._viewTags].map((tags, view) => {
-      state.watchers = [...arc._viewTags].map(([view, tags]) => {
-        if (!tags || !tags.has('#nosync')) {
-          return this._syncView(arc, tags, view);
+      state.watchers = [...arc._viewTags].map(([localView, tags]) => {
+        if (tags && tags.has('#nosync')) {
+          return;
+        }
+        let viewId = this._getViewId(tags, localView);
+        if (state.watching.has(viewId)) {
+          return;
+        }
+        state.watching.add(viewId);
+
+        let remoteViewMeta = this._db.child(`views/${viewId}`);
+        remoteViewMeta.child('metadata').update({
+          type: Arcs.utils.metaTypeFromType(localView.type),
+          name: localView.name || null,
+          tags: [...tags]
+        });
+        let remoteView = remoteViewMeta.child('values');
+
+        if (localView.type.isSetView) {
+          PersistentViews.log(`Syncing set view ${viewId}`);
+          return this._syncView(arc, localView, remoteView);
+        }
+        if (localView.type.isEntity) {
+          PersistentViews.log(`Syncing variable ${viewId}`);
+          return this._syncVariable(arc, localView, remoteView);
         }
       });
     }
-    _syncView(arc, tags, view) {
-      let watching = this._state.watching;
-      let viewId = this._getViewId(tags, view);
-      // Make sure we only synchronize each view at most once.
-      if (!watching.has(viewId)) {
-        watching.add(viewId);
-        // db node
-        let node = this._db.child(`views/${viewId}`);
-        // force latest metadata
-        let metadata = {
-          type: Arcs.utils.metaTypeFromType(view.type),
-          name: view.name || null,
-          tags: [...tags]
-        };
-        node.update({metadata});
-        // watch the db
-        node = node.child('values');
-        let off = this._watchView(node, view, data => {
-          if (!data || (!data.length && !data.rawData)) {
-            // If data is null it means the remote variable was cleared.
-            if (data === null && view.type.isEntity) {
-              PersistentViews.log(`[${viewId}] remote variable got cleared, updating`);
-              view.clear();
+    // Synchronize a local variable with a remote variable.
+    _syncVariable(arc, localView, remoteView) {
+      var initialLoad = true;
+      let callback = remoteView.on('value', snapshot => {
+        if (snapshot.val() && !snapshot.val().id.startsWith(arc.id)) {
+          localView.set(snapshot.val());
+        } else if (!snapshot.val()) {
+          localView.clear();
+        }
+        if (initialLoad) {
+          // Once the first load is complete sync starts listening to
+          // local changes and applying those to the remove view.
+          initialLoad = false;
+          localView.on('change', change => {
+            if (change.data && change.data.id.startsWith(arc.id)) {
+              remoteView.set(Arcs.utils.removeUndefined(change.data));
+            } else if (change.data === undefined) {
+              remoteView.remove();
             }
-          } else {
-            // TODO(sjmiles): the `changedHere` gambit worked in previous versions that
-            // watched for Firebase node add/remove signals instead of bluntly using `values`.
-            // The blunt version appeals because of less bookkeeping and less modality,
-            // but `changedHere` only works if we know which records changed, because a view
-            // could contain records originating from multiple arcs
-            // (hence the check fails when implemented as `at least one of these originated here`).
-
-            // only store if change DID NOT originate here
-            //if (!changedHere(data)) {
-              //PersistentViews.log(`[${viewId}] REMOTE change, updating local`, data);
-
-            // only store if data doesn't match
-            if (Arcs.utils.isViewDirty(view, data)) {
-              PersistentViews.log(`[${viewId}] remote data differs from local, updating`, data);
-              Arcs.utils.setViewData(view, data);
-            }
-          }
-        });
-        // origination check
-        let fromHere = id => id.startsWith(arc.id);
-        let changedHere = data => data.length ? data.some(datum => fromHere(datum.id)) : fromHere(data.id);
-        // watch the local view
-        view.on('change', delta => {
-          //PersistentViews.log('TRIGGER[local-view]: view:', delta);
-          let change = delta.add || delta.remove || delta.data;
-          if (!change) {
-            PersistentViews.log('Clearing variable', view);
-            node.set(null);
-          } else if (changedHere(change)) {
-            // only store if change originated here
-            PersistentViews.log(`[${viewId}] LOCAL change, updating remote`, view, change);
-            node.set(Arcs.utils.removeUndefined(Arcs.utils.getViewData(view)));
-          }
-        }, this);
-        return off;
-      }
-    }
-    _watchView(node, view, cb) {
-      //PersistentViews.log('watching REMOTE view', node.toString());
-      let handle = node.on('value', snapshot => {
-        let data = snapshot.val();
-        //PersistentViews.log('TRIGGER[remote-fb]: view', String(node), data);
-        cb(data);
+          }, {});
+        }
       });
-      return () => node.off('value', handle);
+      return () => removeView.off('value', callback);
+    }
+
+    _syncView(arc, localView, remoteView) {
+      let off = [];
+      let cb = remoteView.on('child_added', data => {
+        if (!data.val().id.startsWith(arc.id)) {
+          localView.store(data.val());
+        }
+      });
+      off.push(() => remoteView.off('child_added', cb));
+      cb = remoteView.on('child_removed', data => {
+        // Note: element will only be removed and 'remove' event will only be
+        // fired iff the ID is present in the view.
+        localView.remove(data.val().id);
+      });
+      off.push(() => remoteView.off('child_removed', cb));
+      
+      // Since child_added events for the initial, pre-loaded data above will
+      // fire *before* the value event fires on the parent, we use the value
+      // event to detect when initial loading is done. That is when we start
+      // listening to local view changes.
+      remoteView.once('value', snapshot => {
+        // At this point we're guaranteed the initial remote load is done.
+        localView.on('change', change => {
+          if (change.add) {
+            change.add.forEach(a => {
+              // Only store changes that were made locally.
+              if (a.id.startsWith(arc.id)) {
+                remoteView.push(Arcs.utils.removeUndefined(a));
+              }
+            });
+          } else if (change.remove) {
+            change.remove.forEach(r => {
+              remoteView.orderByChild('id').equalTo(r.id).once('value', snapshot => {
+                snapshot.forEach(data => {
+                  remoteView.child(data.key).remove();
+                });
+              });
+            });
+          } else {
+            PersistentViews.log('Unsupported change', change);
+          }
+        }, {});
+      });
+      return () => off.forEach(w => w && w());
     }
     _getViewId(tags, view) {
       let viewid = view.type.toString().replace(/ /g, '-').replace(/[\[\]]/g, '!');
