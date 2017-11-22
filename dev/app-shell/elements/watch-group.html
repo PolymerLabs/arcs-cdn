@@ -8,8 +8,15 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 <script>
+{
+  let scope = this;
+  let watches = 0;
+  //
   class WatchGroup extends XenBase {
-    static get observedAttributes() { return ['watches']; }
+    static get observedAttributes() { return ['watches','db']; }
+    add(watches) {
+      this._watchAll(this._props.db, watches, this._state.plugs);
+    }
     _getInitialState() {
       return {
         plugs: new Set()
@@ -18,30 +25,48 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _update(props, state, lastProps) {
       if (props.watches !== lastProps.watches) {
         this._unplug(state.plugs);
-        state.plugs.clear();
-        if (props.watches) {
-          this._watchAll(props.watches, state.plugs);
-        }
+        this._watchAll(props.db, props.watches, state.plugs);
       }
-    }
-    add(watches) {
-      this._watchAll(watches, this._state.plugs);
+      WatchGroup.log("[NEW] total watches", watches);
     }
     _unplug(plugs) {
       plugs.forEach(pull => pull());
       plugs.clear();
     }
-    _watchAll(watches, plugs) {
-      for (let watch of watches) {
-        plugs.add(this._watch(watch.node, watch.handler));
+    _watchAll(db, watches, plugs) {
+      if (watches) {
+        for (let watch of watches) {
+          let pull = watch.path ? this._watchPath(db, watch) : this._watch(watch.node, watch.handler);
+          // for nested watches, if we pull the plug on this watch, pull the plug on nested group too
+          // note that it's `watch.handler`'s job to install watches into `watch.group`, we only do clean-up
+          if (watch.group) {
+            let off = pull;
+            pull = () => {
+              off();
+              watch.group.watches = null;
+            };
+          }
+          plugs.add(pull);
+        }
       }
     }
+    _watchPath(db, {path, handler, group}) {
+      let node = db.child(path);
+      return this._watch(node, handler);
+    }
     _watch(node, handler) {
+      watches++;
       let handle = node.on('value', handler);
-      return () => node.off('value', handle);
+      return () => {
+        watches--;
+        node.off('value', handle);
+      };
     }
   }
   WatchGroup.module = document.currentImport;
   WatchGroup.log = XenBase.logFactory('WatchGroup', '#aa00c7');
   customElements.define('watch-group', WatchGroup);
+  //
+  scope.WatchGroup = WatchGroup;
+}
 </script>

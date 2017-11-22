@@ -10,37 +10,50 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script>
   class RemoteProfileViews extends XenBase {
     static get observedAttributes() { return ['arc', 'user']; }
+    _getInitialState() {
+      let group = new WatchGroup();
+      group.db = db;
+      return {
+        group
+      };
+    }
     _update(props, state, lastProps) {
       if (props.user && props.user !== lastProps.user) {
         state.user = props.user;
       }
       if (props.arc && state.user) {
         state.user = null;
-        state.friends = null;
-        state.dispose && state.dispose();
-        state.dispose = this._watchProfileViews(props.user, props.arc);
+        state.group.watches = this._watchProfileViews(props.user, props.arc, state.friends);
       }
     }
-    _watchProfileViews(user, arc) {
-      RemoteProfileViews.log(`watching user's profiles`, user);
-      let remotes = Arcs.utils.getUserProfileKeys(user).map(key =>
-        this._createRemoteView({arc, key, profiles: true}, e =>
-          this._remoteViewChanged(arc, e.detail.view, e.detail.data)
-        )
-      );
-      return () => remotes.forEach(r => r.dispose());
+    _watchProfileViews(user, arc, friends) {
+      let profiles = Arcs.utils.getUserProfileKeys(user);
+      //RemoteProfileViews.log('NEW profile watches: ', profiles);
+      return profiles.map(key => {
+        return {
+          // TODO(sjmiles): path is technically not firebase specific
+          path: `arcs/${key}/views`,
+          // TODO(sjmiles): firebase knowledge here
+          handler: snapshot => this._remoteViewsChanged(arc, friends, snapshot.key, snapshot.val())
+        }
+      });
     }
-    _createRemoteView(config, handler) {
-      let remote = new RemoteViews();
-      remote.addEventListener('view', handler);
-      remote.dispose = () => remote.removeEventListener('view', handler);
-      Object.assign(remote, config);
-      return remote;
+    _remoteViewsChanged(arc, friends, key, remotes) {
+      // TODO(sjmiles): these are remote-data-describing-a-view ... cow needs a name
+      RemoteProfileViews.log(`READING views`, remotes);
+      Object.keys(remotes).forEach(key => {
+        // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _view_ keys
+        // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
+        let view = Arcs.utils.createOrUpdateView(arc, remotes[key], 'PROFILE');
+        RemoteProfileViews.log('NEW created/updated view', view.id);
+        this._synthesizeFriendsView(friends, view);
+        //this._fire('view', {view});
+      });
     }
-    _remoteViewChanged(arc, view, data) {
-      Arcs.utils.setViewData(view, data);
-      RemoteProfileViews.log(`remoteViewChanged`, view.id);
-      if (!this._state.friends && view.id == 'PROFILE/[Person]/friends/') {
+    // TODO(sjmiles): special handling for `friends` view, should this be factored out?
+    _synthesizeFriendsView(friends, view) {
+      // TODO(sjmiles): `friends` is only captured once, assumption is that this view is immortal
+      if (!friends && view.id == 'PROFILE/[Person]/friends/') {
         this._state.friends = view;
         view.on('change', this._friendsViewChanged.bind(this, view), this);
         this._friendsViewChanged(view);
