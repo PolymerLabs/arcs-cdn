@@ -34,7 +34,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           return;
         }
         state.watching.add(viewId);
-
         let remoteViewMeta = this._db.child(`views/${viewId}`);
         remoteViewMeta.child('metadata').update({
           type: Arcs.utils.metaTypeFromType(localView.type),
@@ -42,7 +41,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           tags: [...tags]
         });
         let remoteView = remoteViewMeta.child('values');
-
         if (localView.type.isSetView) {
           PersistentViews.log(`Syncing set view ${viewId}`);
           return this._syncView(arc, localView, remoteView);
@@ -75,9 +73,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }, {});
         }
       });
-      return () => removeView.off('value', callback);
+      return () => remoteView.off('value', callback);
     }
-
     _syncView(arc, localView, remoteView) {
       let off = [];
       let cb = remoteView.on('child_added', data => {
@@ -92,7 +89,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         localView.remove(data.val().id);
       });
       off.push(() => remoteView.off('child_removed', cb));
-      
+
       // Since child_added events for the initial, pre-loaded data above will
       // fire *before* the value event fires on the parent, we use the value
       // event to detect when initial loading is done. That is when we start

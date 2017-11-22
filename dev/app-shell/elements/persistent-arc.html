@@ -8,7 +8,6 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 <script>
-(scope => {
   class PersistentArc extends XenBase {
     static get observedAttributes() { return ['key','metadata']; }
     _getInitialState() {
@@ -49,7 +48,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let arcMetadata = db.child(key).child('metadata');
       PersistentArc.log('watching', String(arcMetadata));
       return {
-        arcMetadata,
+        node: arcMetadata,
         handler: snap => {
           let metadata = snap.val();
           this._setState({metadata});
@@ -62,5 +61,4 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   PersistentArc.module = document.currentImport;
   PersistentArc.log = XenBase.logFactory('PersistentArc', '#a30000');
   customElements.define('persistent-arc', PersistentArc);
-})(this);
 </script>
