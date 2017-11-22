@@ -526,9 +526,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._setState({plan: suggestion.plan});
     }
     _onApplied(e, plan, props, state) {
-      let description = utils.describeArc(state.arc);
+      let description = Arcs.utils.describeArc(state.arc);
       if (!description && !state.description) {
-        description = utils.randomName();
+        description = Arcs.utils.randomName();
       }
       if (description && description !== state.description) {
         this._updateMetadata({description});
