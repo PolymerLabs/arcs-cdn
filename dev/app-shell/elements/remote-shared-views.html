@@ -18,6 +18,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _watchSharedViews(remotes, friends, arc) {
       remotes && remotes.forEach(rv => rv.dispose());
       remotes = [];
+      //
       friends = friends.map(friend => friend.rawData);
       RemoteSharedViews.log('found FRIENDS', friends);
       friends.forEach(friend => {
@@ -41,10 +42,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _createRemoteView(config, handler) {
       let remote = Object.assign(new RemoteViews(), config);
       remote.dispose = () => remote.removeEventListener('view', handler);
-      remote.addEventListener('view', e => handler(e.detail.view));
+      remote.addEventListener('view', e => handler(e.detai.view, e.detail.data));
       return remote;
     }
-    _remoteViewChanged(e, view) {
+    _remoteViewChanged(e, info) {
+      let {view, data} = info;
+      Arcs.utils.setViewData(view, data);
       RemoteSharedViews.log(`remoteViewChanged`, view.id); //, view);
     }
     */

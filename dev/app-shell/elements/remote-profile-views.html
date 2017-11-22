@@ -25,7 +25,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       RemoteProfileViews.log(`watching user's profiles`, user);
       let remotes = Arcs.utils.getUserProfileKeys(user).map(key =>
         this._createRemoteView({arc, key, profiles: true}, e =>
-          this._remoteViewChanged(arc, e.detail.view)
+          this._remoteViewChanged(arc, e.detail.view, e.detail.data)
         )
       );
       return () => remotes.forEach(r => r.dispose());
@@ -37,7 +37,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       Object.assign(remote, config);
       return remote;
     }
-    _remoteViewChanged(arc, view) {
+    _remoteViewChanged(arc, view, data) {
+      Arcs.utils.setViewData(view, data);
       RemoteProfileViews.log(`remoteViewChanged`, view.id);
       if (!this._state.friends && view.id == 'PROFILE/[Person]/friends/') {
         this._state.friends = view;
