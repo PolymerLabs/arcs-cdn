@@ -135,6 +135,10 @@ let utils = {
   getViewData(view) {
     return view.toList ? view.toList() : {id: view.id, rawData: view._stored && view._stored.rawData || {}};
   },
+  setViewData(view, data) {
+    this.clearView(view);
+    this.addViewData(view, data);
+  },
   clearView(view) {
     if (view.toList) {
       view.toList().forEach(e => view.remove(e.id));
@@ -145,14 +149,10 @@ let utils = {
   },
   addViewData(view, data) {
     if (view.toList) {
-      data && data.forEach(e => view.store(e));
+      data && Object.values(data).forEach(e => view.store(e));
     } else {
       view.set(data);
     }
-  },
-  setViewData(view, data) {
-    this.clearView(view);
-    this.addViewData(view, data);
   },
   getUserProfileKeys(user) {
     return Arcs.utils.intersectArcKeys(user.arcs, user.profiles);
