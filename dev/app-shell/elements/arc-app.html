@@ -425,14 +425,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onVisitedArcs(e, visited) {
       ArcApp.log('_onVisitedArcs: ', visited);
       let data = Object.keys(visited).map(key => {
-        let arc = visited[key];
+        let {metadata} = visited[key];
         return {
           key: key,
-          description: arc.description || key.slice(1),
-          icon: arc.icon || 'broken_image',
-          color: arc.color || 'gray',
+          description: metadata.description || key.slice(1),
+          icon: metadata.icon || 'broken_image',
+          color: metadata.color || 'gray',
           href: `${location.origin}${location.pathname}?arc=${key}&user=${this._state.user.id}`,
-          profile: arc.profile
+          profile: Boolean(metadata.profile)
         };
       });
       // prepend New Arc item to `items`
