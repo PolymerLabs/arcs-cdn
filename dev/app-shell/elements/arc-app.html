@@ -127,7 +127,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
     <persistent-views arc="{{arc}}" key="{{key}}"></persistent-views>
     <remote-profile-views arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-views>
-    <remote-shared-views arc="{{arc}}" friends="{{friends}}"></remote-shared-views>
+    <remote-shared-views arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-views>
     <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-views>
 
     <!-- only for launcher -->
@@ -425,14 +425,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onVisitedArcs(e, visited) {
       ArcApp.log('_onVisitedArcs: ', visited);
       let data = Object.keys(visited).map(key => {
-        let arc = visited[key];
+        let {metadata} = visited[key];
         return {
           key: key,
-          description: arc.description || key.slice(1),
-          icon: arc.icon || 'broken_image',
-          color: arc.color || 'gray',
+          description: metadata.description || key.slice(1),
+          icon: metadata.icon || 'broken_image',
+          color: metadata.color || 'gray',
           href: `${location.origin}${location.pathname}?arc=${key}&user=${this._state.user.id}`,
-          profile: arc.profile
+          profile: Boolean(metadata.profile)
         };
       });
       // prepend New Arc item to `items`

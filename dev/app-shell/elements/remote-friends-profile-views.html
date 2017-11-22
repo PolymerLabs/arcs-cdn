@@ -29,6 +29,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       RemoteFriendsProfileViews.log('got raw FRIENDS', friends);
       return friends.map(friend => {
         return {
+          // TODO(sjmiles): watch the entire friend record because today we need
+          // both `profiles` and `arcs` to work out the active profile set
+          // (because of a lack of referential integrity in the DB)
+          // Either enforce integrity here or put these lists into a
+          // node where they can be watched discretely (as opposed to watching the
+          // entire user node). Over-watching should be harmless, but thrashing
+          // slows things down, makes it harder to debug, etc.
           node: db.child(`users/${friend.id}`),
           handler: snap => {
             group.add(this._watchFriendProfileViews(db, arc, friend, snap));
@@ -59,14 +66,18 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       //RemoteFriendsProfileViews.log(`friend's profile views`, friend, views);
       Object.keys(views).forEach(key => {
         let {values, metadata: {name, type, tags}} = views[key];
-        let arcsType = Arcs.utils.typeFromMetaType(type).setViewOf();
         let tagString = (tags && tags.length ? `${tags.sort().join('_').replace(/#/g, '')}` : '');
         let id = `FRIENDS_PROFILE_${tagString}`;
-        //RemoteFriendsProfileViews.log(`processing view [${id}]`);
+        // TODO(sjmiles): not always a SetView is it?
+        let arcsType = Arcs.utils.typeFromMetaType(type).setViewOf();
         if (values) {
           let view = this._requireView(arc, id, arcsType, id, [`#friends_${tagString}`]);
-          if (!Array.isArray(values)) {
+          // TODO(sjmiles): how to know if `values` represents a SetView or Entity?
+          //if (!Array.isArray(values)) {
+          if ('id' in values) {
             values = [values];
+          } else {
+            values = Object.values(values);
           }
           let data = values.map(v => {
             v.rawData.owner = friend.id;

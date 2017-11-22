@@ -7,10 +7,7 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
-<link rel="import" href="remote-views.html">
-
 <script>
-(scope => {
   class PersistentUsers extends XenBase {
     static get observedAttributes() { return []; }
     _update(props, state, lastProps) {
@@ -43,5 +40,4 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   PersistentUsers.module = document.currentImport;
   PersistentUsers.log = XenBase.logFactory('PersistentUsers', '#883997');
   customElements.define('persistent-users', PersistentUsers);
-})(this);
 </script>

@@ -86,40 +86,34 @@ let utils = {
   removeUndefined(object) {
     return JSON.parse(JSON.stringify(object));
   },
-  /*
-  undefinedToNull(object) {
-    for (var n in object) {
-      if (object[n] === undefined) {
-        object[n] = null;
-      }
-    }
+  createOrUpdateView(arc, remoteView, idPrefix) {
+    let {metadata, values} = remoteView;
+    // construct type object
+    let type = Arcs.utils.typeFromMetaType(metadata.type);
+    // construct id
+    let id = Arcs.utils.getContextViewId(type, metadata.tags, idPrefix);
+    // find or create a view in the arc context
+    let view = Arcs.utils._requireView(arc, type, metadata.name, id, metadata.tags);
+    Arcs.utils.setViewData(view, values);
+    return view;
   },
-  */
   // Returns the context view id for the given params.
-  getContextViewId(type, tags, amkey, isProfile) {
+  getContextViewId(type, tags, prefix) {
     return ''
-      + `${isProfile ? `PROFILE/` : `AMKEY${amkey}/`}`
-      + `${type.toString().replace(' ', '-')}/`
+      + (prefix ? `${prefix}/` : prefix)
+      + (`${type.toString().replace(' ', '-')}/`)
       + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : '')
       ;
   },
-  /*
-  // Returns a Type object given a serialized type stored in Firebase.
-  oldGetTypeFromMetadata(arc, metaType) {
-    let {tag, data} = metaType;
-    // This logic should be moved somewhere more appropriate.
-    if (tag == 'entity') {
-      let schema = arc.context.findSchemaByName(data.name);
-      if (schema && schema.type) {
-        return schema.type;
-      }
+  _requireView(arc, type, name, id, tags) {
+    let view = arc.context.findViewById(id);
+    if (!view) {
+      view = arc.context.newView(type, name, id, tags);
+      Arcs.utils.log('[NEW] synthesized view', id, tags);
     }
-    if (tag == 'list') {
-      data = Arcs.utils.getTypeFromMetadata(arc, data);
-    }
-    return new Arcs.Type(tag, data);
+    return view;
+    //return arc.context.findViewById(id) || arc.context.newView(type, name, id, tags);
   },
-  */
   metaTypeFromType(type) {
     return JSON.stringify(type ? type.toLiteral() : null);
   },
@@ -141,6 +135,10 @@ let utils = {
   getViewData(view) {
     return view.toList ? view.toList() : {id: view.id, rawData: view._stored && view._stored.rawData || {}};
   },
+  setViewData(view, data) {
+    this.clearView(view);
+    this.addViewData(view, data);
+  },
   clearView(view) {
     if (view.toList) {
       view.toList().forEach(e => view.remove(e.id));
@@ -151,25 +149,25 @@ let utils = {
   },
   addViewData(view, data) {
     if (view.toList) {
-      data && data.forEach(e => view.store(e));
+      data && Object.values(data).forEach(e => view.store(e));
     } else {
       view.set(data);
     }
   },
-  setViewData(view, data) {
-    this.clearView(view);
-    this.addViewData(view, data);
-  },
   getUserProfileKeys(user) {
+    return Arcs.utils.intersectArcKeys(user.arcs, user.profiles);
+  },
+  getUserShareKeys(user) {
+    return Arcs.utils.intersectArcKeys(user.arcs, user.shares);
+  },
+  intersectArcKeys(arcs, other) {
     // TODO(sjmiles): database has no referential integrity, so
-    // `user.profiles` may contain dead keys. The actual profile
-    // set is the intersection of `user.arcs` and `user.profiles`.
-    if (user.arcs && user.profiles) {
-      return Object.keys(user.arcs).filter(key => Boolean(user.profiles[key]));
-    }
-    return [];
+    // `user.[profiles|shares]` may contain dead keys (aka keys not in `arcs`).
+    // The corrected set is the intersection of `user.arcs` and `user.[profiles|shares]`.
+    return arcs && other ? Object.keys(arcs).filter(key => Boolean(other[key])) : [];
   }
 };
+utils.log = XenBase.logFactory('Arcs.utils', '#4a148c');
 
 // global module (for now)
 window.Arcs.utils = utils;
