@@ -17,19 +17,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         db: db.child('arcs')
       };
     }
-    get _db() {
-      return db.child(`arcs`);
-    }
     _update(props, state, lastProps) {
       if (props.key === '*' && lastProps.key != props.key) {
         this._createKey(state.db);
       }
       if (props.key && props.key !== '*') {
         if (props.metadata && props.metadata !== lastProps.metadata) {
-          let node = this._db.child(props.key);
-          PersistentArc.log('WRITING (update) metadata for', String(node), props.metadata);
-          // TODO: write the metadata out to firebase.
-          // node.update(props.metadata);
+          let arcMetadata = state.db.child(props.key).child('metadata');
+          PersistentArc.log('WRITING (update) metadata for', String(arcMetadata), props.metadata);
+          arcMetadata.update(props.metadata);
         }
         if (props.key !== lastProps.key) {
           state.watch.watches = this._watchKey(state.db, props.key);
@@ -44,35 +40,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         icon: icons[Math.floor(Math.random()*icons.length)],
         color: colors[Math.floor(Math.random()*colors.length)]
       };
-      let key = db.push(data).key;
+      let key = db.push({'metadata': data}).key;
       this._setState({key});
       PersistentArc.log('providing key (_createKey)', key);
       this._fire('key', key);
     }
-    _getMetadata() {
-      let meta = {};
-      ['description', 'icon', 'color'].forEach(child => {
-        if (child in this._state) {
-          meta[child] = this._state[child];
-        }
-        meta[child] = null;
-      });
-      return meta;
-    }
     _watchKey(db, key) {
-      let node = db.child(key);
-      PersistentArc.log('watching', String(node));
-      return ['description', 'icon', 'color'].map(child => {
-        return {
-          node: node.child(child),
-          handler: snap => {
-            let value = snap.val();
-            this._setState({[child]: value});
-            PersistentArc.log(`${child} changed`, value);
-            this._fire('metadata', this._getMetadata());
-          }
-        };
-      });
+      let arcMetadata = db.child(key).child('metadata');
+      PersistentArc.log('watching', String(arcMetadata));
+      return {
+        arcMetadata,
+        handler: snap => {
+          let metadata = snap.val();
+          this._setState({metadata});
+          PersistentArc.log('remoteChanged', metadata);
+          this._fire('metadata', metadata);
+        }
+      };
     }
   }
   PersistentArc.module = document.currentImport;
