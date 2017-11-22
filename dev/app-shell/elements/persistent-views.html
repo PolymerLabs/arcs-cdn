@@ -19,7 +19,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     _watchViews(arc) {
-      //PersistentViews.log('resyncing views...', arc._viewTags);
+      PersistentViews.log('Re-syncing views');
       let state = this._state;
       if (state.watchers) {
         state.watchers.forEach(w => w && w());
@@ -42,7 +42,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         });
         let remoteView = remoteViewMeta.child('values');
         if (localView.type.isSetView) {
-          PersistentViews.log(`Syncing set view ${viewId}`);
+          PersistentViews.log(`Syncing setView ${viewId}`);
           return this._syncView(arc, localView, remoteView);
         }
         if (localView.type.isEntity) {
@@ -89,7 +89,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         localView.remove(data.val().id);
       });
       off.push(() => remoteView.off('child_removed', cb));
-
       // Since child_added events for the initial, pre-loaded data above will
       // fire *before* the value event fires on the parent, we use the value
       // event to detect when initial loading is done. That is when we start

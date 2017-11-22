@@ -63,7 +63,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // no-op if data matches
       // right now the only change we support is removal, so length check is enough
       if (user.arcs && keys.length !== Object.keys(user.arcs).length) {
-        RemoteVisitedArcs.log('updateVisitedArcs', keys, user.arcs);
+        //RemoteVisitedArcs.log('updateVisitedArcs', keys, user.arcs);
         let visited = Object.create(null);
         keys.forEach(key => {
           let arc = user.arcs[key];
