@@ -45,25 +45,91 @@
   <script>
     class ExtensionAppShell extends AppShell {
 
-      _configure(obj) {
-        let config = super._configure(obj);
-        let manifests = (new URL(document.location)).searchParams.getAll('manifest');
-        config.additionalManifests = manifests.filter(elem => elem!=config.manifestPath);
-        return config;
-      }
-
-      async _fetchManifestList() {
-        let manifests = await super._fetchManifestList();
-        manifests.push(...this._config.additionalManifests);
-        return manifests;
+      async _extendManifestList(manifests) {
+        if (this._config.additionalManifests) {
+          this._config.additionalManifests.forEach(manifest => {
+            manifests.includes(manifest) || manifests.push(manifest);
+            manifests.remotes.includes(manifest) || manifests.remotes.push(manifest);
+          });
+        }
       }
 
       async _start(config) {
         await super._start(config);
-        // always take the browser arc public
-        StorageTools.saveProfileState(true);
-      }
+        var appshell = this;
 
+        window.addEventListener('message', event => {
+          if (event.source != window || event.data.method != 'injectArcsData') {
+            return;
+          }
+          console.log('do arcs!1!', event.data.entities);
+          console.log(config);
+
+          // reduce the deeply nested structure of url=>entities-of-many-types
+          // to a flatter, combined form of type=>entities.
+          let dataByType = Object.entries(event.data.entities).reduce( (accumulator, [key, value]) => {
+            console.log('a', key, value);
+            value.forEach(entry => {
+              // TODO(smalls) need to dedup in here as well
+              let type = entry['@type'];
+              accumulator[type] ? accumulator[type].push(entry) : accumulator[type] = [entry];
+            });
+            return accumulator;
+          }, new Map());
+
+          if (dataByType['text/x-arcs-manifest']) {
+            config.additionalManifests = dataByType['text/x-arcs-manifest'].map(m => m.url);
+            console.log('loading additional manifests', config.additionalManifests);
+          }
+
+          appshell.reloadManifests().then(() => {
+            // gather Arcs schemas for all known types
+            var schemas = new Map(Object.entries(dataByType).map( ([fqTypeName, unused]) => {
+              let shortTypeName = (fqTypeName.startsWith('http') && fqTypeName.includes('/'))
+                  ? fqTypeName.split('/').slice(-1)[0] : fqTypeName;
+              let schema = arc._context.findSchemaByName(shortTypeName);
+              return [fqTypeName, schema];
+            }));
+
+            // the meat - create views, store entities in those.
+            Object.entries(dataByType).forEach( ([fqTypeName, entities]) => {
+              if (!schemas.has(fqTypeName) || !schemas.get(fqTypeName)) {
+                console.log('Skipping unknown type '+fqTypeName);
+                return;
+              }
+
+              const schema = schemas.get(fqTypeName);
+              const validSchemaKeys = Object.keys(schema.optional).concat(Object.keys(schema.normative));
+              const shortTypeName = schema.name;
+              const entityClass = schemas.get(fqTypeName).entityClass();
+
+              // tag product views with shortlist
+              let viewTag = shortTypeName=='Product' ? 'shortlist' : shortTypeName;
+
+              var view = arc._context.newView(
+                schema.type.viewOf(),
+                'Browser/'+shortTypeName,
+                arc.generateID()
+                [viewTag]);
+
+              // There are some fields that don't make sense in arcs, and
+              // there are some values that aren't in the right format. Let's
+              // fix all that up.
+              let filteredEntities = entities.map(entity => Object.entries(entity)
+                  .filter(entry => validSchemaKeys.includes(entry[0]))
+                  .reduce((result,current) => {
+                    result[current[0]] = current[1];
+                    return result;
+                  }, {})
+              );
+              filteredEntities.forEach(entity => view.store({id: arc.generateID(), rawData: entity}));
+            });
+          });
+        }, false);
+
+        // in case the message was sent & discarded, request sending of entities
+        window.postMessage({method: 'pleaseInjectArcsData'}, '*');
+      }
     }
 
     customElements.define('extension-app-shell', ExtensionAppShell);
