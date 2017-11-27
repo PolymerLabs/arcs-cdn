@@ -48,13 +48,20 @@
 
     class ExtensionAppShell extends AppShell {
 
-      async _extendManifestList(manifests) {
+      async _fetchManifestList() {
+        let manifests = await ManifestTools.fetchManifestList();
         if (this._config.additionalManifests) {
           this._config.additionalManifests.forEach(manifest => {
             manifests.includes(manifest) || manifests.push(manifest);
             manifests.remotes.includes(manifest) || manifests.remotes.push(manifest);
           });
         }
+
+        this._setState({
+          remotes: manifests.remotes,
+          exclusions: manifests.exclusions
+        });
+        return manifests;
       }
 
       async _start(config) {

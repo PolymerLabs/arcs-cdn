@@ -361,10 +361,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return await ManifestTools.loadManifest(this._config, this._loader, manifests);
     }
 
-    _extendManifestList(manifests) {}
     async _fetchManifestList() {
       let manifests = await ManifestTools.fetchManifestList();
-      this._extendManifestList(manifests);
       this._setState({
         remotes: manifests.remotes,
         exclusions: manifests.exclusions
