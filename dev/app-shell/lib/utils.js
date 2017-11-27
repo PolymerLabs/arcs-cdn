@@ -100,10 +100,19 @@ let utils = {
   // Returns the context view id for the given params.
   getContextViewId(type, tags, prefix) {
     return ''
-      + (prefix ? `${prefix}/` : prefix)
-      + (`${type.toString().replace(' ', '-')}/`)
+      + (prefix ? `${prefix}/` : '')
+      + (`${type.toString().replace(' ', '-')}/`).replace(/[\[\]]/g, '!')
       + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : '')
       ;
+  },
+  _getViewDescription(name, tags, user, owner) {
+      let noun = (user === owner) ? 'my' : `<b>${owner}'s</b>`;
+      if (tags && tags.length) {
+        return `${noun} ${tags[0].substring(1)}`;
+      }
+      if (name) {
+        return `${noun} ${name}`;
+      }
   },
   _requireView(arc, type, name, id, tags) {
     let view = arc.context.findViewById(id);

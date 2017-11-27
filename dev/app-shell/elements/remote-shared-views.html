@@ -18,35 +18,35 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _update(props, state, lastProps) {
       // TODO(sjmiles): rely on invariant that `arc` and `user` are required a-priori for `friends`?
       if (/*props.arc && props.user &&*/ props.friends !== lastProps.friends) {
-        let friends;
+        let watches = [];
         if (props.friends) {
-          friends = props.friends.map(friend => friend.rawData);
+          let friends = props.friends.map(friend => friend.rawData);
           // include `user` in friends, so we can access generic profile info this way
           // TODO(sjmiles): is adding 'user' to 'friends' copacetic?
           friends.push({id: user.id});
+          watches = this._watchFriends(props.arc, friends, props.user, state.groups)
         }
         RemoteSharedViews.log('[NEW] watching (raw) FRIENDS', friends);
-        state.group.watches = !friends ? [] : this._watchFriends(props.arc, friends, props.user, state.groups);
+        state.group.watches = watches;
       }
     }
     _watchFriends(arc, friends, user, groups) {
       return friends.map(friend => {
         //RemoteSharedViews.log(`[NEW] watching friend's [${friend.id}] shared views`);
-        // subgroup hassle
         let group = Object.assign(new WatchGroup(), {db});
         return {
           path: `users/${friend.id}`,
           handler: snap => {
-            group.watches = this._watchSharedViews(arc, snap.val());
+            group.watches = this._watchSharedViews(arc, user, snap.val());
           },
           group
         }
       });
     }
-    _watchSharedViews(arc, user) {
-      //let remotes = Arcs.utils.getUserProfileKeys(user);
-      let remotes = Arcs.utils.getUserShareKeys(user);
-      RemoteSharedViews.log(`[NEW] user [${user.name}]'s shared arcs`, remotes);
+    _watchSharedViews(arc, user, sharer) {
+      //let remotes = Arcs.utils.getUserProfileKeys(sharer);
+      let remotes = Arcs.utils.getUserShareKeys(sharer);
+      RemoteSharedViews.log(`[NEW] watching [${sharer.name}]'s shared arcs`, remotes);
       return remotes.map(key => {
         return {
           // TODO(sjmiles): path is technically not firebase specific
