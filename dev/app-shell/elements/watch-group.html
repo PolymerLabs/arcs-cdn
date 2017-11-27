@@ -8,10 +8,6 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 <script>
-{
-  let scope = this;
-  let watches = 0;
-  //
   class WatchGroup extends XenBase {
     static get observedAttributes() { return ['watches','db']; }
     add(watches) {
@@ -27,7 +23,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._unplug(state.plugs);
         this._watchAll(props.db, props.watches, state.plugs);
       }
-      WatchGroup.log("[NEW] total watches", watches);
     }
     _unplug(plugs) {
       plugs.forEach(pull => pull());
@@ -48,6 +43,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
           plugs.add(pull);
         }
+        WatchGroup.log("[NEW] total watches", WatchGroup.watchCount);
       }
     }
     _watchPath(db, {path, handler, group}) {
@@ -55,18 +51,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return this._watch(node, handler);
     }
     _watch(node, handler) {
-      watches++;
+      WatchGroup.watchCount++;
       let handle = node.on('value', handler);
       return () => {
-        watches--;
         node.off('value', handle);
+        WatchGroup.watchCount--;
+        WatchGroup.log("[NEW] total watches", WatchGroup.watchCount);
       };
     }
   }
+  WatchGroup.watchCount = 0;
   WatchGroup.module = document.currentImport;
   WatchGroup.log = XenBase.logFactory('WatchGroup', '#aa00c7');
   customElements.define('watch-group', WatchGroup);
-  //
-  scope.WatchGroup = WatchGroup;
-}
 </script>
