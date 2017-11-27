@@ -28,7 +28,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _watchProfileViews(user, arc, friends) {
       let profiles = Arcs.utils.getUserProfileKeys(user);
-      //RemoteProfileViews.log('NEW profile watches: ', profiles);
       return profiles.map(key => {
         return {
           // TODO(sjmiles): path is technically not firebase specific
@@ -45,7 +44,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _view_ keys
         // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
         let view = Arcs.utils.createOrUpdateView(arc, remotes[key], 'PROFILE');
-        RemoteProfileViews.log('NEW created/updated view', view.id);
+        RemoteProfileViews.log('[NEW] created/updated view', view.id);
         this._synthesizeFriendsView(friends, view);
         //this._fire('view', {view});
       });

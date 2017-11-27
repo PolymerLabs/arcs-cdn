@@ -117,11 +117,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
   </style>
-
   <app-main>
     <!--<arc-auth on-auth="_onAuth"></arc-auth>-->
     <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
-
     <persistent-users on-users="_onUsers"></persistent-users>
     <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
     <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
@@ -129,19 +127,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <remote-profile-views arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-views>
     <remote-shared-views arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-views>
     <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-views>
-
     <!-- only for launcher -->
     <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
-
     <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
     <arc-view arc="{{arc}}" data="{{identityViewData}}" options="{{identityViewOptions}}" on-view="_onIdentityView"></arc-view>
     <arc-view arc="{{arc}}" data="{{users}}" options="{{identitiesViewOptions}}" on-view="_onIdentitiesView"></arc-view>
     <arc-view arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarViewOptions}}"></arc-view>
-
     <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
-
     <shell-particles arc="{{arc}}"></shell-particles>
-
     <!-- toolbar is here only to reserve space in the static flow, the app-toolbar is position-fixed -->
     <toolbar>
       <app-toolbar>
@@ -159,17 +152,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         </div>
       </app-toolbar>
     </toolbar>
-
     <arc-host config="{{hostConfig}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
       <div slotid="toproot"></div>
       <div slotid="root"></div>
     </arc-host>
-
     <footer>
       <arc-footer suggestions="{{plans}}" on-suggest="_onSuggest"></arc-footer>
     </footer>
   </app-main>
-
   <app-tools>
     <simple-tabs>
       <!--<user-data title="User Sharing" user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>-->
@@ -185,7 +175,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       </div>
     </simple-tabs>
   </app-tools>
-
 </template>
 
 <script>
@@ -424,27 +413,30 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onVisitedArcs(e, visited) {
       ArcApp.log('_onVisitedArcs: ', visited);
-      let data = Object.keys(visited).map(key => {
-        let {metadata} = visited[key];
-        return {
-          key: key,
-          description: metadata.description || key.slice(1),
-          icon: metadata.icon || 'broken_image',
-          color: metadata.color || 'gray',
-          href: `${location.origin}${location.pathname}?arc=${key}&user=${this._state.user.id}`,
-          profile: Boolean(metadata.profile)
-        };
-      });
-      // prepend New Arc item to `items`
-      data.unshift({
-        key: '*',
-        blurb: 'New Arc',
-        description: 'New Arc',
-        icon: 'star',
-        color: 'black',
-        href: `?arc=*&user=${this._state.user.id}`
-      });
-      this._setState({arcsViewData: data});
+      let user = this._state.user;
+      if (user) {
+        let data = Object.keys(visited).map(key => {
+          let {metadata} = visited[key];
+          return {
+            key: key,
+            description: metadata.description || key.slice(1),
+            icon: metadata.icon || 'broken_image',
+            color: metadata.color || 'gray',
+            href: `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`,
+            profile: Boolean(metadata.profile)
+          };
+        });
+        // prepend New Arc item to `items`
+        data.unshift({
+          key: '*',
+          blurb: 'New Arc',
+          description: 'New Arc',
+          icon: 'star',
+          color: 'black',
+          href: `?arc=*&user=${user.id}`
+        });
+        this._setState({arcsViewData: data});
+      }
     }
     _onFriends(e, friends) {
       this._setIfDirty({friends});
