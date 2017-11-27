@@ -105,7 +105,9 @@
         return;
       }
       let v = this._arc.context.findViewById(viewId);
-      if (v && v.toList) {
+      if (!v) {
+        log(`couldn't find view ${viewId} to clear`);
+      } else if (v.toList) {
         v.toList().forEach(e => {
           v.remove(e.id);
         });
