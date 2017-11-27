@@ -43,6 +43,9 @@
   <extension-app-shell></extension-app-shell>
 
   <script>
+    const pre = Arcs.utils.prettyLogPrefix('ExtensionAppShell', '#2277a8');
+    const easLog = console.log.bind(console, ...pre);
+
     class ExtensionAppShell extends AppShell {
 
       async _extendManifestList(manifests) {
@@ -58,17 +61,21 @@
         await super._start(config);
         var appshell = this;
 
+        // The content script handles this, but that could have happened
+        // before we added our event listener below. Let's ask the content
+        // script to trigger again now that we're ready.
+        window.postMessage({method: 'pleaseInjectArcsData'}, '*');
+
         window.addEventListener('message', event => {
+          easLog(`received event ${event.data.method} from ${event.source}`,
+              event.data, config);
           if (event.source != window || event.data.method != 'injectArcsData') {
             return;
           }
-          console.log('do arcs!1!', event.data.entities);
-          console.log(config);
 
           // reduce the deeply nested structure of url=>entities-of-many-types
           // to a flatter, combined form of type=>entities.
           let dataByType = Object.entries(event.data.entities).reduce( (accumulator, [key, value]) => {
-            console.log('a', key, value);
             value.forEach(entry => {
               // TODO(smalls) need to dedup in here as well
               let type = entry['@type'];
@@ -79,7 +86,7 @@
 
           if (dataByType['text/x-arcs-manifest']) {
             config.additionalManifests = dataByType['text/x-arcs-manifest'].map(m => m.url);
-            console.log('loading additional manifests', config.additionalManifests);
+            easLog('loading additional manifests', config.additionalManifests);
           }
 
           appshell.reloadManifests().then(() => {
@@ -94,7 +101,7 @@
             // the meat - create views, store entities in those.
             Object.entries(dataByType).forEach( ([fqTypeName, entities]) => {
               if (!schemas.has(fqTypeName) || !schemas.get(fqTypeName)) {
-                console.log('Skipping unknown type '+fqTypeName);
+                easLog('skipping unknown type '+fqTypeName);
                 return;
               }
 
@@ -123,12 +130,10 @@
                   }, {})
               );
               filteredEntities.forEach(entity => view.store({id: arc.generateID(), rawData: entity}));
+              easLog(`stored entities of type ${fqTypeName}`, filteredEntities);
             });
           });
         }, false);
-
-        // in case the message was sent & discarded, request sending of entities
-        window.postMessage({method: 'pleaseInjectArcsData'}, '*');
       }
     }
 
