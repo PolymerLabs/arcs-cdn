@@ -38,21 +38,23 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       });
     }
     _remoteViewsChanged(arc, friends, key, remotes) {
-      // TODO(sjmiles): these are remote-data-describing-a-view ... cow needs a name
-      RemoteProfileViews.log(`READING views`, remotes);
-      Object.keys(remotes).forEach(key => {
-        // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _view_ keys
-        // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
-        let view = Arcs.utils.createOrUpdateView(arc, remotes[key], 'PROFILE');
-        RemoteProfileViews.log('[NEW] created/updated view', view.id);
-        this._synthesizeFriendsView(friends, view);
-        //this._fire('view', {view});
-      });
+      if (remotes) {
+        // TODO(sjmiles): these are remote-data-describing-a-view ... cow needs a name
+        RemoteProfileViews.log(`READING views`, remotes);
+        Object.keys(remotes).forEach(key => {
+          // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _view_ keys
+          // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
+          let view = Arcs.utils.createOrUpdateView(arc, remotes[key], 'PROFILE');
+          RemoteProfileViews.log('created/updated view', view.id);
+          this._synthesizeFriendsView(friends, view);
+          //this._fire('view', {view});
+        });
+      }
     }
     // TODO(sjmiles): special handling for `friends` view, should this be factored out?
     _synthesizeFriendsView(friends, view) {
       // TODO(sjmiles): `friends` is only captured once, assumption is that this view is immortal
-      if (!friends && view.id == 'PROFILE/[Person]/friends/') {
+      if (!friends && view.id == 'PROFILE/!Person!/friends/') {
         this._state.friends = view;
         view.on('change', this._friendsViewChanged.bind(this, view), this);
         this._friendsViewChanged(view);
@@ -60,11 +62,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _friendsViewChanged(view) {
       let data = Arcs.utils.getViewData(view);
-      RemoteProfileViews.log('FRIENDS changed:', data);
+      RemoteProfileViews.log('FRIENDS view changed:', data);
       this._fire('friends', data);
     }
   }
   RemoteProfileViews.module = document.currentImport;
-  RemoteProfileViews.log = XenBase.logFactory('RemoteProfileViews', '#003c8f');
+  RemoteProfileViews.log = XenBase.logFactory('RemotePVs', '#003c8f');
   customElements.define('remote-profile-views', RemoteProfileViews);
 </script>
