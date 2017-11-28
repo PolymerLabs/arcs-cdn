@@ -512,7 +512,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onPlans(e, plans) {
       if (this._setIfDirty({plans})) {
-        this._fire('generations', plans.generations, document);
+        if (plans) {
+          this._fire('generations', plans.generations, document);
+        }
       }
     }
     _onStep(e, step) {
