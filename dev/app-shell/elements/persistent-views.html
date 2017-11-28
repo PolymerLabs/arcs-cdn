@@ -29,12 +29,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         if (tags && tags.has('#nosync')) {
           return;
         }
-        let viewId = this._getViewId(tags, localView);
+        let viewId = Arcs.utils.getContextViewId(localView.type, tags);
+        //let viewId2 = this._getViewId(tags, localView);
+        //PersistentViews.log(`viewIds `, viewId, viewId2);
         if (state.watching.has(viewId)) {
           return;
         }
         state.watching.add(viewId);
         let remoteViewMeta = this._db.child(`views/${viewId}`);
+        // TODO(sjmiles): maybe not do this unless we have to (reducing FB thrash)
         remoteViewMeta.child('metadata').update({
           type: Arcs.utils.metaTypeFromType(localView.type),
           name: localView.name || null,
@@ -118,6 +121,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       });
       return () => off.forEach(w => w && w());
     }
+    /*
     _getViewId(tags, view) {
       let viewid = view.type.toString().replace(/ /g, '-').replace(/[\[\]]/g, '!');
       if (tags && [...tags].length) {
@@ -125,6 +129,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return viewid;
     }
+    */
   }
   PersistentViews.module = document.currentImport;
   PersistentViews.log = XenBase.logFactory('PersistentViews', '#aa00c7');
