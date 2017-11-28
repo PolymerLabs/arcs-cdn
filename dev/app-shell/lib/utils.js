@@ -100,9 +100,9 @@ let utils = {
   // Returns the context view id for the given params.
   getContextViewId(type, tags, prefix) {
     return ''
-      + (prefix ? `${prefix}/` : '')
-      + (`${type.toString().replace(' ', '-')}/`).replace(/[\[\]]/g, '!')
-      + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}/` : '')
+      + (prefix ? `${prefix}_` : '')
+      + (`${type.toString().replace(' ', '-')}_`).replace(/[\[\]]/g, '!')
+      + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}` : '')
       ;
   },
   _getViewDescription(name, tags, user, owner) {

@@ -54,7 +54,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     // TODO(sjmiles): special handling for `friends` view, should this be factored out?
     _synthesizeFriendsView(friends, view) {
       // TODO(sjmiles): `friends` is only captured once, assumption is that this view is immortal
-      if (!friends && view.id == 'PROFILE/!Person!/friends/') {
+      if (!friends && view.id == 'PROFILE_!Person!_friends') {
         this._state.friends = view;
         view.on('change', this._friendsViewChanged.bind(this, view), this);
         this._friendsViewChanged(view);
