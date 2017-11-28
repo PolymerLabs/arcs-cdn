@@ -84,6 +84,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       right: 0;
       background-color: white;
     }
+    [hidden] {
+      display: none;
+    }
     [illuminate] [particle-host] {
       border: 1px solid #ea80fc;
       border-top: 18px solid #ea80fc;
@@ -156,8 +159,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <div slotid="toproot"></div>
       <div slotid="root"></div>
     </arc-host>
-    <footer>
-      <arc-footer suggestions="{{plans}}" on-suggest="_onSuggest"></arc-footer>
+    <footer hidden="{{hideFooter}}">
+      <arc-footer hidden="{{hideFooter}}" suggestions="{{plans}}" on-suggest="_onSuggest"></arc-footer>
     </footer>
   </app-main>
   <app-tools>
@@ -285,6 +288,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         $template: 'users-options',
         models: this._renderUserOptionModels(state.users, state.user)
       };
+      state.hideFooter = state.config && state.config.launcher;
       // must have `auth` before doing anything else
       return state.auth ? state : null;
     }
