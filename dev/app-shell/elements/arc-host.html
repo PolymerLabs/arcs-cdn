@@ -46,11 +46,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // only wait for one _beginPlanning at a time
         if (!state.planning) {
           state.planning = true;
+          // old plans are stale, evacipate them
+          ArcHost.log('clearing old plans');
+          this._fire('plans', null);
           // TODO(sjmiles): primitive attempt to throttle planning
           setTimeout(async () => {
             await this._beginPlanning(state)
             state.planning = false;
-          }, 500);
+          }, 300);
           //await this._beginPlanning(state);
           //state.planning = false;
         }
