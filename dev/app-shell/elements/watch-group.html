@@ -43,7 +43,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           }
           plugs.add(pull);
         }
-        WatchGroup.log("[NEW] total watches", WatchGroup.watchCount);
+        //WatchGroup.log("total watches", WatchGroup.watchCount);
       }
     }
     _watchPath(db, {path, handler, group}) {
@@ -56,7 +56,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return () => {
         node.off('value', handle);
         WatchGroup.watchCount--;
-        WatchGroup.log("[NEW] total watches", WatchGroup.watchCount);
+        //WatchGroup.log("total watches", WatchGroup.watchCount);
       };
     }
   }

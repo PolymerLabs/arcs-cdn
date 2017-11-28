@@ -25,14 +25,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           // TODO(sjmiles): is adding 'user' to 'friends' copacetic?
           friends.push({id: user.id});
           watches = this._watchFriends(props.arc, friends, props.user, state.groups)
+          RemoteSharedViews.log(`watching (raw) FRIENDS`, friends);
         }
-        RemoteSharedViews.log('[NEW] watching (raw) FRIENDS', friends);
         state.group.watches = watches;
       }
     }
     _watchFriends(arc, friends, user, groups) {
       return friends.map(friend => {
-        //RemoteSharedViews.log(`[NEW] watching friend's [${friend.id}] shared views`);
+        //RemoteSharedViews.log(`watching friend's [${friend.id}] shared views`);
         let group = Object.assign(new WatchGroup(), {db});
         return {
           path: `users/${friend.id}`,
@@ -46,7 +46,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _watchSharedViews(arc, user, sharer) {
       //let remotes = Arcs.utils.getUserProfileKeys(sharer);
       let remotes = Arcs.utils.getUserShareKeys(sharer);
-      RemoteSharedViews.log(`[NEW] watching [${sharer.name}]'s shared arcs`, remotes);
+      RemoteSharedViews.log(`watching [${sharer.name}]'s shared arcs`, remotes);
       return remotes.map(key => {
         return {
           // TODO(sjmiles): path is technically not firebase specific
@@ -60,13 +60,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (views) {
         Object.keys(views).forEach(key => {
           let view = views[key];
-          RemoteSharedViews.log(`[NEW] remoteViewsChanged`, view.metadata.tags);
+          RemoteSharedViews.log(`remoteViewsChanged`, view.metadata.tags);
           Arcs.utils.createOrUpdateView(arc, view, `SHARED[${arcKey}]`);
         });
       }
     }
   }
   RemoteSharedViews.module = document.currentImport;
-  RemoteSharedViews.log = XenBase.logFactory('RemoteSharedViews', '#c79400');
+  RemoteSharedViews.log = XenBase.logFactory('RemoteSVs', '#c79400');
   customElements.define('remote-shared-views', RemoteSharedViews);
 </script>

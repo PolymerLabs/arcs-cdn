@@ -118,10 +118,9 @@ let utils = {
     let view = arc.context.findViewById(id);
     if (!view) {
       view = arc.context.newView(type, name, id, tags);
-      Arcs.utils.log('[NEW] synthesized view', id, tags);
+      Arcs.utils.log('synthesized view', id, tags);
     }
     return view;
-    //return arc.context.findViewById(id) || arc.context.newView(type, name, id, tags);
   },
   metaTypeFromType(type) {
     return JSON.stringify(type ? type.toLiteral() : null);

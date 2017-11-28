@@ -9,7 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 -->
 <script>
   class RemoteFriendsProfileViews extends XenBase {
-    static get observedAttributes() { return ['arc', 'friends','user']; }
+    static get observedAttributes() { return ['arc','friends','user']; }
     _getInitialState() {
       return {
         group: new WatchGroup(),
@@ -96,6 +96,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
   }
   RemoteFriendsProfileViews.module = document.currentImport;
-  RemoteFriendsProfileViews.log = XenBase.logFactory('RemoteFriendsPV', '#805acb');
+  RemoteFriendsProfileViews.log = XenBase.logFactory('RemoteFriendsPVs', '#805acb');
   customElements.define('remote-friends-profiles-views', RemoteFriendsProfileViews);
 </script>
