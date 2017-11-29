@@ -138,7 +138,7 @@ ${productStyles}
         // There's a longer-term question, though - we need this same
         // treatment everywhere, so how to handle that? Should we filter
         // earlier in the system?
-        name = Array.isArray(item.name) ? item.name[0] : item.name;
+        let name = Array.isArray(item.name) ? item.name[0] : item.name;
         item.subId = name.replace(/ /g,'').toLowerCase();
         return item;
       });
