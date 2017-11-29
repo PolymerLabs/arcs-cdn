@@ -143,6 +143,17 @@
                     return result;
                   }, {})
               );
+
+              // For Products, populate shipDays if it's not already done.
+              if (shortTypeName=='Product') {
+                let shipDays = 0;
+                filteredEntities.forEach(entity => {
+                  if (!entity.hasOwnProperty('shipDays')) {
+                      entity['shipDays']=shipDays++;
+                  }
+                });
+              }
+
               filteredEntities.forEach(entity => view.store({id: arc.generateID(), rawData: entity}));
               easLog(`stored entities of type ${fqTypeName}`, filteredEntities);
             });
