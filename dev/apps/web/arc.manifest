@@ -7,9 +7,10 @@
 
 import 'https://sjmiles.github.io/arc-stories/0.3/People/People.recipes'
 import 'https://sjmiles.github.io/arc-stories/0.3/Places/Places.recipes'
-import 'https://sjmiles.github.io/arc-stories/0.3/Products/Products.recipes'
+#import 'https://sjmiles.github.io/arc-stories/0.3/Products/Products.recipes'
 import 'https://sjmiles.github.io/arc-stories/0.3/Restaurants/Restaurants.recipes'
 import 'https://sjmiles.github.io/arc-stories/0.3/Events/Events.recipes'
 import 'https://sjmiles.github.io/arc-stories/0.3/Messages/Messages.recipes'
 import 'https://sjmiles.github.io/arc-stories/0.3/Finance/Finance.recipes'
 import 'https://sjmiles.github.io/arc-stories/0.3/PlaidAccounts/PlaidAccounts.recipes'
+import 'https://mmandlis.github.io/arcs-stories/0.3/Products/Products.recipes'
