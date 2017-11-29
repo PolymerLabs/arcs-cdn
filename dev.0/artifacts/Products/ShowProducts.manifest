@@ -21,4 +21,4 @@ particle ShowProducts in 'source/ShowProducts.js'
       view list
     provide set of prenotation
       view list
-  description `Show ${list}`
+  description `show ${list}`
