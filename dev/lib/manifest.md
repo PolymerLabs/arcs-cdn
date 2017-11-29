@@ -48,7 +48,7 @@ Views contain entities of a particular Schema. There are two kinds of view
 instantiations:
 
 * 'set' view: `view MyProducts of [Product] in 'my-products.json'`
-* 'variable' view: `view MyProduct of Product in 'my-products.jsoin'`.
+* 'variable' view: `view MyProduct of Product in 'my-products.json'`.
 
 Views defined in manifests are immutable. They may be mapped, or copied via a
 Recipe into an arc.
@@ -183,8 +183,8 @@ Recipes can refer to particles and views by name:
 ```
 ...
 recipe
-  map MyView # 'MyView' could be is defined in this manifest or imported
-  MyParticle # 'MyParticle' could be is defined in this manifest or imported
+  map MyView # 'MyView' could be defined in this manifest or imported
+  MyParticle # 'MyParticle' could be defined in this manifest or imported
 ```
 
 Within a recipe; views, particles, and slots can be given 'local names'. Local names are scoped to the recipe:
