@@ -48,7 +48,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (record) {
         // if this arc is part of our profile, mark it that way
         if (user.profiles && user.profiles[snap.key]) {
-          record.profile = snap.key;
+          record.metadata = record.metadata || {};
+          record.metadata.profile = snap.key;
         }
         // stuff this record into our list of arc metadata
         data[snap.key] = record;
