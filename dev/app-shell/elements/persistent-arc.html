@@ -21,7 +21,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._createKey(state.db);
       }
       if (props.key && props.key !== '*') {
-        if (props.metadata && props.metadata !== lastProps.metadata) {
+        if (props.metadata && props.metadata !== state.metadata) {
+          state.metadata = props.metadata;
           let arcMetadata = state.db.child(props.key).child('metadata');
           PersistentArc.log('WRITING (update) metadata for', String(arcMetadata), props.metadata);
           arcMetadata.update(props.metadata);
