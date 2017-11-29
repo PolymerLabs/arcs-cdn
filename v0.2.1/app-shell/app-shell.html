@@ -419,7 +419,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // empty string = show suggestions matching current slots, i.e.
         // suggestions furthering current flow, but not those just appending
         // TODO(seefeld): Also add suggestions based on in-arc views?
-        results = plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
+        results = plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root' || s.name == 'toproot'));
       }
       return results || [];
     }
