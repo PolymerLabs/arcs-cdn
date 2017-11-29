@@ -41,10 +41,11 @@ defineParticle(({DomParticle}) => {
               let then = new Date(now + item.shipDays*daysToMs);
               if (then > needed) {
                 style = {color: 'orange', fontWeight: 'bold', fontStyle: 'normal'};
+                arrival = `Arrives ${then.toDateString()}. Too late!`;
               } else {
                 style = {color: 'green'};
+                arrival = `Arrives ${then.toDateString()}`;
               }
-              arrival = `Arrives ${then.toDateString()}`;
             } else {
               arrival = `No shipping info.`;
             }
