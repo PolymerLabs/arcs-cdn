@@ -113,7 +113,7 @@
               const entityClass = schemas.get(fqTypeName).entityClass();
 
               // tag product views with shortlist
-              let viewTag = shortTypeName=='Product' ? 'shortlist' : shortTypeName;
+              let viewTag = shortTypeName=='Product' ? '#shortlist' : '#'+shortTypeName;
 
               var view = arc._context.newView(
                 schema.type.viewOf(),
