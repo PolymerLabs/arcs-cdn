@@ -140,17 +140,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <!-- toolbar is here only to reserve space in the static flow, the app-toolbar is position-fixed -->
     <toolbar>
       <app-toolbar>
-        <i style="color: #9c27b0;" on-click="_onNavClick">donut_small</i>
+        <i style="color: #9c27b0;" title="Arcs" on-click="_onNavClick">donut_small</i>
         <span arc-title style%="{{titleStatic}}" on-click="_onStartEditingTitle" unsafe-html="{{description}}"></span>
         <select on-change="_onUserSelected">{{usersOptions}}</select>
         <template users-options>
           <option value="{{value}}" selected="{{selected}}">{{user}}</option>
         </template>
         <div buttons style%="{{toolbarButtonsStyle}}">
-          <toggle-button state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
-          <toggle-button state="{{sharingState}}" on-state="_onSharingState" icons="link supervisor_account"></toggle-button>
-          <toggle-button on-state="_onCastState" icons="cast cast_connected"></toggle-button>
-          <i on-click="_onNewClick">note_add</i>
+          <toggle-button title="Arc Contains Profile Data" state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
+          <toggle-button title="Share this Arc" state="{{sharingState}}" on-state="_onSharingState" icons="link supervisor_account"></toggle-button>
+          <toggle-button title="Cast" on-state="_onCastState" icons="cast cast_connected"></toggle-button>
+          <i on-click="_onNewArcClick">note_add</i>
         </div>
       </app-toolbar>
     </toolbar>
@@ -231,7 +231,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       state.appState = state;
       //
       if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData)) {
-        state.identityViewData = state.user; //this._synthesizeIdentityViewData(state.arc, state.user);
+        state.identityViewData = this._synthesizeIdentityViewData(state.arc, state.user);
       }
       if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
         state.plan = state.plans[0].plan;
@@ -270,7 +270,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (state.config && state.key && state.user) {
         // modifying config only matters before initializing arc-host
         let isProfile = state.user.profiles && state.user.profiles[state.key];
-        if (isProfile) {
+        if (isProfile && !state.arc) {
           ArcApp.log('is a profile Arc, setting soloPath to "profile.manifest"');
           state.config.soloPath = 'profile.manifest';
         }
@@ -305,7 +305,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _renderUserOptionModels(users, user) {
       let models = [
         {user: '(none)'},
-        {user: '(New)'}
+        {user: '* New User'}
       ];
       if (users) {
         let selectedId = user ? user.id : '';
@@ -319,13 +319,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return models;
     }
-    /*
     _synthesizeIdentityViewData(arc, user) {
       return {
         id: user.id,
         name: user.name
       };
     }
+    /*
     _hasViews(state) {
       return Boolean(state.arcsView && state.identityView && state.identitiesView);
     }
@@ -401,18 +401,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onUserSelected(e) {
       let user, userId;
-      switch (selected) {
+      switch (e.currentTarget.selectedIndex) {
         case 0:
           break;
         case 1:
-          user = this._newUserPrompt();
-          break;
+          this._onNewUser(e);
+          return;
         default:
           userId = e.currentTarget.value
           break;
       }
       ArcApp.log('switching user', user, userId);
       this._setState({user, userId});
+    }
+    _onNewUser(e) {
+      let url = `?arc=profile&user=new`;
+      open(url, '_blank');
     }
     _newUserPrompt() {
       // returns String 'null' (sheesh) on cancel
@@ -424,7 +428,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onUser(e, user, props, state) {
       // TODO(sjmiles): in the new user flow, stale `user` record can be received after the
       // app sets state.user.name but before persistent-user constructs the new user.
-      // Ways of fixing: (1) examine the timing issues, make sure we are doing the right things, (2) stop
+      // This is fixed here by careful examination of the state data.
+      // Other ways of fixing: (1) examine the timing issues, make sure we are doing the right things, (2) stop
       // multiplexing `user` object to request user-creation.
       if ((state.user && state.user.name && !state.user.id) || user) {
         // reference testing, remember to treat `user` as immutable
@@ -450,6 +455,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             profile: Boolean(profile)
           };
         });
+        /*
         // prepend New User item
         data.unshift({
           key: '*',
@@ -459,6 +465,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           color: 'gray',
           href: `?arc=profile&user=new`
         });
+        */
         // prepend New Arc item
         data.unshift({
           key: '*',
@@ -474,7 +481,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onFriends(e, friends) {
       this._setIfDirty({friends});
     }
-    _onNewClick(e) {
+    _onNewArcClick(e) {
       open(`${location.origin}${location.pathname}`, `_blank`);
     }
     _onKey(e, key) {
