@@ -298,7 +298,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // toggles boolean attribute `expanded` on `this`
       Xen.setBoolAttribute(this, 'expanded', Boolean(state.arcsToolsVisible));
       if (state.config) {
-        localStorage.setItem('arcs-dev-tools', state.arcsToolsVisible ? 'open' : 'closed');
+        localStorage.setItem('0-3-arcs-dev-tools', state.arcsToolsVisible ? 'open' : 'closed');
       }
       Xen.setBoolAttribute(this, 'illuminate', Boolean(state.illuminateParticles));
     }
@@ -435,7 +435,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // reference testing, remember to treat `user` as immutable
         if (this._setIfDirty({user})) {
           if (user) {
-            localStorage.setItem('currentUser', user.id);
+            localStorage.setItem('0-3-currentUser', user.id);
           }
         }
       }
@@ -445,7 +445,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let user = this._state.user;
       if (user) {
         let data = Object.keys(visited).map(key => {
-          let {metadata,profile} = visited[key];
+          let {metadata, profile} = visited[key];
           return {
             key: key,
             description: metadata.description || key.slice(1),
