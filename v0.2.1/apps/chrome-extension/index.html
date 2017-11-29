@@ -127,10 +127,33 @@
               let filteredEntities = entities.map(entity => Object.entries(entity)
                   .filter(entry => validSchemaKeys.includes(entry[0]))
                   .reduce((result,current) => {
-                    result[current[0]] = current[1];
+                    let key = current[0];
+
+                    // do some basic filtering on values.
+                    // TODO(smalls) as we discover more cases that need this,
+                    // let's pull this out into something more maintanable.
+                    let value;
+                    if (key=='name' && Array.isArray(current[1])) {
+                      value = current[1][0];
+                    } else {
+                      value = current[1];
+                    }
+
+                    result[key] = value;
                     return result;
                   }, {})
               );
+
+              // For Products, populate shipDays if it's not already done.
+              if (shortTypeName=='Product') {
+                let shipDays = 5;
+                filteredEntities.forEach(entity => {
+                  if (!entity.hasOwnProperty('shipDays')) {
+                      entity['shipDays']=shipDays++;
+                  }
+                });
+              }
+
               filteredEntities.forEach(entity => view.store({id: arc.generateID(), rawData: entity}));
               easLog(`stored entities of type ${fqTypeName}`, filteredEntities);
             });

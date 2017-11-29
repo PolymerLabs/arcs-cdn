@@ -133,7 +133,14 @@ ${productStyles}
         // TODO(sjmiles): rawData provides POJO access, but shortcuts schema-enforcing getters
         let item = Object.assign({}, rawData);
         item.image = resolver ? resolver(item.image) : item.image;
-        item.subId = item.name.replace(/ /g,'').toLowerCase();
+
+        // TODO(smalls): names can be lists, so don't assume we just have one.
+        // There's a longer-term question, though - we need this same
+        // treatment everywhere, so how to handle that? Should we filter
+        // earlier in the system?
+        let name = Array.isArray(item.name) ? item.name[0] : item.name;
+        item.subId = name.replace(/ /g,'').toLowerCase();
+
         return item;
       });
       this._setState({
