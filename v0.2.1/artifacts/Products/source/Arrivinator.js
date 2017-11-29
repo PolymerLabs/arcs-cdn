@@ -30,7 +30,11 @@ defineParticle(({DomParticle}) => {
           items: props.list.map((item, i) => {
             // TODO(sjmiles): bypass schema for the moment
             item = item.rawData;
-            let subId = item.name.replace(/ /g,'').toLowerCase();
+
+            // TODO(smalls() see ShowProducts.js for a similar issue
+            let name = Array.isArray(item.name) ? item.name[0] : item.name;
+            let subId = name.replace(/ /g,'').toLowerCase();
+
             let style = null;
             let arrival = '';
             if (item.shipDays) {
