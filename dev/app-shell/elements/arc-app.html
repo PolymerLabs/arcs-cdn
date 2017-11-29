@@ -231,9 +231,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       state.appState = state;
       //
       if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData)) {
-        state.identityViewData = this._synthesizeIdentityViewData(state.arc, state.user);
+        state.identityViewData = state.user; //this._synthesizeIdentityViewData(state.arc, state.user);
       }
-      if (!state.plan && state.plans && state.plans.length && state.config.launcher) {
+      if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
         state.plan = state.plans[0].plan;
       }
       if (state.user) {
@@ -250,7 +250,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       super._update(props, state);
     }
     _render(props, state) {
-      // only persistent-arc ever gets '*' as key, which will convert it into a real key
+      // only persistent-arc ever gets '*', which it converts into a real key;
+      // state.key is blank in the interim
       state.suggestKey = state.key;
       if (state.key === '*') {
         state.key = '';
@@ -266,10 +267,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (state.user) {
         state.userName = state.user.name;
       }
-      // unpack button states
-      if (state.key && state.user) {
-        state.profileState = state.user.profiles ? (state.user.profiles[state.key] ? 1 : 0) : 0;
-        state.sharedState = state.user.shares ? (state.user.shares[state.key] ? 1 : 0) : 0;
+      if (state.config && state.key && state.user) {
+        // modifying config only matters before initializing arc-host
+        let isProfile = state.user.profiles && state.user.profiles[state.key];
+        if (isProfile) {
+          ArcApp.log('is a profile Arc, setting soloPath to "profile.manifest"');
+          state.config.soloPath = 'profile.manifest';
+        }
+        let isShared = state.user.shares && state.user.shares[state.key];
+        // unpack button states
+        state.profileState = isProfile ? 1 : 0;
+        state.sharedState = isShared ? 1 : 0;
       }
       // enable remote-visited-arcs if running as launcher
       if (state.config && state.config.launcher) {
@@ -356,19 +364,28 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return true;
     }
     _onConfig(e, config) {
+      let user = null;
+      let userId = config.user;
       let key = config.key || '';
       if (!config.key) {
         config.key = 'launcher';
       }
-      if (config.key === 'profile') {
-        config.soloPath = 'profile.manifest';
-      }
       if (config.key === 'launcher') {
-        config.soloPath = config.soloPath || 'launcher.manifest';
+        config.soloPath = /*config.soloPath ||*/ 'launcher.manifest';
         config.launcher = true;
         key = '';
       }
-      this._setState({config, key, userId: config.user, arcsToolsVisible: config.arcsToolsVisible});
+      if (config.key === 'profile') {
+        config.soloPath = 'profile.manifest';
+        config.profiler = true;
+        key = '*';
+      }
+      if (userId === 'new') {
+        userId = null;
+        user = this._newUserPrompt();
+        ArcApp.log('new user', user);
+      }
+      this._setState({config, key, userId, user, arcsToolsVisible: config.arcsToolsVisible});
     }
     _onToggleIlluminate() {
       this._setState({illuminateParticles: !this._state.illuminateParticles});
@@ -384,17 +401,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onUserSelected(e) {
       let user, userId;
-      let selected = e.currentTarget.selectedIndex;
       switch (selected) {
         case 0:
           break;
         case 1:
-          ArcApp.log('mutated user object (onUserSelected)', user);
-          // returns String 'null' (sheesh) on cancel
-          let name = prompt('User name?', 'User');
-          if (name !== "null") {
-            user = {name}
-          }
+          user = this._newUserPrompt();
           break;
         default:
           userId = e.currentTarget.value
@@ -403,11 +414,24 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       ArcApp.log('switching user', user, userId);
       this._setState({user, userId});
     }
+    _newUserPrompt() {
+      // returns String 'null' (sheesh) on cancel
+      let name = prompt('User name?', 'User');
+      if (name !== "null") {
+        return {name};
+      }
+    }
     _onUser(e, user, props, state) {
-      // reference testing, remember to treat `user` as immutable
-      if (this._setIfDirty({user})) {
-        if (user) {
-          localStorage.setItem('currentUser', user.id);
+      // TODO(sjmiles): in the new user flow, stale `user` record can be received after the
+      // app sets state.user.name but before persistent-user constructs the new user.
+      // Ways of fixing: (1) examine the timing issues, make sure we are doing the right things, (2) stop
+      // multiplexing `user` object to request user-creation.
+      if ((state.user && state.user.name && !state.user.id) || user) {
+        // reference testing, remember to treat `user` as immutable
+        if (this._setIfDirty({user})) {
+          if (user) {
+            localStorage.setItem('currentUser', user.id);
+          }
         }
       }
     }
@@ -416,17 +440,26 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let user = this._state.user;
       if (user) {
         let data = Object.keys(visited).map(key => {
-          let {metadata} = visited[key];
+          let {metadata,profile} = visited[key];
           return {
             key: key,
             description: metadata.description || key.slice(1),
             icon: metadata.icon || 'broken_image',
             color: metadata.color || 'gray',
             href: `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`,
-            profile: Boolean(metadata.profile)
+            profile: Boolean(profile)
           };
         });
-        // prepend New Arc item to `items`
+        // prepend New User item
+        data.unshift({
+          key: '*',
+          blurb: 'New User',
+          description: 'New User',
+          icon: 'new_releases',
+          color: 'gray',
+          href: `?arc=profile&user=new`
+        });
+        // prepend New Arc item
         data.unshift({
           key: '*',
           blurb: 'New Arc',
@@ -449,6 +482,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onArc(e, arc) {
       this._setState({arc});
+      if (arc && this._state.config.profiler) {
+        this._modifyProfileState(true);
+      }
     }
     _onArcsView(e, arcsView) {
       this._installSyntheticView('arcsView', arcsView);
@@ -474,17 +510,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onProfileState(e, profileState) {
       ArcApp.log('profile state changed', profileState);
+      this._modifyProfileState(profileState);
+    }
+    _modifyProfileState(profileState) {
       let {user, key} = this._state;
-      if (user) {
+      if (user && key) {
         user.profiles = user.profiles || Object.create(null);
-        if (profileState) {
-          user.profiles[key] = true;
-        } else {
-          delete user.profiles[key];
+        if (Boolean(user.profiles[key]) !== Boolean(profileState)) {
+          if (profileState) {
+            user.profiles[key] = true;
+          } else {
+            delete user.profiles[key];
+          }
+          ArcApp.log('mutating user object (onProfileState)', user);
+          // `state.user` is considered immutable, need a copy
+          this._setState({user: Object.assign(Object.create(null), user)});
         }
-        ArcApp.log('mutating user object (onProfileState)', user);
-        // `state.user` is considered immutable, need a copy
-        this._setState({user: Object.assign(Object.create(null), user)});
       }
     }
     _onSharedState(e, sharedState) {
