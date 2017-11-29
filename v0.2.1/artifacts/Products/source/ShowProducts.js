@@ -140,6 +140,7 @@ ${productStyles}
         // earlier in the system?
         let name = Array.isArray(item.name) ? item.name[0] : item.name;
         item.subId = name.replace(/ /g,'').toLowerCase();
+
         return item;
       });
       this._setState({
