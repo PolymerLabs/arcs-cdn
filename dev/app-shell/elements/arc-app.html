@@ -123,21 +123,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <app-main>
     <!--<arc-auth on-auth="_onAuth"></arc-auth>-->
     <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
+    <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
     <persistent-users on-users="_onUsers"></persistent-users>
     <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
-    <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
     <persistent-views arc="{{arc}}" key="{{key}}"></persistent-views>
     <remote-profile-views arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-views>
     <remote-shared-views arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-views>
     <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-views>
-    <!-- only for launcher -->
-    <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
     <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
     <arc-view arc="{{arc}}" data="{{identityViewData}}" options="{{identityViewOptions}}" on-view="_onIdentityView"></arc-view>
     <arc-view arc="{{arc}}" data="{{users}}" options="{{identitiesViewOptions}}" on-view="_onIdentitiesView"></arc-view>
     <arc-view arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarViewOptions}}"></arc-view>
     <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
-    <shell-particles arc="{{arc}}"></shell-particles>
+    <!-- only for launcher -->
+    <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
     <!-- toolbar is here only to reserve space in the static flow, the app-toolbar is position-fixed -->
     <toolbar>
       <app-toolbar>
@@ -165,14 +164,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   </app-main>
   <app-tools>
     <simple-tabs>
-      <!--<user-data title="User Sharing" user="{{user}}" users="{{users}}" on-data-changed="_onUserDataChanged"></user-data>-->
-      <!--<arc-list user="{{user}}" users="{{users}}"></arc-list>-->
-      <arc-explorer tab="Arc Explorer" user="{{user}}"></arc-explorer>
-      <!--<div title="Manifests">
-        <local-data manifest="{{localManifest}}" on-promote-manifest="_onPromoteManifest" on-update-manifest="_onUpdateManifest"></local-data>
-        <manifest-data manifests="{{remotes}}" exclusions="{{exclusions}}" on-manifests-change="_onManifestsChange"></manifest-data>
+      <div tab="Arc Explorer">
+        <arc-explorer user="{{user}}"></arc-explorer>
       </div>
-      -->
       <div tab="App State">
         <data-explorer style="font-size: 0.6em;" object="{{appState}}"></data-explorer>
       </div>
@@ -317,6 +311,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return models;
     }
+    /*
     _synthesizeIdentityViewData(arc, user) {
       return {
         id: user.id,
@@ -326,6 +321,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _hasViews(state) {
       return Boolean(state.arcsView && state.identityView && state.identitiesView);
     }
+    */
     _setIfDirty(object) {
       let dirty = null;
       for (let property in object) {
@@ -508,7 +504,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onSteps(e, steps) {
       this._setState({newSteps: steps})
-      //this._updateMetadata({steps});
     }
     _onPlans(e, plans) {
       if (this._setIfDirty({plans})) {
