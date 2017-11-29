@@ -146,7 +146,7 @@
 
               // For Products, populate shipDays if it's not already done.
               if (shortTypeName=='Product') {
-                let shipDays = 0;
+                let shipDays = 5;
                 filteredEntities.forEach(entity => {
                   if (!entity.hasOwnProperty('shipDays')) {
                       entity['shipDays']=shipDays++;
