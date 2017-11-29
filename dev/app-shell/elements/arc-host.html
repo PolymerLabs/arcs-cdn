@@ -12,7 +12,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <style>
     :host {
       display: block;
-      /*border: 4px solid darkorange;*/
       box-sizing: border-box;
     }
   </style>
@@ -35,28 +34,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       if (props.plan && lastProps.plan !== props.plan) {
         this._applySuggestion(state.arc, props.plan);
-        //this._fire('plans', null);
-        //this._beginPlanning(state.arc);
       }
     }
     async _update(props, state) {
       if (state.arc && !props.plans) {
-        // results obtained before now are invalid
-        state.invalid = true;
-        // only wait for one _beginPlanning at a time
-        if (!state.planning) {
-          state.planning = true;
-          // old plans are stale, evacipate them
-          ArcHost.log('clearing old plans');
-          this._fire('plans', null);
-          // TODO(sjmiles): primitive attempt to throttle planning
-          setTimeout(async () => {
-            await this._beginPlanning(state)
-            state.planning = false;
-          }, 300);
-          //await this._beginPlanning(state);
-          //state.planning = false;
-        }
+        this._schedulePlanning(state);
       }
     }
     async _applyConfig(config) {
@@ -64,14 +46,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       ArcHost.log('instantiated', arc);
       this._setState({arc});
       this._fire('arc', arc)
-    }
-    async _beginPlanning(state) {
-      let plans;
-      while (state.invalid) {
-        state.invalid = false;
-        plans = await this._plan(state.arc);
-      }
-      this._fire('plans', plans);
     }
     async _createArc(config) {
       // make an id
@@ -91,6 +65,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // Arc!
       let arc = Arcs.utils.createArc({id, urlMap, slotComposer, context});
       // TODO(sjmiles): loader instance has to follow the arc, why is it not already this way?
+      // TODO(sjmiles): ArcsLib made a similar change (arc._loader?), unify
       arc.loader = loader;
       return arc;
     }
@@ -134,15 +109,33 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let content = manifests.map(u => `import '${u}'`).join('\n');
       return {folder, content};
     }
-    async _plan(arc) {
-      //ArcHost.log('planning');
-      let plans;
-      try {
-        plans = await Arcs.utils.makePlans(arc, 5000);
-      } finally {
-        ArcHost.log(`plans`, plans);
+    _schedulePlanning(state) {
+      // results obtained before now are invalid
+      state.invalid = true;
+      // only wait for one _beginPlanning at a time
+      if (!state.planning) {
+        state.planning = true;
+        // old plans are stale, evacipate them
+        ArcHost.log('clearing old plans');
+        this._fire('plans', null);
+        // TODO(sjmiles): primitive attempt to throttle planning
+        setTimeout(async () => {
+          await this._beginPlanning(state)
+          state.planning = false;
+        }, 300);
       }
-      return plans || [];
+    }
+    async _beginPlanning(state) {
+      let plans;
+      while (state.invalid) {
+        state.invalid = false;
+        plans = await this._plan(state.arc);
+      }
+      ArcHost.log(`plans`, plans);
+      this._fire('plans', plans);
+    }
+    async _plan(arc) {
+      return await Arcs.utils.makePlans(arc, 5000) || [];
     }
     async _applySuggestion(arc, plan) {
       // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
@@ -157,6 +150,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }).then(() => {
         this._fire('applied', plan);
       });
+    }
+    async reloadManifests() {
+      let {config} = this._props;
+      let {arc} = this._state;
+      arc._context = await this.loadManifest(config, arc.loader);
     }
   }
   ArcHost.module = document.currentImport;
