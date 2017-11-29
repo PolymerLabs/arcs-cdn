@@ -25,7 +25,7 @@ defineParticle(({DomParticle}) => {
     _render(props) {
       if (props.list && props.list.length) {
         let now = Date.now();
-        let needed = new Date().setHours(21*24); // Advance time by three week
+        let needed = new Date().setHours(7*24); // Advance time by three week
         return {
           items: props.list.map((item, i) => {
             // TODO(sjmiles): bypass schema for the moment
