@@ -37,7 +37,7 @@ defineParticle(({DomParticle}) => {
       let {person} = props;
       let name = (person && person.name) || 'n/a';
       let inOneWeek =
-        new Date(new Date().setHours(7*24))  // Advance time by three weeks
+        new Date(new Date().setHours(7*24))  // Advance time by one weeks
           .toISOString().substr(0, 10);
       return {
         person: name,
