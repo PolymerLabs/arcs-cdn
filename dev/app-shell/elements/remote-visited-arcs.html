@@ -58,8 +58,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     _updateVisitedArcs(arcs, user) {
-      // update list of visited arcs (`user.arcs`) to match input list (`arcs`)
-      let keys = arcs.map(a => a.rawData.key);
+      // update list of visited arcs (`user.arcs`) to match input list (`arcs`, minus New Arc [*])
+      let keys = arcs.map(a => a.rawData.key).filter(key => key != '*');
       // no-op if data matches
       // right now the only change we support is removal, so length check is enough
       if (user.arcs && keys.length !== Object.keys(user.arcs).length) {
