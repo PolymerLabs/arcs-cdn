@@ -160,15 +160,11 @@
           });
         }, false);
 
-        // The content script handles this, but that could have happened
-        // before we added our event listener below. Let's ask the content
-        // script to trigger again now that we're ready.
+        // Request injection of data from the extension.
         // This must be after the reloadManifests() call above - before then
         // we end up in race conditions (lots of errors about uninitialized
-        // views) because the callback is called too soon.
-        // TODO I'm not sure I fully understand why, though. I'm worried it's
-        // working not because it's correct but because I've narrowed the
-        // unlucky window. As we get more users this should become clearer.
+        // views) because the callback is called before Arcs is initialized
+        // (after this method, _start() returns).
         window.postMessage({method: 'pleaseInjectArcsData'}, '*');
       }
     }
