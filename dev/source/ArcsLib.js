@@ -8,15 +8,23 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
+import Arc from '../../../arcs/runtime/arc.js';
+import Description from '../../../arcs/runtime/description.js';
+import Manifest from '../../../arcs/runtime/manifest.js';
+import Planner from '../../../arcs/runtime/planner.js';
+import SlotComposer from '../../../arcs/runtime/slot-composer.js';
+import Type from '../../../arcs/runtime/type.js';
+import BrowserLoader from './browser-cdn-loader.js';
+
 let Arcs = {
   version: '0.2',
-  Arc: require(`../../../arcs/runtime/arc.js`),
-  Description: require('../../../arcs/runtime/description.js'),
-  Manifest: require("../../../arcs/runtime/manifest.js"),
-  Planner: require(`../../../arcs/runtime/planner.js`),
-  SlotComposer: require(`../../../arcs/runtime/slot-composer.js`),
-  Type: require('../../../arcs/runtime/type.js'),
-  BrowserLoader: require(`./browser-cdn-loader.js`)
+  Arc,
+  Description,
+  Manifest,
+  Planner,
+  SlotComposer,
+  Type,
+  BrowserLoader,
 };
 
 window.Arcs = Arcs;

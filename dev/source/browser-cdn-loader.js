@@ -7,13 +7,12 @@
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-"use strict";
 
-const Loader = require('../../../arcs/runtime/loader.js');
-const particle = require("../../../arcs/runtime/particle.js");
-const DomParticle = require("../../../arcs/runtime/dom-particle.js");
+import Loader from '../../../arcs/runtime/loader.js';
+import particle from '../../../arcs/runtime/particle.js';
+import DomParticle from '../../../arcs/runtime/dom-particle.js';
 
-module.exports = class BrowserLoader extends Loader {
+export default class BrowserLoader extends Loader {
   constructor(urlMap) {
     super();
     this._urlMap = urlMap;
