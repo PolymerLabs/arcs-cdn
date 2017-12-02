@@ -7,10 +7,15 @@
   },
   "devDependencies": {
     "chai": "^4.1.2",
+    "chromedriver": "^2.33.2",
     "gulp": "^3.9.1",
     "gulp-babili": "^0.1.4",
     "mocha": "^4.0.1",
     "mocha-chrome": "^1.0.2",
+    "selenium-standalone": "^6.11.0",
+    "wdio-dot-reporter": "0.0.9",
+    "wdio-mocha-framework": "^0.5.11",
+    "webdriverio": "^4.9.11"
     "webpack": "^2.6.1"
   },
   "prettier": {
