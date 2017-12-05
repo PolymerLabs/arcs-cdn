@@ -15,7 +15,7 @@
     "selenium-standalone": "^6.11.0",
     "wdio-dot-reporter": "0.0.9",
     "wdio-mocha-framework": "^0.5.11",
-    "webdriverio": "^4.9.11"
+    "webdriverio": "^4.9.11",
     "webpack": "^2.6.1"
   },
   "prettier": {
