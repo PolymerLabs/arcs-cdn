@@ -8,6 +8,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
+  <script src="data-processing.js"></script>
 </head>
 <body>
 
@@ -75,16 +76,7 @@
             return;
           }
 
-          // reduce the deeply nested structure of url=>entities-of-many-types
-          // to a flatter, combined form of type=>entities.
-          let dataByType = Object.entries(event.data.entities).reduce( (accumulator, [key, value]) => {
-            value.forEach(entry => {
-              // TODO(smalls) need to dedup in here as well
-              let type = entry['@type'];
-              accumulator[type] ? accumulator[type].push(entry) : accumulator[type] = [entry];
-            });
-            return accumulator;
-          }, new Map());
+          let dataByType = flatten(event.data.entities);
 
           if (dataByType['text/x-arcs-manifest']) {
             config.additionalManifests = dataByType['text/x-arcs-manifest'].map(m => m.url);
