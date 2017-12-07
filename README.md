@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/PolymerLabs/arcs-cdn.svg?branch=gh-pages)](https://travis-ci.org/PolymerLabs/arcs-cdn)
+
+
 # arcs-cdn
 
 ## Versions and Development
