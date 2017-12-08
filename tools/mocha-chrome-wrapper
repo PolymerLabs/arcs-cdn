@@ -12,7 +12,7 @@ const MochaChrome = require('mocha-chrome');
 const fs = require('fs');
 
 let promises = process.argv.slice(2).map(testScript => {
-  // we're not doing a ton of checking for now, since we've relied on
+  // We're not doing a ton of checking for now, since we've relied on
   // shell globs to populate the parameter list with valid files in the only
   // caller we care about for now (npm test).
   let url = 'file://' + fs.realpathSync(testScript);
@@ -27,10 +27,10 @@ let promises = process.argv.slice(2).map(testScript => {
     // 'ended' seems like the preferred event, but let's catch everything
     // that the mocha-chrome cli does.
     mochaChrome.on('ended', stats => {
-      resolve(stats.failures);
+      resolve({ url: url, failures: stats.failures });
     });
     mochaChrome.on('failure', message => {
-      resolve(1);
+      resolve({ url: url, failures: 1 });
     });
 
     console.log('running tests at: ' + options.url);
@@ -39,9 +39,21 @@ let promises = process.argv.slice(2).map(testScript => {
   });
   return promise;
 });
-Promise.all(promises).then(values => {
-  let exitCode = values.reduce(
-    (accumulator, currentValue) => (accumulator |= currentValue)
+Promise.all(promises).then(results => {
+  results.forEach(results => {
+    console.log(
+      `${results.failures ? 'failed' : 'succeeded'} for tests at url ${
+        results.url
+      }`
+    );
+  });
+  let exitCode = results
+    .map(result => result.failures)
+    .reduce((accumulator, currentValue) => accumulator || currentValue);
+  console.log(
+    `overall run ${exitCode ? 'failed some tests' : 'passed all tests'} (code ${
+      exitCode
+    })`
   );
   process.exit(exitCode);
 });
