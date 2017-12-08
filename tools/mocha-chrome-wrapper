@@ -15,7 +15,7 @@ let promises = process.argv.slice(2).map(testScript => {
   // we're not doing a ton of checking for now, since we've relied on
   // shell globs to populate the parameter list with valid files in the only
   // caller we care about for now (npm test).
-  let url = 'file://'+fs.realpathSync(testScript);
+  let url = 'file://' + fs.realpathSync(testScript);
 
   const options = Object.assign({
     url: url
@@ -23,8 +23,7 @@ let promises = process.argv.slice(2).map(testScript => {
 
   const mochaChrome = new MochaChrome(options);
 
-
-  let promise = new Promise(async (resolve) => {
+  let promise = new Promise(async resolve => {
     // 'ended' seems like the preferred event, but let's catch everything
     // that the mocha-chrome cli does.
     mochaChrome.on('ended', stats => {
@@ -34,15 +33,15 @@ let promises = process.argv.slice(2).map(testScript => {
       resolve(1);
     });
 
-    console.log('running tests at: '+options.url);
+    console.log('running tests at: ' + options.url);
     await mochaChrome.connect();
     await mochaChrome.run();
   });
   return promise;
 });
-Promise.all(promises).then((values) => {
+Promise.all(promises).then(values => {
   let exitCode = values.reduce(
-    (accumulator, currentValue) => accumulator|=currentValue
+    (accumulator, currentValue) => (accumulator |= currentValue)
   );
   process.exit(exitCode);
 });
