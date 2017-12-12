@@ -159,7 +159,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <div slotid="root"></div>
     </arc-host>
     <footer hidden="{{hideFooter}}">
-      <arc-footer hidden="{{hideFooter}}" suggestions="{{plans}}" on-suggest="_onSuggest"></arc-footer>
+      <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" suggestions="{{plans}}" on-suggest="_onSuggest"></arc-footer>
     </footer>
   </app-main>
   <app-tools>
@@ -291,6 +291,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         models: this._renderUserOptionModels(state.users, state.user)
       };
       state.hideFooter = state.config && state.config.launcher;
+      state.dots = state.plans == null ? 'active' : '';
       // must have `auth` before doing anything else
       return state.auth ? state : null;
     }
