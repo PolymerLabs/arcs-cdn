@@ -12,5 +12,8 @@
     "mocha": "^4.0.1",
     "mocha-chrome": "^1.0.2",
     "webpack": "^2.6.1"
+  },
+  "dependencies": {
+    "lodash": "^4.17.4"
   }
 }

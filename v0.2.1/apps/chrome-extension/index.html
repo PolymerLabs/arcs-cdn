@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en">
 <head>
-
   <title>Arcs</title>
   <link rel="shortcut icon" href="favicon.ico">
 
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
+  <script src="../../node_modules/lodash/lodash.js"></script>
   <script src="data-processing.js"></script>
 </head>
 <body>
@@ -76,7 +76,9 @@
             return;
           }
 
-          let dataByType = flatten(event.data.entities);
+          // TODO(smalls) This should be replaced with transformations done in
+          // particles.
+          let dataByType = deduplicate(flatten(event.data.entities));
 
           if (dataByType['text/x-arcs-manifest']) {
             config.additionalManifests = dataByType['text/x-arcs-manifest'].map(m => m.url);

@@ -15,18 +15,14 @@ describe('ChromeExtensionDataProcessing', function() {
   describe('#flatten()', function() {
     it('should flatten & combine single datatype', function() {
       let sample = {
-        'http://my/great/site': [
-          {'@type': 'TypeA', name: 'TypeA_MGS'}
-        ],
-        'http://my/terrible/site': [
-          {'@type': 'TypeA', name: 'TypeA_MTS'}
-        ]
+        'http://my/great/site': [{'@type': 'TypeA', name: 'TypeA_MGS'}],
+        'http://my/terrible/site': [{'@type': 'TypeA', name: 'TypeA_MTS'}],
       };
       let expected = {
-        'TypeA': [
+        TypeA: [
           {'@type': 'TypeA', name: 'TypeA_MGS'},
-          {'@type': 'TypeA', name: 'TypeA_MTS'}
-        ]
+          {'@type': 'TypeA', name: 'TypeA_MTS'},
+        ],
       };
 
       let result = flatten(sample);
@@ -36,27 +32,46 @@ describe('ChromeExtensionDataProcessing', function() {
       let sample = {
         'http://my/great/site': [
           {'@type': 'TypeA', name: 'TypeA_MGS'},
-          {'@type': 'TypeB', name: 'TypeB_MGS'}
+          {'@type': 'TypeB', name: 'TypeB_MGS'},
         ],
         'http://my/terrible/site': [
           {'@type': 'TypeA', name: 'TypeA_MTS'},
-          {'@type': 'TypeB', name: 'TypeB_MTS'}
-        ]
+          {'@type': 'TypeB', name: 'TypeB_MTS'},
+        ],
       };
       let expected = {
-        'TypeA': [
+        TypeA: [
           {'@type': 'TypeA', name: 'TypeA_MGS'},
-          {'@type': 'TypeA', name: 'TypeA_MTS'}
+          {'@type': 'TypeA', name: 'TypeA_MTS'},
         ],
-        'TypeB': [
+        TypeB: [
           {'@type': 'TypeB', name: 'TypeB_MGS'},
-          {'@type': 'TypeB', name: 'TypeB_MTS'}
-        ]
+          {'@type': 'TypeB', name: 'TypeB_MTS'},
+        ],
       };
 
       let result = flatten(sample);
       assert.deepEqual(result, expected);
     });
   });
-});
+  describe('#deduplicate()', function() {
+    it('should deduplicate', function() {
+      let sample = {
+        TypeA: [
+          {'@type': 'TypeA', name: 'same'},
+          {'@type': 'TypeA', name: 'same'},
+          {'@type': 'TypeA', name: 'different'},
+        ],
+      };
+      let expected = {
+        TypeA: [
+          {'@type': 'TypeA', name: 'same'},
+          {'@type': 'TypeA', name: 'different'},
+        ],
+      };
 
+      let result = deduplicate(sample);
+      assert.deepEqual(result, expected);
+    });
+  });
+});
