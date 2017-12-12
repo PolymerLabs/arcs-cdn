@@ -15,10 +15,12 @@
  * {typeA: [{@type: 'typeA', 'a': 1}]}.
  */
 function flatten(entities) {
-  return Object.entries(entities).reduce( (accumulator, [key, value]) => {
+  return Object.entries(entities).reduce((accumulator, [key, value]) => {
     value.forEach(entry => {
       let type = entry['@type'];
-      accumulator[type] ? accumulator[type].push(entry) : accumulator[type] = [entry];
+      accumulator[type]
+        ? accumulator[type].push(entry)
+        : (accumulator[type] = [entry]);
     });
     return accumulator;
   }, new Object());
@@ -31,7 +33,10 @@ function flatten(entities) {
 function deduplicate(entities) {
   return Object.entries(entities).reduce((accumulator, [key, values]) => {
     accumulator[key] = values.reduce((accumulator, value) => {
-      let isIncluded = accumulator.reduce((a, av) => _.isEqual(av, value) || a, false);
+      let isIncluded = accumulator.reduce(
+        (a, av) => _.isEqual(av, value) || a,
+        false
+      );
       isIncluded || accumulator.push(value);
       return accumulator;
     }, []);
