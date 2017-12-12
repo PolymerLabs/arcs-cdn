@@ -76,12 +76,12 @@ let utils = {
     return `${rl(adjectives)}-${rl(nouns)}`.replace(/ /g, '-');
   },
   describeArc(arc) {
-    let combinedSuggestion = arc.description.getRecipeSuggestion(arc._activeRecipe.particles);
-    if (combinedSuggestion) {
-      let tags = Object.keys(arc._tags).filter(t => ['#nosync','#arcmetadata','#identity','#identities'].indexOf(t) < 0);
-      return `${combinedSuggestion}${tags.length ? ` (${tags.join(", ")})` : ''}`;
-    }
-    return '';
+    let combinedSuggestion = Arcs.Description.getSuggestion(arc._activeRecipe, arc, null);
+    //if (combinedSuggestion) {
+    //  let tags = Object.keys(arc._tags).filter(t => ['#nosync','#arcmetadata','#identity','#identities'].indexOf(t) < 0);
+    //  combinedSuggestion += `${tags.length ? ` (${tags.join(", ")})` : ''}`;
+    //}
+    return combinedSuggestion || '';
   },
   removeUndefined(object) {
     return JSON.parse(JSON.stringify(object));
