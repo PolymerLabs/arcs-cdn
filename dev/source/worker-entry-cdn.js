@@ -14,6 +14,6 @@ const log = console.log.bind(console, `%cworker-entry`, `background: #12005e; co
 self.onmessage = function(e) {
   self.onmessage = null;
   let {id, base} = e.data;
-  log('starting worker', id);
+  //log('starting worker', id);
   new InnerPec(e.ports[0], id, new Loader(base));
 };
