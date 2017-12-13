@@ -35,7 +35,7 @@
   <x-toast app-footer open="{{toastOpen}}" suggestion-container>
     <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
     <div search>
-      <input value="{{searchText}}" on-input="_onSearchChange" on-blur="_onSeachDone">
+      <input value="{{searchText}}" on-input="_onSearchChange" on-blur="_onSearchDone">
       <i class="material-icons" on-click="_onSearchClick">search</i>
     </div>
     <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
@@ -48,13 +48,13 @@
     _render(props, state) {
       let {dots, suggestions} = props;
 
-      suggestions = this._filterPlans(suggestions, props.search);
+      suggestions = this._filterPlans(suggestions, state.search);
 
       return {
         dotsDisabled: dots == 'disabled',
         dotsActive: dots == 'active',
-        searchText: props.search || '',
-        toastOpen: props.open,
+        searchText: state.search || '',
+        toastOpen: state.open || true,
         suggestions
       };
     }
@@ -63,26 +63,35 @@
       this._doBackendSearch(null);
     }
     _onSearchClick(e) {
-      this._updateSearchProps('*');
+      this._updateSearchState('*');
     }
     _onSearchChange(e) {
-      let search = e.target.value.toLowerCase();
+      let search = e.target.value;
       if (!search || search == '*' || search[search.length - 1] == ' ') {
         this._doBackendSearch(search);
       } else {
-        this._updateSearchProps(search);
+        this._updateSearchState(search);
       }
     }
-    _onSeachDone(e) {
-      this._doBackendSearch(e.target.value.toLowerCase());
+    _onSearchDone(e) {
+      this._doBackendSearch(e.target.value);
+    }
+    _prepareSearchTermForBackendSearch(search) {
+      if (search) {
+        search = search.trim().toLowerCase();
+        if (!search || search == '*') {
+          return null;
+        }
+        return search;
+      }
+      return null;
     }
     _doBackendSearch(search) {
-      this._fire('replan', {search: (search == '*' ? null : search)});  // trigger planner
-
-      this._updateSearchProps(search);
+      this._fire('search', {search: this._prepareSearchTermForBackendSearch(search)});  // triggers planner
+      this._updateSearchState(search);
     }
-    _updateSearchProps(search) {
-      this._setProps(Object.assign(this._props || {}, {search, open: true}));
+    _updateSearchState(search) {
+      this._setState({search, open: true});
     }
     _filterPlans(plans, term) {
       if (!plans) {
@@ -97,7 +106,7 @@
       } else if (term === '*' || term.length <= 2) {
         return plans;
       } else {
-        let terms = term.match(/\b(\w+)\b/g);
+        let terms = term.trim().toLowerCase().match(/\b(\w+)\b/g);
         return plans.filter(p => {
           let desc = p.description.toLowerCase();
           let searchPhrase = p.plan.search ? p.plan.search.phrase : '';
