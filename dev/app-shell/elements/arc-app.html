@@ -159,7 +159,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <div slotid="root"></div>
     </arc-host>
     <footer hidden="{{hideFooter}}">
-      <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" suggestions="{{plans}}" on-suggest="_onSuggest"></arc-footer>
+      <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" suggestions="{{plans}}" on-suggest="_onSuggest" on-search="_onMakeSuggestions"></arc-footer>
     </footer>
   </app-main>
   <app-tools>
@@ -567,6 +567,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onSuggest(e, suggestion) {
       this._setState({plan: suggestion.plan});
+    }
+    _onMakeSuggestions(e) {
+      let search = e.detail.search;
+      if (state.arc._search != search) {
+        state.arc._search = search;
+        this._setState({plans: null});
+      }
     }
     async _onApplied(e, plan, props, state) {
       let description = await Arcs.utils.describeArc(state.arc);
