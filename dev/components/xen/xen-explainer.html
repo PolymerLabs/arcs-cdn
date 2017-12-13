@@ -54,6 +54,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <li class="{{class}}">Inverted via CSS class.</li>
 
       <!--
+        Bind to a mixed-case property using the extended syntax below.
+        In this case, the attribute defining the binding (`scroll` in the example)
+        is unused, but must be unique (duplicates are ignored by the html parser).
+        The expression below is essentially: `div.scrollTop = top`
+      -->
+      <div scroll="{{scrollTop:top}}"></div>
+
+      <!--
         Add a `$` and the model value will be mapped to the element *attribute*
         instead of the property.
         The expression below is essentially: `li.setAttribute('class', class);`.
