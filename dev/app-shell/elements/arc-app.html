@@ -494,10 +494,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._modifyProfileState(true);
       }
     }
-    _onArcsView(e, arcsView) {
+    async _onArcsView(e, arcsView) {
       this._installSyntheticView('arcsView', arcsView);
-      this._setState({visitedArcs: Arcs.utils.getViewData(arcsView)});
-      ArcApp.log('visitedArcs: ', Arcs.utils.getViewData(arcsView));
+      let visitedArcs = await Arcs.utils.getViewData(arcsView);
+      this._setState({visitedArcs});
+      ArcApp.log('visitedArcs: ', visitedArcs);
     }
     _onIdentityView(e, identityView) {
       this._installSyntheticView('identityView', identityView);
@@ -567,8 +568,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _onSuggest(e, suggestion) {
       this._setState({plan: suggestion.plan});
     }
-    _onApplied(e, plan, props, state) {
-      let description = Arcs.utils.describeArc(state.arc);
+    async _onApplied(e, plan, props, state) {
+      let description = await Arcs.utils.describeArc(state.arc);
       if (!description && !state.description) {
         description = Arcs.utils.randomName();
       }

@@ -41,10 +41,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (remotes) {
         // TODO(sjmiles): these are remote-data-describing-a-view ... cow needs a name
         RemoteProfileViews.log(`READING views`, remotes);
-        Object.keys(remotes).forEach(key => {
+        Object.keys(remotes).forEach(async key => {
           // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _view_ keys
           // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
-          let view = Arcs.utils.createOrUpdateView(arc, remotes[key], 'PROFILE');
+          let view = await Arcs.utils.createOrUpdateView(arc, remotes[key], 'PROFILE');
           RemoteProfileViews.log('created/updated view', view.id);
           this._synthesizeFriendsView(friends, view);
           //this._fire('view', {view});
@@ -60,8 +60,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._friendsViewChanged(view);
       }
     }
-    _friendsViewChanged(view) {
-      let data = Arcs.utils.getViewData(view);
+    async _friendsViewChanged(view) {
+      let data = await Arcs.utils.getViewData(view);
       RemoteProfileViews.log('FRIENDS view changed:', data);
       this._fire('friends', data);
     }

@@ -75,8 +75,9 @@ let utils = {
     let rl = list => list[Math.floor(Math.random()*list.length)];
     return `${rl(adjectives)}-${rl(nouns)}`.replace(/ /g, '-');
   },
-  describeArc(arc) {
-    let combinedSuggestion = Arcs.Description.getSuggestion(arc._activeRecipe, arc, null);
+  async describeArc(arc) {
+    let combinedSuggestion = await new Arcs.Description(arc).getRecipeSuggestion(arc._activeRecipe.particles);
+    //let combinedSuggestion = Arcs.Description.getSuggestion(arc._activeRecipe, arc, null);
     //if (combinedSuggestion) {
     //  let tags = Object.keys(arc._tags).filter(t => ['#nosync','#arcmetadata','#identity','#identities'].indexOf(t) < 0);
     //  combinedSuggestion += `${tags.length ? ` (${tags.join(", ")})` : ''}`;
@@ -86,7 +87,7 @@ let utils = {
   removeUndefined(object) {
     return JSON.parse(JSON.stringify(object));
   },
-  createOrUpdateView(arc, remoteView, idPrefix) {
+  async createOrUpdateView(arc, remoteView, idPrefix) {
     let {metadata, values} = remoteView;
     // construct type object
     let type = Arcs.utils.typeFromMetaType(metadata.type);
@@ -94,7 +95,7 @@ let utils = {
     let id = Arcs.utils.getContextViewId(type, metadata.tags, idPrefix);
     // find or create a view in the arc context
     let view = Arcs.utils._requireView(arc, type, metadata.name, id, metadata.tags);
-    Arcs.utils.setViewData(view, values);
+    await Arcs.utils.setViewData(view, values);
     return view;
   },
   // Returns the context view id for the given params.
@@ -140,16 +141,17 @@ let utils = {
       return view.id !== data.id;
     }
   },
-  getViewData(view) {
-    return view.toList ? view.toList() : {id: view.id, rawData: view._stored && view._stored.rawData || {}};
+  async getViewData(view) {
+    return view.toList ? await view.toList() : {id: view.id, rawData: view._stored && view._stored.rawData || {}};
   },
-  setViewData(view, data) {
-    this.clearView(view);
+  async setViewData(view, data) {
+    await this.clearView(view);
     this.addViewData(view, data);
   },
-  clearView(view) {
+  async clearView(view) {
     if (view.toList) {
-      view.toList().forEach(e => view.remove(e.id));
+      let entities = await view.toList();
+      entities.forEach(e => view.remove(e.id));
     } else {
       // TODO(sjmiles): necessary? correct semantics?
       view.clear();
