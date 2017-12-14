@@ -126,6 +126,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
     <persistent-users on-users="_onUsers"></persistent-users>
     <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
+    <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
     <persistent-views arc="{{arc}}" key="{{key}}"></persistent-views>
     <remote-profile-views arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-views>
     <remote-shared-views arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-views>
@@ -154,7 +155,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         </div>
       </app-toolbar>
     </toolbar>
-    <arc-host config="{{hostConfig}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+    <arc-host config="{{hostConfig}}" manifests="{{effectiveManifests}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
       <div slotid="toproot"></div>
       <div slotid="root"></div>
     </arc-host>
@@ -164,6 +165,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   </app-main>
   <app-tools>
     <simple-tabs>
+      <div tab="Manifests">
+        <local-data manifest="{{manifest}}" on-update-manifest="_onUpdateManifest" on-promote-manifest="_onPromoteManifest"></local-data>
+        <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-exclusions="{{_onExclusions}}"></manifest-data>
+      </div>
       <div tab="Arc Explorer">
         <arc-explorer user="{{user}}"></arc-explorer>
       </div>
@@ -224,6 +229,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _update(props, state, lastProps, lastState) {
       // for debugging
+      window.app = this;
       window.state = state;
       window.arc = state.arc;
       window.user = state.user;
@@ -292,6 +298,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       state.hideFooter = state.config && state.config.launcher;
       state.dots = state.plans == null ? 'active' : '';
+      // bindings for manifest-data
+      let effectiveManifests = [];
+      if (state.manifests && state.exclusions) {
+        effectiveManifests = state.manifests.filter(m => !state.exclusions.includes(m));
+      }
+      state.effectiveManifests = effectiveManifests;
       // must have `auth` before doing anything else
       return state.auth ? state : null;
     }
@@ -595,6 +607,25 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // set new object to state
         this._setState({metadata});
       }
+    }
+    _onUpdateManifest(e, manifestPath) {
+      ArcApp.log(`onUpdateManifest: [${manifestPath}]`);
+      this._setState({manifestPath});
+    }
+    _onPromoteManifest(e) {
+      let state = this._state;
+      //ArcApp.log(`onPromoteManifest: [${state.manifestPath}]`);
+      if (state.manifestPath) {
+        let manifests = (state.manifests || []).concat([state.manifestPath]);
+        ArcApp.log(`onPromoteManifest: [${manifests}]`);
+       this._setState({manifestPath: '', manifests: manifests.slice()})
+      }
+    }
+    _onManifests(e, manifests) {
+      this._setIfDirty({manifests});
+    }
+    _onExclusions(e, exclusions) {
+      this._setIfDirty({exclusions});
     }
   }
   ArcApp.module = document.currentImport;
