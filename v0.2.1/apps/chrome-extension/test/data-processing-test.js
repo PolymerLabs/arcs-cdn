@@ -53,6 +53,31 @@ describe('ChromeExtensionDataProcessing', function() {
       let result = flatten(sample);
       assert.deepEqual(result, expected);
     });
+    it('should flatten & combine datatypes ignore https', function() {
+      let sample = {
+        'https://my/great/site': [
+          { '@type': 'https://TypeA', name: 'TypeA_MGS' },
+          { '@type': 'https://TypeB', name: 'TypeB_MGS' }
+        ],
+        'http://my/terrible/site': [
+          { '@type': 'http://TypeA', name: 'TypeA_MTS' },
+          { '@type': 'http://TypeB', name: 'TypeB_MTS' }
+        ]
+      };
+      let expected = {
+        'http://TypeA': [
+          { '@type': 'https://TypeA', name: 'TypeA_MGS' },
+          { '@type': 'http://TypeA', name: 'TypeA_MTS' }
+        ],
+        'http://TypeB': [
+          { '@type': 'https://TypeB', name: 'TypeB_MGS' },
+          { '@type': 'http://TypeB', name: 'TypeB_MTS' }
+        ]
+      };
+
+      let result = flatten(sample);
+      assert.deepEqual(result, expected);
+    });
   });
   describe('#deduplicate()', function() {
     it('should deduplicate', function() {
