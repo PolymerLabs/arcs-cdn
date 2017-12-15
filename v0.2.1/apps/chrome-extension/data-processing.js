@@ -26,6 +26,10 @@ function flatten(entities) {
   }, new Object());
 }
 
+function deepIsEqual(a, b) {
+  return JSON.stringify(a)==JSON.stringify(b);
+}
+
 /**
  * Removes duplicate entries. Expects the input to match the output format of
  * #flatten().
@@ -34,7 +38,7 @@ function deduplicate(entities) {
   return Object.entries(entities).reduce((accumulator, [key, values]) => {
     accumulator[key] = values.reduce((accumulator, value) => {
       let isIncluded = accumulator.reduce(
-        (a, av) => _.isEqual(av, value) || a,
+        (a, av) => deepIsEqual(av, value) || a,
         false
       );
       isIncluded || accumulator.push(value);
