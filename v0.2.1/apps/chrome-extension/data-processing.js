@@ -18,6 +18,12 @@ function flatten(entities) {
   return Object.entries(entities).reduce((accumulator, [key, value]) => {
     value.forEach(entry => {
       let type = entry['@type'];
+
+      // normalize all https? urls to http in keys
+      if (type.match(/^https?:\/\//)) {
+        type = type.replace(/^https?:/, 'http:');
+      }
+
       accumulator[type]
         ? accumulator[type].push(entry)
         : (accumulator[type] = [entry]);
