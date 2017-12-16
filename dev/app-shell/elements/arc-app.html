@@ -133,7 +133,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-views>
     <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
     <arc-view arc="{{arc}}" data="{{identityViewData}}" options="{{identityViewOptions}}" on-view="_onIdentityView"></arc-view>
-    <arc-view arc="{{arc}}" data="{{users}}" options="{{identitiesViewOptions}}" on-view="_onIdentitiesView"></arc-view>
+    <arc-view arc="{{arc}}" data="{{identitiesViewData}}" options="{{identitiesViewOptions}}" on-view="_onIdentitiesView"></arc-view>
     <arc-view arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarViewOptions}}"></arc-view>
     <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
     <!-- only for launcher -->
@@ -155,7 +155,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         </div>
       </app-toolbar>
     </toolbar>
-    <arc-host config="{{hostConfig}}" manifests="{{effectiveManifests}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+    <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
       <div slotid="toproot"></div>
       <div slotid="root"></div>
     </arc-host>
@@ -167,7 +167,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <simple-tabs>
       <div tab="Manifests">
         <local-data manifest="{{manifest}}" on-update-manifest="_onUpdateManifest" on-promote-manifest="_onPromoteManifest"></local-data>
-        <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-exclusions="{{_onExclusions}}"></manifest-data>
+        <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></manifest-data>
       </div>
       <div tab="Arc Explorer">
         <arc-explorer user="{{user}}"></arc-explorer>
@@ -239,6 +239,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData)) {
         state.identityViewData = this._synthesizeIdentityViewData(state.arc, state.user);
       }
+      if (state.users && (state.users !== lastState.users || !state.identitiesViewData)) {
+        state.identitiesViewData = this._sythesizeIdentitiesViewData(state.users);
+      }
       if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
         state.plan = state.plans[0].plan;
       }
@@ -298,12 +301,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       };
       state.hideFooter = state.config && state.config.launcher;
       state.dots = state.plans == null ? 'active' : '';
-      // bindings for manifest-data
-      let effectiveManifests = [];
-      if (state.manifests && state.exclusions) {
-        effectiveManifests = state.manifests.filter(m => !state.exclusions.includes(m));
-      }
-      state.effectiveManifests = effectiveManifests;
       // must have `auth` before doing anything else
       return state.auth ? state : null;
     }
@@ -337,6 +334,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         id: user.id,
         name: user.name
       };
+    }
+    _sythesizeIdentitiesViewData(users) {
+      return Object.keys(users).map(id => {
+        return {
+          id: id,
+          name: users[id].name
+        };
+      });
     }
     /*
     _hasViews(state) {
@@ -465,7 +470,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             icon: metadata.icon || 'broken_image',
             color: metadata.color || 'gray',
             href: `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`,
-            profile: Boolean(profile)
+            profile: profile
           };
         });
         /*

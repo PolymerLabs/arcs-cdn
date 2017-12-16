@@ -7,6 +7,7 @@
 
 schema ArcMetadata
   normative
+    Text blurb
     Text description
     Text icon
     Text key
