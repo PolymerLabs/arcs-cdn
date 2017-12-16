@@ -50,7 +50,7 @@ export default class BrowserLoader extends Loader {
     delete self.defineParticle;
     return this.unwrapParticle(result[0]);
   }
-  mapParticleUrl() {
+  mapParticleUrl(path) {
     let parts = path.split('/');
     let suffix = parts.pop();
     let folder = parts.join('/');
