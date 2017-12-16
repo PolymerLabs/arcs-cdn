@@ -417,7 +417,7 @@ class Entity {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__type_js__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(12);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__ = __webpack_require__(0);
-  /**
+/**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
  * This code may only be used under the BSD style license found at
@@ -668,37 +668,59 @@ class Schema {
 
   entityClass() {
     let schema = this;
-    const className = this.name;
-    var properties = Object.keys(this.normative).concat(Object.keys(this.optional));
-    var classJunk = ['toJSON', 'prototype', 'toString', 'inspect'];
+    let className = this.name;
+    let normative = this.normative;
+    let optional = this.optional;
+    let classJunk = ['toJSON', 'prototype', 'toString', 'inspect'];
 
-    var clazz = class extends __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */] {
+    let checkFieldIsValidAndGetTypes = (name, op) => {
+      let fieldType = normative[name] || optional[name];
+      switch (fieldType) {
+        case undefined:
+          throw new Error(`Can't ${op} field ${name} not in schema ${className}`);
+        case 'Number':
+          return [fieldType, 'number'];
+        default:
+          // Text, URL
+          return [fieldType, 'string'];
+      }
+    };
+
+    let clazz = class extends __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */] {
       constructor(data, userIDComponent) {
-        var p = new Proxy(data, {
+        super(userIDComponent);
+        this.rawData = new Proxy({}, {
           get: (target, name) => {
             if (classJunk.includes(name))
               return undefined;
             if (name.constructor == Symbol)
               return undefined;
-            if (!properties.includes(name))
-              throw new Error(`Can't access field ${name} not in schema ${className}`);
-            return target[name];
+            let [fieldType, jsType] = checkFieldIsValidAndGetTypes(name, 'get');
+            let value = target[name];
+            __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(value === undefined || value === null || typeof(value) == jsType,
+                   `Field ${name} (type ${fieldType}) has value ${value} (type ${typeof(value)})`);
+            return value;
           },
           set: (target, name, value) => {
-            if (!properties.includes(name)) {
-              throw new Error(`Can't write field ${name} not in schema ${className}`);
+            let [fieldType, jsType] = checkFieldIsValidAndGetTypes(name, 'set');
+            if (value !== undefined && value !== null && typeof(value) != jsType) {
+              throw new TypeError(
+                  `Can't set field ${name} (type ${fieldType}) to value ${value} (type ${typeof(value)})`);
             }
             target[name] = value;
             return true;
           }
         });
-        super(userIDComponent);
-        this.rawData = p;
+        for (let [name, value] of Object.entries(data)) {
+          this.rawData[name] = value;
+        }
       }
 
       dataClone() {
-        var clone = {};
-        properties.forEach(prop => clone[prop] = this.rawData[prop]);
+        let clone = {};
+        for (let propertyList of [normative, optional]) {
+          Object.keys(propertyList).forEach(prop => clone[prop] = this.rawData[prop]);
+        }
         return clone;
       }
 
@@ -712,28 +734,19 @@ class Schema {
 
     Object.defineProperty(clazz, 'type', {value: this.type});
     Object.defineProperty(clazz, 'name', {value: this.name});
-    for (let property in this.normative) {
-      // TODO: type checking, make a distinction between normative
-      // and optional properties.
-      // TODO: add query / getter functions for user properties
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
-    }
-    for (let property in this.optional) {
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
+    // TODO: make a distinction between normative and optional properties.
+    // TODO: add query / getter functions for user properties
+    for (let propertyList of [normative, optional]) {
+      for (let property in propertyList) {
+        Object.defineProperty(clazz.prototype, property, {
+          get: function() {
+            return this.rawData[property];
+          },
+          set: function(v) {
+            this.rawData[property] = v;
+          }
+        });
+      }
     }
     return clazz;
   }
@@ -2039,11 +2052,7 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
     let path = this._resolve(fileName);
     // inject path to this particle into the UrlMap,
     // allows "foo.js" particle to invoke `importScripts(resolver('foo/othermodule.js'))`
-    let parts = path.split('/');
-    let suffix = parts.pop();
-    let folder = parts.join('/');
-    let name = suffix.split('.').shift();
-    this._urlMap[name] = folder;
+    this.mapParticleUrl(path);
     let result = [];
     self.defineParticle = function(particleWrapper) {
       result.push(particleWrapper);
@@ -2051,6 +2060,13 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
     importScripts(path);
     delete self.defineParticle;
     return this.unwrapParticle(result[0]);
+  }
+  mapParticleUrl(path) {
+    let parts = path.split('/');
+    let suffix = parts.pop();
+    let folder = parts.join('/');
+    let name = suffix.split('.').shift();
+    this._urlMap[name] = folder;
   }
   unwrapParticle(particleWrapper) {
     // TODO(sjmiles): regarding `resolver`:
@@ -2649,7 +2665,7 @@ module.exports = g;
  * http://polymer.github.io/PATENTS.txt
  */
 
-var supportedTypes = ["Text", "URL"];
+var supportedTypes = ["Text", "URL", "Number"];
 
 class JsonldToManifest {
   static convert(jsonld, theClass) {
@@ -3711,7 +3727,10 @@ function compareComparables(o1, o2) {
 function testEntityClass(type) {
   return new __WEBPACK_IMPORTED_MODULE_4__schema_js__["a" /* default */]({
     name: type,
-    sections: [],
+    sections: [{
+      sectionType: 'normative',
+      fields: {'id': 'Number', 'value': 'Text'}
+    }],
     parents: [],
   }).entityClass();
 }
