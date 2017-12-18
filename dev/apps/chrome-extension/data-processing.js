@@ -6,6 +6,22 @@
 // http://polymer.github.io/PATENTS.txt
 
 /**
+ * There are some entity shapes that aren't yet supported by Arcs. Ensure that:
+ *  - There is a 'name' field.
+ */
+function filter(entities) {
+  return Object.entries(entities).reduce((accumulator, [key, values]) => {
+    accumulator[key] = values.reduce((accumulator, value) => {
+      if (value.hasOwnProperty('name')) {
+        accumulator.push(value);
+      }
+      return accumulator;
+    }, []);
+    return accumulator;
+  }, new Object());
+}
+
+/**
  * Reduce the deeply nested structure of url=>entities-of-many-types to a
  * flatter, combined form of type=>entities.
  *
@@ -18,12 +34,25 @@ function flatten(entities) {
   return Object.entries(entities).reduce((accumulator, [key, value]) => {
     value.forEach(entry => {
       let type = entry['@type'];
+
+      // normalize all https? urls to http in keys
+      if (type.match(/^https?:\/\//)) {
+        type = type.replace(/^https?:/, 'http:');
+      }
+
       accumulator[type]
         ? accumulator[type].push(entry)
         : (accumulator[type] = [entry]);
     });
     return accumulator;
   }, new Object());
+}
+
+/** Returns true iff a & b are pointers to the same object, or if their naive
+ * JSON representations (without sorting) are the same. {a, b} != {b, a}.
+ */
+function _deepIsEqual(a, b) {
+  return a === b || JSON.stringify(a) == JSON.stringify(b);
 }
 
 /**
@@ -34,7 +63,7 @@ function deduplicate(entities) {
   return Object.entries(entities).reduce((accumulator, [key, values]) => {
     accumulator[key] = values.reduce((accumulator, value) => {
       let isIncluded = accumulator.reduce(
-        (a, av) => _.isEqual(av, value) || a,
+        (a, av) => _deepIsEqual(av, value) || a,
         false
       );
       isIncluded || accumulator.push(value);
