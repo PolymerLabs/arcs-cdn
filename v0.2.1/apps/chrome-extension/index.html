@@ -75,9 +75,9 @@
             return;
           }
 
-          // TODO(smalls) This should be replaced with transformations done in
-          // particles.
-          let dataByType = deduplicate(flatten(event.data.entities));
+          // TODO(smalls) Should these be replaced with Transformation
+          // particles?
+          let dataByType = deduplicate(flatten(filter(event.data.entities)));
 
           if (dataByType['text/x-arcs-manifest']) {
             config.additionalManifests = dataByType['text/x-arcs-manifest'].map(m => m.url);

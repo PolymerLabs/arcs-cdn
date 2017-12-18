@@ -12,8 +12,27 @@ afterEach(function() {
 });
 
 describe('ChromeExtensionDataProcessing', function() {
+  describe('#filter', function() {
+    it('should skip entities without a name', function() {
+      let sample = {
+        'https://my/great/site': [{ '@type': 'http://TypeA' }],
+        'http://my/terrible/site': [
+          { '@type': 'http://TypeA', name: 'TypeA_MTS' }
+        ]
+      };
+      let expected = {
+        'https://my/great/site': [],
+        'http://my/terrible/site': [
+          { '@type': 'http://TypeA', name: 'TypeA_MTS' }
+        ]
+      };
+
+      let result = filter(sample);
+      assert.deepEqual(result, expected);
+    });
+  });
   describe('#flatten()', function() {
-    it('should flatten & combine single datatype', function() {
+    it('should organize entities by data type', function() {
       let sample = {
         'http://my/great/site': [{ '@type': 'TypeA', name: 'TypeA_MGS' }],
         'http://my/terrible/site': [{ '@type': 'TypeA', name: 'TypeA_MTS' }]
@@ -28,7 +47,7 @@ describe('ChromeExtensionDataProcessing', function() {
       let result = flatten(sample);
       assert.deepEqual(result, expected);
     });
-    it('should flatten & combine datatypes', function() {
+    it('should organize entities by data type (multiple data types should be kept separate)', function() {
       let sample = {
         'http://my/great/site': [
           { '@type': 'TypeA', name: 'TypeA_MGS' },
@@ -53,7 +72,7 @@ describe('ChromeExtensionDataProcessing', function() {
       let result = flatten(sample);
       assert.deepEqual(result, expected);
     });
-    it('should flatten & combine datatypes ignore https', function() {
+    it('should ignore http vs https', function() {
       let sample = {
         'https://my/great/site': [
           { '@type': 'https://TypeA', name: 'TypeA_MGS' },
