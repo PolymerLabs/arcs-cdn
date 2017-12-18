@@ -54,13 +54,14 @@
         dotsDisabled: dots == 'disabled',
         dotsActive: dots == 'active',
         searchText: state.search || '',
-        toastOpen: state.open || true,
+        toastOpen: state.open == undefined ? true : state.open,
         suggestions
       };
     }
     _onPlanSelected(e, suggestion) {
       this._fire('suggest', suggestion);
       this._doBackendSearch(null);
+      this._setState({open: false});
     }
     _onSearchClick(e) {
       this._updateSearchState('*');
