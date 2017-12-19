@@ -12,4 +12,6 @@ schema ArcMetadata
     Text key
     Text href
     Text color
-    Text profile
+    Boolean profile
+  optional
+    Text blurb
