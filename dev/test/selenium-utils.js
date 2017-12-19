@@ -18,6 +18,10 @@ let debug = true;
  * Selectors must be specific - if a selector matches multiple items
  * (including results in both the light & shadow trees) this method will error
  * out.
+ *
+ * The selector containing a shadowRoot must be explicitly specified. Any
+ * specified selector (e.g. every selector in 'querySelectors') will have both
+ * light & shadow children searched.
  */
 function pierceShadows(querySelectors) {
   return _pierceShadows(document, querySelectors);
