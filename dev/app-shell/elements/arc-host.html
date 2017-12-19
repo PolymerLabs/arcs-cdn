@@ -63,10 +63,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // send urlMap to the Arc so worker-entry*.js can create mapping loaders
       let urlMap = loader._urlMap;
       // Arc!
-      let arc = Arcs.utils.createArc({id, urlMap, slotComposer, context});
-      // TODO(sjmiles): loader instance has to follow the arc, why is it not already this way?
-      // TODO(sjmiles): ArcsLib made a similar change (arc._loader?), unify
-      arc.loader = loader;
+      let arc = Arcs.utils.createArc({id, urlMap, slotComposer, context, loader});
       return arc;
     }
     _marshalLoader(config) {
