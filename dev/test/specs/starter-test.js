@@ -40,6 +40,30 @@ function loadSeleniumUtils(cdnBranch) {
   }, cdnBranch);
 }
 
+function acceptSuggestionMatchingText(footerPath, textSubstring) {
+  let suggestionsRoot = queryElements(footerPath.concat(['suggestions-element']));
+  let suggestionsDiv = queryElements(footerPath.concat(['suggestions-element', 'div']));
+  let allSuggestions = browser.elementIdElements(
+      suggestionsDiv.value.ELEMENT, 'suggest');
+  let allSuggestionIds = allSuggestions
+    .value
+    .map(value => {
+      return {
+        id: value.ELEMENT, text: browser.elementIdText(value.ELEMENT).value
+      };
+    });
+  assert.ok(allSuggestionIds.length>0, allSuggestionIds);
+
+  let desiredSuggestion = allSuggestionIds.reduce((accumulator, currentValue) => {
+    if (accumulator) {
+      return accumulator;
+    }
+    return currentValue.text.startsWith(textSubstring) ? currentValue : null;
+  }, null);
+  assert.ok(desiredSuggestion);
+  browser.elementIdClick(desiredSuggestion.id);
+}
+
 describe('test a new arc', function() {
   it('creates an arc', function() {
 
@@ -74,28 +98,7 @@ describe('test a new arc', function() {
     let magnifier = queryElements(footerPath.concat(['div[search]', 'i']));
     browser.elementIdClick(magnifier.value.ELEMENT);
 
-    let suggestionsRoot = queryElements(footerPath.concat(['suggestions-element']));
-    let suggestionsDiv = queryElements(footerPath.concat(['suggestions-element', 'div']));
-    let allSuggestions = browser.elementIdElements(
-        suggestionsDiv.value.ELEMENT, 'suggest');
-    let allSuggestionIds = allSuggestions
-      .value
-      .map(value => {
-        return {
-          id: value.ELEMENT, textLater: browser.elementIdText(value.ELEMENT).value
-        };
-      });
-    console.log('allSuggestionIds', allSuggestionIds);
-    assert.ok(allSuggestionIds.length>0, allSuggestionIds);
-    let findSfRestaurant = allSuggestionIds.reduce((accumulator, currentValue) => {
-      if (accumulator) {
-        return accumulator;
-      }
-      return currentValue.text.startsWith('Find restaurants') ? currentValue : null
-    }, null);
-    console.log(findSfRestaurant);
-    assert.ok(findSfRestaurant);
-    browser.elementIdClick(findRestaurants.id);
+    acceptSuggestionMatchingText(footerPath, 'Find restaurants');
     
 
     //console.log('magnifier', magnifier);
@@ -113,7 +116,8 @@ describe('test a new arc', function() {
 //        ['arc-app', 'app-main', 'footer', 'arc-footer', 'x-toast'])
 //  .click()
 
-    // note: to drop into debug mode with a REPL
+    // to drop into debug mode with a REPL; also a handy way to see the state
+    // at the end of the test.
     browser.debug();
   });
 });
