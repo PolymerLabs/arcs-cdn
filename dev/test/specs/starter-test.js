@@ -21,23 +21,13 @@ function queryElements(selectors) {
 }
 
 /** wait for the dancing dots to stop. */
-async function waitForStillness() {
-  let dotsStopped = false;
-  for (let i=0; i < 10; i++) {
-    var element = await queryElements(['arc-footer', 'x-toast[app-footer]', 'dancing-dots']);
-    var result = await browser.elementIdAttribute(element.value.ELEMENT, 'animate');
+function waitForStillness() {
+  var element = queryElements(['arc-footer', 'x-toast[app-footer]', 'dancing-dots']);
 
-    if (result.value==null) {
-      dotsStopped = true;
-      break;
-    }
-
-    await sleep(1000);
-  }
-
-  if (!dotsStopped) {
-    throw 'the dancing dots never stopped';
-  }
+  browser.waitUntil(() => {
+    var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
+    return null==result.value;
+  }, 5000, `the dancing dots can't stop won't stop`);
 }
 
 /** Load the selenium utils into the current page. */
@@ -51,7 +41,7 @@ function loadSeleniumUtils(cdnBranch) {
 }
 
 describe('test a new arc', function() {
-  it('creates an arc', async function() {
+  it('creates an arc', function() {
 
     // TODO(smalls) need to spin up a server for this
     let cdnBranch = 'http://localhost:8000/arcs-cdn/dev';
@@ -60,7 +50,6 @@ describe('test a new arc', function() {
     browser.url(`${cdnBranch}/apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
 
     assert.equal('Arcs', browser.getTitle());
-    await browser.debug();
 
     // create a new arc, switch to that tab (toggling back to the first tab to
     // reset the webdriver window state).
@@ -80,38 +69,30 @@ describe('test a new arc', function() {
     assert.ok(queryElements(footerPath).value);
 
     // wait for the dancing dots to stop
-    await waitForStillness();
+    waitForStillness();
 
-    let magnifier = await queryElements(footerPath.concat(['div[search]', 'i']));
+    let magnifier = queryElements(footerPath.concat(['div[search]', 'i']));
     browser.elementIdClick(magnifier.value.ELEMENT);
 
-    let suggestionsRoot = await queryElements(footerPath.concat(['suggestions-element']));
-    let suggestionsDiv = await queryElements(footerPath.concat(['suggestions-element', 'div']));
-    let allSuggestions = await browser.elementIdElements(
+    let suggestionsRoot = queryElements(footerPath.concat(['suggestions-element']));
+    let suggestionsDiv = queryElements(footerPath.concat(['suggestions-element', 'div']));
+    let allSuggestions = browser.elementIdElements(
         suggestionsDiv.value.ELEMENT, 'suggest');
     let allSuggestionIds = allSuggestions
       .value
       .map(value => {
         return {
-          id: value.ELEMENT, textLater: browser.elementIdText(value.ELEMENT)
+          id: value.ELEMENT, textLater: browser.elementIdText(value.ELEMENT).value
         };
-      });/*.reduce((accumulator, currentValue) => {
-        accumulator[currentValue.text] = currentValue.id;
-        return accumulator }, new Object()
-      );*/
-    await Promise.all(allSuggestionIds.map(suggestion => suggestion.textLater));
-    allSuggestionIds = allSuggestionIds.map(suggestion => {
-      return {id: suggestion.id, text: suggestion.textLater}
-    });
-    console.log(allSuggestionIds);
+      });
+    console.log('allSuggestionIds', allSuggestionIds);
     assert.ok(allSuggestionIds.length>0, allSuggestionIds);
-    console.log(allSuggestionIds);
     let findSfRestaurant = allSuggestionIds.reduce((accumulator, currentValue) => {
-        if (accumulator) {
-          return accumulator;
-        }
-        return currentValue.text.startsWith('Find re') ? currentValue : null
-      }, null);
+      if (accumulator) {
+        return accumulator;
+      }
+      return currentValue.text.startsWith('Find restaurants') ? currentValue : null
+    }, null);
     console.log(findSfRestaurant);
     assert.ok(findSfRestaurant);
     browser.elementIdClick(findRestaurants.id);
@@ -133,6 +114,6 @@ describe('test a new arc', function() {
 //  .click()
 
     // note: to drop into debug mode with a REPL
-    await browser.debug();
+    browser.debug();
   });
 });
