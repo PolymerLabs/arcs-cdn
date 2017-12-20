@@ -72,7 +72,15 @@ function loadSeleniumUtils(cdnBranch) {
   }, cdnBranch);
 }
 
-function acceptSuggestionMatchingText(footerPath, textSubstring) {
+function allSuggestions(footerPath) {
+  // wait for the dancing dots to stop
+  waitForStillness();
+
+  let magnifier = pierceShadowsSingle(footerPath.concat(['div[search]', 'i']));
+  browser.elementIdClick(magnifier.value.ELEMENT);
+}
+
+function acceptSuggestion(footerPath, textSubstring) {
   waitForStillness();
 
   let suggestionsRoot = pierceShadowsSingle(footerPath.concat(['suggestions-element']));
@@ -85,28 +93,22 @@ function acceptSuggestionMatchingText(footerPath, textSubstring) {
 }
 
 /**
- * Click in the main arcs app. In order:
- * - use slotName (often root) and shadowSelectors to pierce through to the
- *   particle
- * - selectors is used within that context to find all matches
- * - if there are more than 1 matches from that, and textQuery is specified,
- *   return the matches with textQuery as a substring
+ * Click in the main arcs app, in the slot with the name 'slotName', using the
+ * specified selectors, filtering by the optional textQuery.
  */
-function clickInSlot(slotName, selectors, textQuery) {
+function clickInParticles(slotName, selectors, textQuery) {
+  waitForStillness();
+
   if (!selectors) selectors = [];
   let realSelectors = ['arc-host', `div[slotid="${slotName}"]`].concat(selectors);
 
-
   browser.waitUntil(() => {
-    console.log('realSelectors', realSelectors);
     let pierced = pierceShadows(realSelectors);
-    console.log('pierced', pierced);
     assert.ok(pierced);
     if (!pierced.value || pierced.value.length==0) {
       return false;
     }
 
-    console.log(`searching amongst ${pierced.value} for ${textQuery}`);
     let selected;
     if (textQuery) {
       selected = searchElementsForText(pierced.value, textQuery).id;
@@ -129,9 +131,8 @@ function clickInSlot(slotName, selectors, textQuery) {
   );
 }
 
-describe('test a new arc', function() {
-  it('creates an arc', function() {
-
+describe('test basic arcs functionality', function() {
+  it('can use the restaurant demo flow', function() {
     // TODO(smalls) need to spin up a server for this
     let cdnBranch = 'http://localhost:8000/arcs-cdn/dev';
 
@@ -157,14 +158,10 @@ describe('test a new arc', function() {
     assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
     assert.ok(pierceShadowsSingle(footerPath).value);
 
-    // wait for the dancing dots to stop
-    waitForStillness();
+    allSuggestions(footerPath);
 
-    let magnifier = pierceShadowsSingle(footerPath.concat(['div[search]', 'i']));
-    browser.elementIdClick(magnifier.value.ELEMENT);
-
-    acceptSuggestionMatchingText(footerPath, 'Find restaurants');
-    clickInSlot('root', ['div.item', 'div.title'], 'Tacolicious');
+    acceptSuggestion(footerPath, 'Find restaurants');
+    clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
     
 
     // to drop into debug mode with a REPL; also a handy way to see the state

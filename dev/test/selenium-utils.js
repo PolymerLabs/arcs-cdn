@@ -8,6 +8,11 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
+/**
+ * These utilities can be loaded into a running web page to help automate
+ * selenium testing of arcs.
+ */
+
 
 let debug = true;
 
@@ -15,13 +20,12 @@ let debug = true;
  * Traverse the list of query selectors. After each selector, both the shadow
  * & light DOM trees will be traversed.
  *
- * Selectors must be specific - if a selector matches multiple items
- * (including results in both the light & shadow trees) this method will error
- * out.
+ * Note that to traverse the shadow dom, the selector directly above the
+ * branch to the shadow root must be specified (or the logic here won't be
+ * able to traverse that path).
  *
- * The selector containing a shadowRoot must be explicitly specified. Any
- * specified selector (e.g. every selector in 'querySelectors') will have both
- * light & shadow children searched.
+ * This will return all results from all branches that match the given
+ * selectors.
  */
 function pierceShadows(querySelectors) {
   return _pierceShadows(document, querySelectors);
