@@ -47,6 +47,7 @@ exports.config = {
         browserName: 'chrome',
         chromeOptions: {
           args: [
+            // arcs note: comment this out to see the system running
             '--headless'
           ]
         }
@@ -85,7 +86,8 @@ exports.config = {
     baseUrl: 'http://localhost',
     //
     // Default timeout for all waitFor* commands.
-    waitforTimeout: 10000,
+    // arcs note: increase this for debugging
+    waitforTimeout: 10002,
     //
     // Default timeout in milliseconds for request
     // if Selenium Grid doesn't send response
@@ -134,7 +136,9 @@ exports.config = {
     // Options to be passed to Mocha.
     // See the full list at http://mochajs.org/
     mochaOpts: {
-        ui: 'bdd'
+      ui: 'bdd',
+      // arcs note: increase this timeout for debugging
+      timeout: 20003
     },
     //
     // =====
