@@ -27,38 +27,52 @@ function pierceShadows(querySelectors) {
   return _pierceShadows(document, querySelectors);
 }
 
+/** As #pierceShadows, but asserts that only a single result is found. */
+function pierceShadowsSingle(querySelectors) {
+  let result = _pierceShadows(document, querySelectors);
+  if (result.length>1) {
+    throw Error(`too many results found ${result}`);
+  }
+  return result[0];
+}
+
+function _nodelistToArray(nl) {
+  if (!nl) return [];
+  var l=nl.length, r = new Array(l);
+  while(l--){r[l]=nl[l]};
+  return r;
+}
+
 function _pierceShadows(node, querySelectors, depth) {
   if (undefined===depth) depth=0;
 
 
-  let remainingSelectors = querySelectors.slice(1);
-  let nextNode = node.querySelectorAll(querySelectors[0]);
-  if (nextNode.length>1) {
-    throw `too many results for selector ${querySelectors[0]}: ${nextNode}`;
-  }
-  nextNode = nextNode[0];
+  const remainingSelectors = querySelectors.slice(1);
+  let nextNodes = node.querySelectorAll(querySelectors[0]);
 
 
-  // all done
   if (0==remainingSelectors.length) {
-    !debug || console.log(`${Array(depth+1).join(' ')}end of recursion at ${nextNode}`);
-    return nextNode;
-  } else {
-    let light, shadow;
-    if (nextNode) {
-      !debug || console.log(`${Array(depth+1).join(' ')}descending to light ${nextNode} with selector ${remainingSelectors[0]}`);
-      light = _pierceShadows(nextNode, remainingSelectors, depth+1);
-    }
-    if (nextNode && nextNode.shadowRoot) {
-      !debug || console.log(`${Array(depth+1).join(' ')}descending to shadow ${nextNode.shadowRoot} with selector ${remainingSelectors[0]}`);
-      shadow = _pierceShadows(nextNode.shadowRoot, remainingSelectors, depth+1);
-    }
-    !debug || console.log(`${Array(depth+1).join(' ')}returning light ${light} and shadow ${shadow}`);
-
-    if (light && shadow) {
-      throw `both light & shadow roots were valid; please use a more selective descriptor (${light}, ${shadow})`;
-    }
-
-    return light || shadow;
+    !debug || console.log(`${Array(depth+1).join(' ')}end of recursion at ${nextNodes}`);
+    return nextNodes;
   }
+
+  var l=nextNodes.length, nextNodesArr = new Array(l);
+  while(l--){nextNodesArr[l]=nextNodes[l]};
+
+  let results = nextNodesArr.reduce((accumulator, currentValue) => {
+    !debug || console.log(`${Array(depth+1).join(' ')}descending to light ${currentValue} with selector ${remainingSelectors[0]}`);
+    let lightNodes = _pierceShadows(currentValue, remainingSelectors, depth+1);
+
+    let shadowNodes;
+    if (currentValue && currentValue.shadowRoot) {
+      !debug || console.log(`${Array(depth+1).join(' ')}descending to shadow ${currentValue.shadowRoot} with selector ${remainingSelectors[0]}`);
+      shadowNodes = _pierceShadows(currentValue.shadowRoot, remainingSelectors, depth+1);
+    }
+    !debug || console.log(`${Array(depth+1).join(' ')}returning light ${lightNodes} and shadow ${shadowNodes}`);
+
+    return accumulator
+      .concat(_nodelistToArray(lightNodes))
+      .concat(_nodelistToArray(shadowNodes));
+  }, []);
+  return results;
 }
