@@ -39,7 +39,7 @@ function searchElementsForText(elements, textQuery) {
   assert.equal(textToId.length, elements.length);
 
   let matches = textToId.reduce((accumulator, currentValue) => {
-    let found = currentValue.text.startsWith(textQuery) ? currentValue : null;
+    let found = currentValue.text.includes(textQuery) ? currentValue : null;
     if (accumulator && found) {
       throw Error(`found two matches ${accumulator}, ${found}`);
     } else if (accumulator) {
@@ -59,7 +59,7 @@ function waitForStillness() {
   browser.waitUntil(() => {
     var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
     return null==result.value;
-  }, 5000, `the dancing dots can't stop won't stop`);
+  }, 5000, `the dancing dots can't stop won't stop`, 1000);
 }
 
 /** Load the selenium utils into the current page. */
@@ -73,7 +73,6 @@ function loadSeleniumUtils(cdnBranch) {
 }
 
 function allSuggestions(footerPath) {
-  // wait for the dancing dots to stop
   waitForStillness();
 
   let magnifier = pierceShadowsSingle(footerPath.concat(['div[search]', 'i']));
@@ -85,11 +84,30 @@ function acceptSuggestion(footerPath, textSubstring) {
 
   let suggestionsRoot = pierceShadowsSingle(footerPath.concat(['suggestions-element']));
   let suggestionsDiv = pierceShadowsSingle(footerPath.concat(['suggestions-element', 'div']));
-  let allSuggestions = browser.elementIdElements(
-      suggestionsDiv.value.ELEMENT, 'suggest');
-  let desiredSuggestion = searchElementsForText(allSuggestions.value, textSubstring);
-  assert.ok(desiredSuggestion);
-  browser.elementIdClick(desiredSuggestion.id);
+  browser.waitUntil(() => {
+    let allSuggestions = browser.elementIdElements(
+        suggestionsDiv.value.ELEMENT, 'suggest');
+    if (!allSuggestions.value || 0==allSuggestions.value) {
+      return false;
+    }
+
+    try {
+      let desiredSuggestion = searchElementsForText(allSuggestions.value, textSubstring);
+      if (!desiredSuggestion) {
+        return false;
+      }
+
+      browser.elementIdClick(desiredSuggestion.id);
+      return true;
+    } catch (e) {
+      if (e.message.includes('stale element reference')) {
+        console.log(`got a not-entirely-unexpected error, but we'll try again ${e}`);
+        return false;
+      }
+
+      throw e;
+    }
+  }, 5000, `couldn't find suggestion ${textSubstring}`);
 }
 
 /**
@@ -162,10 +180,13 @@ describe('test basic arcs functionality', function() {
 
     acceptSuggestion(footerPath, 'Find restaurants');
     clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
+
+    acceptSuggestion(footerPath, 'Make a reservation');
+    acceptSuggestion(footerPath, 'You are free');
     
 
     // to drop into debug mode with a REPL; also a handy way to see the state
-    // at the end of the test.
-    browser.debug();
+    // at the end of the test:
+    // browser.debug();
   });
 });
