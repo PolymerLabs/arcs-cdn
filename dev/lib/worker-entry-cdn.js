@@ -63,7 +63,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 15);
+/******/ 	return __webpack_require__(__webpack_require__.s = 13);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -92,9 +92,9 @@ function assert(test, message) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__schema_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(25);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -227,9 +227,7 @@ class Type {
     if (this.tag !== type.tag)
       return false;
     if (this.tag == 'Entity') {
-      // TODO: Remove this hack that allows the old resolver to match
-      //       types by schema name.
-      return this.data.name == type.data.name;
+      return this.data.equals(type.data);
     }
     if (this.isSetView) {
       return this.data.equals(type.data);
@@ -313,9 +311,13 @@ class Type {
       return `[${this.variableName}]`;
     if (this.isVariableReference)
       return `[${this.variableReferenceName}]`;
-    if (this.isEntity)
+    if (this.isEntity) {
       // Spit MyTypeFOO to My Type FOO
-      return this.entitySchema.name.replace(/([^A-Z])([A-Z])/g, "$1 $2").replace(/([A-Z][^A-Z])/g, " $1").trim();
+      if (this.entitySchema.name) {
+        return this.entitySchema.name.replace(/([^A-Z])([A-Z])/g, "$1 $2").replace(/([A-Z][^A-Z])/g, " $1").trim();
+      } 
+      return JSON.stringify(this.entitySchema._model);
+    }
     if (this.isManifestReference)
       return this.manifestReferenceName;
     if (this.isInterface)
@@ -376,6 +378,11 @@ class Entity {
   isIdentified() {
     return this[__WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier] !== undefined;
   }
+  // TODO: entity should not be exposing its IDs.
+  get id() {
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!!this.isIdentified());
+    return this[__WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier];
+  }
   identify(identifier) {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!this.isIdentified());
     this[__WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier] = identifier;
@@ -415,9 +422,9 @@ class Entity {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__type_js__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__ = __webpack_require__(0);
-  /**
+/**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
  * This code may only be used under the BSD style license found at
@@ -539,8 +546,9 @@ class ParticleSpec {
   }
 
   static fromLiteral(literal) {
-    literal.args.forEach(a => a.type = __WEBPACK_IMPORTED_MODULE_0__type_js__["a" /* default */].fromLiteral(a.type));
-    return new ParticleSpec(literal);
+    let {args, name, verbs, transient, description, implFile, affordance, slots} = literal;
+    args = args.map(({type, direction, name}) => ({type: __WEBPACK_IMPORTED_MODULE_0__type_js__["a" /* default */].fromLiteral(type), direction, name}));
+    return new ParticleSpec({args, name, verbs, transient, description, implFile, affordance, slots});
   }
 
   validateDescription(description) {
@@ -643,7 +651,46 @@ class Schema {
   }
 
   equals(otherSchema) {
-    return this.toLiteral() == otherSchema.toLiteral();
+    return this === otherSchema || (this.name == otherSchema.name
+       // TODO: Check equality without calling contains.
+       && this.contains(otherSchema)
+       && otherSchema.contains(this));
+  }
+
+  contains(otherSchema) {
+    if (!this.containsAncestry(otherSchema)) {
+      return false;
+    }
+    for (let section of ['normative', 'optional']) {
+      let thisSection = this[section];
+      let otherSection = otherSchema[section];
+      for (let field in otherSection) {
+        if (thisSection[field] != otherSection[field]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  containsAncestry(otherSchema) {
+    if (this.name == otherSchema.name) {
+      nextOtherParent: for (let otherParent of otherSchema.parents) {
+        for (let parent of this.parents) {
+          if (parent.containsAncestry(otherParent)) {
+            continue nextOtherParent;
+          }
+        }
+        return false;
+      }
+      return true;
+    } else {
+      for (let parent of this.parents) {
+        if (parent.containsAncestry(otherSchema)) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   get type() {
@@ -668,37 +715,63 @@ class Schema {
 
   entityClass() {
     let schema = this;
-    const className = this.name;
-    var properties = Object.keys(this.normative).concat(Object.keys(this.optional));
-    var classJunk = ['toJSON', 'prototype', 'toString', 'inspect'];
+    let className = this.name;
+    let normative = this.normative;
+    let optional = this.optional;
+    let classJunk = ['toJSON', 'prototype', 'toString', 'inspect'];
 
-    var clazz = class extends __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */] {
+    let checkFieldIsValidAndGetTypes = (name, op) => {
+      let fieldType = normative[name] || optional[name];
+      switch (fieldType) {
+        case undefined:
+          throw new Error(`Can't ${op} field ${name} not in schema ${className}`);
+        case 'Number':
+          return [fieldType, 'number'];
+        case 'Boolean':
+          return [fieldType, 'boolean']
+        case 'Object':
+          return [fieldType, 'object']
+        default:
+          // Text, URL
+          return [fieldType, 'string'];
+      }
+    };
+
+    let clazz = class extends __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */] {
       constructor(data, userIDComponent) {
-        var p = new Proxy(data, {
+        super(userIDComponent);
+        this.rawData = new Proxy({}, {
           get: (target, name) => {
             if (classJunk.includes(name))
               return undefined;
             if (name.constructor == Symbol)
               return undefined;
-            if (!properties.includes(name))
-              throw new Error(`Can't access field ${name} not in schema ${className}`);
-            return target[name];
+            let [fieldType, jsType] = checkFieldIsValidAndGetTypes(name, 'get');
+            let value = target[name];
+            __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(value === undefined || value === null || typeof(value) == jsType,
+                   `Field ${name} (type ${fieldType}) has value ${value} (type ${typeof(value)})`);
+            return value;
           },
           set: (target, name, value) => {
-            if (!properties.includes(name)) {
-              throw new Error(`Can't write field ${name} not in schema ${className}`);
+            let [fieldType, jsType] = checkFieldIsValidAndGetTypes(name, 'set');
+            if (value !== undefined && value !== null && typeof(value) != jsType) {
+              throw new TypeError(
+                  `Can't set field ${name} (type ${fieldType}) to value ${value} (type ${typeof(value)})`);
             }
             target[name] = value;
             return true;
           }
         });
-        super(userIDComponent);
-        this.rawData = p;
+        for (let [name, value] of Object.entries(data)) {
+          this.rawData[name] = value;
+        }
       }
 
       dataClone() {
-        var clone = {};
-        properties.forEach(prop => clone[prop] = this.rawData[prop]);
+        let clone = {};
+        for (let propertyList of [normative, optional]) {
+          Object.keys(propertyList).forEach(prop => clone[prop] = this.rawData[prop]);
+        }
         return clone;
       }
 
@@ -712,28 +785,19 @@ class Schema {
 
     Object.defineProperty(clazz, 'type', {value: this.type});
     Object.defineProperty(clazz, 'name', {value: this.name});
-    for (let property in this.normative) {
-      // TODO: type checking, make a distinction between normative
-      // and optional properties.
-      // TODO: add query / getter functions for user properties
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
-    }
-    for (let property in this.optional) {
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
+    // TODO: make a distinction between normative and optional properties.
+    // TODO: add query / getter functions for user properties
+    for (let propertyList of [normative, optional]) {
+      for (let property in propertyList) {
+        Object.defineProperty(clazz.prototype, property, {
+          get: function() {
+            return this.rawData[property];
+          },
+          set: function(v) {
+            this.rawData[property] = v;
+          }
+        });
+      }
     }
     return clazz;
   }
@@ -790,9 +854,9 @@ class Schema {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__runtime_js__ = __webpack_require__(27);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__runtime_js__ = __webpack_require__(24);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_spec_js__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__tracelib_trace_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__tracelib_trace_js__ = __webpack_require__(26);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__schema_js__ = __webpack_require__(4);
 /**
@@ -975,7 +1039,6 @@ class Particle {
 
   setParticleDescription(pattern) {
     return this.setDescriptionPattern('_pattern_', pattern);
-
   }
   setDescriptionPattern(connectionName, pattern) {
     let descriptions = this._views.get('descriptions');
@@ -1041,256 +1104,6 @@ class StateChanges {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(8);
-/*
-  Copyright 2015 Google Inc. All Rights Reserved.
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-      http://www.apache.org/licenses/LICENSE-2.0
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License.
-*/
-
-
-
-var events = [];
-if (typeof document == 'object') {
-  var pid = 42;
-  var now = function() {
-    var t = performance.now();
-    return t;
-  }
-} else {
-  var pid = process.pid;
-  var now = function() {
-    var t = process.hrtime();
-    return t[0] * 1000000 + t[1] / 1000;
-  }
-}
-
-var flowId = 0;
-
-function parseInfo(info) {
-  if (!info)
-    return {};
-  if (typeof info == 'function')
-    return parseInfo(info());
-  if (info.toTraceInfo)
-    return parseInfo(info.toTraceInfo());
-  return info;
-}
-
-let module = {exports: {}};
-/* harmony default export */ __webpack_exports__["a"] = (module.exports);
-module.exports.enabled = false;
-module.exports.enable = function() {
-  module.exports.enabled = true;
-  init();
-};
-
-// TODO: Add back support for options.
-//module.exports.options = options;
-//var enabled = Boolean(options.traceFile);
-
-function init() {
-  var result = {
-    wait: function(f) {
-      if (f instanceof Function) {
-        return f();
-      }
-      return f;
-    },
-    resume: function() {
-      return this;
-    },
-    start: function() {
-      return this;
-    },
-    end: function() {
-      return this;
-    },
-    step: function() {
-      return this;
-    },
-    endWrap: function(fn) {
-      return fn;
-    },
-  };
-  module.exports.wrap = function(info, fn) {
-    return fn;
-  };
-  module.exports.start = function(info, fn) {
-    return result;
-  };
-  module.exports.async = function(info, fn) {
-    return result;
-  };
-  module.exports.flow = function(info, fn) {
-    return result;
-  };
-  module.exports.dump = function() {
-  };
-
-  if (!module.exports.enabled) {
-    return;
-  }
-
-  module.exports.wrap = function(info, fn) {
-    return function() {
-      var t = module.exports.start(info);
-      try {
-        return fn.apply(this, arguments);
-      } finally {
-        t.end();
-      }
-    };
-  };
-  module.exports.start = function(info) {
-    info = parseInfo(info);
-    let args = info.args || {};
-    let begin = now();
-    return {
-      end: function(endInfo) {
-        if (endInfo && endInfo.args) {
-          Object.assign(args, endInfo.args);
-        }
-        var end = now();
-        events.push({
-          ph: 'X',
-          ts: begin,
-          dur: end - begin,
-          cat: info.cat,
-          name: info.name,
-          args: args,
-        });
-      },
-    };
-  };
-  // TODO: perhaps this should just be the only API, it acts the same as
-  //       start() when there is no call to wait/resume().
-  module.exports.async = function(info) {
-    let trace = module.exports.start(info);
-    let flow;
-    let baseInfo = {cat: info.cat, name: info.name + ' (async)'};
-    let n = 0;
-    return {
-      async wait(v) {
-        let result;
-        if (v instanceof Promise) {
-          result = f;
-        } else {
-          result = v();
-        }
-        if (!flow) {
-          flow = module.exports.flow(baseInfo).start();
-        }
-        trace.end();
-        trace = null;
-        return result;
-      },
-      resume(info) {
-        if (info) {
-          Object.assign(info, baseInfo);
-        } else {
-          info = baseInfo;
-        }
-        trace = module.exports.start(info);
-        flow.step(baseInfo);
-      },
-      end(endInfo) {
-        if (flow) {
-          flow.end();
-        }
-        trace.end(endInfo);
-      },
-    };
-  };
-  module.exports.flow = function(info) {
-    info = parseInfo(info);
-    var id = flowId++;
-    var started = false;
-    return {
-      start: function() {
-        var begin = now();
-        started = true;
-        events.push({
-          ph: 's',
-          ts: begin,
-          cat: info.cat,
-          name: info.name,
-          args: info.args,
-          id: id,
-        });
-        return this;
-      },
-      end: function(endInfo) {
-        if (!started) return;
-        var end = now();
-        endInfo = parseInfo(endInfo);
-        events.push({
-          ph: 'f',
-          bp: 'e', // binding point is enclosing slice.
-          ts: end,
-          cat: info.cat,
-          name: info.name,
-          args: endInfo && endInfo.args,
-          id: id,
-        });
-        return this;
-      },
-      step: function(stepInfo) {
-        if (!started) return;
-        var step = now();
-        stepInfo = parseInfo(stepInfo);
-        events.push({
-          ph: 't',
-          ts: step,
-          cat: info.cat,
-          name: info.name,
-          args: stepInfo && stepInfo.args,
-          id: id,
-        });
-        return this;
-      },
-    };
-  };
-  module.exports.save = function() {
-    events.forEach(function(event) {
-      event.pid = pid;
-      event.tid = 0;
-      if (!event.args) {
-        delete event.args;
-      }
-      if (!event.cat) {
-        event.cat = '';
-      }
-    });
-    return {traceEvents: events};
-  };
-  module.exports.dump = function() {
-    __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__["a" /* default */].writeFileSync(options.traceFile, module.exports.save());
-  };
-  module.exports.download = function() {
-    let a = document.createElement('a');
-    a.download = 'trace.json';
-    a.href = 'data:text/plain;base64,' + btoa(JSON.stringify(module.exports.save()));
-    a.click();
-  };
-}
-
-init();
-
-/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(16)))
-
-/***/ }),
-/* 8 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
 // http://polymer.github.io/LICENSE.txt
@@ -1302,13 +1115,13 @@ init();
 
 
 /***/ }),
-/* 9 */
+/* 8 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__ = __webpack_require__(21);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__ = __webpack_require__(19);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -1403,11 +1216,10 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
     this._setState({});
   }
   _update(props, state) {
-    let shouldRender = this._shouldRender(this._props, this._state);
-    if (shouldRender) {  // TODO: should _shouldRender be slot specific?
-      this.config.slotNames.forEach(s => this.render(s, ["model"]));
+    if (this._shouldRender(this._props, this._state)) {  // TODO: should _shouldRender be slot specific?
       this.relevance = 1;  // TODO: improve relevance signal.
     }
+    this.config.slotNames.forEach(s => this.render(s, ["model"]));
   }
 
   render(slotName, contentTypes) {
@@ -1492,320 +1304,21 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
     }
     return Array.from(handlers.keys());
   }
+  setParticleDescription(pattern) {
+    if (typeof pattern === "string") {
+      return super.setParticleDescription(pattern);
+    }
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!!pattern.template && !!pattern.model, 'Description pattern must either be string or have template and model');
+    super.setDescriptionPattern("_template_", pattern.template);
+    super.setDescriptionPattern("_model_", JSON.stringify(pattern.model));
+  }
 }
 
 /* harmony default export */ __webpack_exports__["a"] = (DomParticle);
 
 
 /***/ }),
-/* 10 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__scheduler_js__ = __webpack_require__(28);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__ = __webpack_require__(26);
-// @
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-
-
-
-
-
-
-
-class InMemoryKey {
-  constructor(key) {
-    var parts = key.split("://");
-    this.protocol = parts[0];
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.protocol == 'in-memory');
-    this.location = parts[1];
-  }
-  toString() {
-    return this.protocol + '://' + this.location;
-  }
-}
-
-class InMemoryStorage {
-  constructor(arc) {
-      this._arc = arc;
-      this._memoryMap = {};
-      this.localIDBase = 0;
-  }
-
-  construct(id, type, keyFragment) {
-    var key = new InMemoryKey(keyFragment);
-    if (key.location == undefined)
-      key.location = 'in-memory-' + this.localIDBase++;
-    var provider = InMemoryStorageProvider.newProvider(type, this._arc, undefined, id);
-    if (this._memoryMap[key.toString()] !== undefined)
-      return null;
-    this._memoryMap[key.toString()] = provider;
-    return provider;
-  }
-
-  connect(id, type, key) {
-    if (this._memoryMap[key] == undefined)
-      return null;
-    // TODO assert types match?
-    return this._memoryMap[key];
-  }
-}
-/* unused harmony export InMemoryStorage */
-
-
-class InMemoryStorageProvider {
-  constructor(type, arc, name, id) {
-    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: 'view', name: 'InMemoryStorageProvider::constructor', args: {type: type.key, name: name}});
-    this._type = type;
-    this._arc = arc;
-    this._listeners = new Map();
-    this.name = name;
-    this._version = 0;
-    this.id = id || this._arc.generateID();
-    this.source = null;
-    trace.end();
-  }
-
-  generateID() {
-    return this._arc.generateID();
-  }
-
-  generateIDComponents() {
-    return this._arc.generateIDComponents();
-  }
-
-  get type() {
-    return this._type;
-  }
-  // TODO: add 'once' which returns a promise.
-  on(kind,  callback, target) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(target !== undefined, "must provide a target to register a view event handler");
-    let listeners = this._listeners.get(kind) || new Map();
-    listeners.set(callback, {version: -Infinity, target});
-    this._listeners.set(kind, listeners);
-  }
-
-  _fire(kind, details) {
-    var listenerMap = this._listeners.get(kind);
-    if (!listenerMap || listenerMap.size == 0)
-      return;
-
-    var callTrace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: 'view', name: 'InMemoryStorageProvider::_fire', args: {kind, type: this._type.key,
-        name: this.name, listeners: listenerMap.size}});
-
-    // TODO: wire up a target (particle)
-    let eventRecords = [];
-
-    for (let [callback, registration] of listenerMap.entries()) {
-      let target = registration.target;
-      eventRecords.push({target, callback, kind, details});
-    }
-
-    __WEBPACK_IMPORTED_MODULE_2__scheduler_js__["a" /* default */].enqueue(this, eventRecords);
-
-    callTrace.end();
-  }
-
-  _compareTo(other) {
-    let cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.name, other.name)) != 0) return cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareNumbers(this._version, other._version)) != 0) return cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.source, other.source)) != 0) return cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.id, other.id)) != 0) return cmp;
-    return 0;
-  }
-
-  toString(viewTags) {
-    let results = [];
-    let viewStr = [];
-    viewStr.push(`view`);
-    if (this.name) {
-      viewStr.push(`${this.name}`);
-    }
-    viewStr.push(`of ${this.type.toString()}`);
-    if (this.id) {
-      viewStr.push(`'${this.id}'`);
-    }
-    if (viewTags && viewTags.length) {
-      viewStr.push(`${[...viewTags].join(' ')}`);
-    }
-    if (this.source) {
-      viewStr.push(`in '${this.source}'`);
-    }
-    results.push(viewStr.join(' '));
-    if (this.description)
-      results.push(`  description \`${this.description}\``)
-    return results.join('\n');
-  }
-
-  static newProvider(type, arc, name, id) {
-    if (type.isSetView)
-      return new InMemoryCollection(type, arc, name, id);
-    return new InMemoryVariable(type, arc, name, id);
-  }
-}
-
-class InMemoryCollection extends InMemoryStorageProvider {
-  constructor(type, arc, name, id) {
-    super(type, arc, name, id);
-    this._items = new Map();
-  }
-
-  clone() {
-    var view = new InMemoryCollection(this._type, this._arc, this.name, this.id);
-    view.cloneFrom(this);
-    return view;
-  }
-
-  cloneFrom(view) {
-    this.name = view.name;
-    this.source = view.source;
-    this._items = new Map(view._items);
-    this._version = view._version;
-    this.description = view.description;
-  }
-
-  async get(id) {
-    return this._items.get(id);
-  }
-  traceInfo() {
-    return {items: this._items.size};
-  }
-  // HACK: replace this with some kind of iterator thing?
-  async toList() {
-    return [...this._items.values()];
-  }
-
-  async store(entity) {
-    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: "view", name: "InMemoryCollection::store", args: {name: this.name}});
-    var entityWasPresent = this._items.has(entity.id);
-
-    this._items.set(entity.id, entity);
-    this._version++;
-    if (!entityWasPresent)
-      this._fire('change', {add: [entity], version: this._version});
-    trace.end({args: {entity}});
-  }
-
-  async remove(id) {
-    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: "view", name: "InMemoryCollection::remove", args: {name: this.name}});
-    if (!this._items.has(id)) {
-      return;
-    }
-    let entity = this._items.get(id);
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this._items.delete(id));
-    this._version++;
-    this._fire('change', {remove: [entity], version: this._version});
-    trace.end({args: {entity}});
-  }
-
-  // TODO: Something about iterators??
-  // TODO: Something about changing order?
-
-  extractEntities(set) {
-    this._items.forEach(a => set.add(a));
-  }
-
-  serialize(list) {
-    list.push({
-      id: this.id,
-      sort: 'view',
-      type: this.type.toLiteral(),
-      name: this.name,
-      values: this.toList().map(a => a.id),
-      version: this._version
-    });
-  }
-
-  serializeMappingRecord(list) {
-    list.push({
-      id: this.id,
-      sort: 'view',
-      type: this.type.toLiteral(),
-      name: this.name,
-      version: this._version,
-      arc: this._arc.id
-    })
-  }
-}
-
-class InMemoryVariable extends InMemoryStorageProvider {
-  constructor(type, arc, name, id) {
-    super(type, arc, name, id);
-    this._stored = null;
-  }
-
-  clone() {
-    var variable = new InMemoryVariable(this._type, this._arc, this.name, this.id);
-    variable.cloneFrom(this);
-    return variable;
-  }
-
-  cloneFrom(variable) {
-    this._stored = variable._stored;
-    this._version = variable._version;
-  }
-
-  traceInfo() {
-    return {stored: this._stored !== null};
-  }
-
-  async get() {
-    return this._stored;
-  }
-
-  async set(entity) {
-    this._stored = entity;
-    this._version++;
-    this._fire('change', {data: this._stored, version: this._version});
-  }
-
-  async clear() {
-    this.set(undefined);
-  }
-
-  extractEntities(set) {
-    if (!this._stored) {
-      return;
-    }
-    set.add(this._stored);
-  }
-
-  serialize(list) {
-    if (this._stored == undefined)
-      return;
-    list.push({
-      id: this.id,
-      sort: 'variable',
-      type: this.type.toLiteral(),
-      name: this.name,
-      value: this._stored.id,
-      version: this._version
-    });
-  }
-
-  serializeMappingRecord(list) {
-    list.push({
-      id: this.id,
-      sort: 'variable',
-      type: this.type.toLiteral(),
-      name: this.name,
-      version: this._version,
-      arc: this._arc.id
-    })
-  }
-}
-
-
-/***/ }),
-/* 11 */
+/* 9 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1846,7 +1359,7 @@ class Relation extends __WEBPACK_IMPORTED_MODULE_1__entity_js__["a" /* default *
 
 
 /***/ }),
-/* 12 */
+/* 10 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1989,13 +1502,13 @@ class Shape {
 
 
 /***/ }),
-/* 13 */
+/* 11 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js__ = __webpack_require__(25);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js__ = __webpack_require__(23);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_dom_particle_js__ = __webpack_require__(9);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_dom_particle_js__ = __webpack_require__(8);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -2065,14 +1578,14 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
 
 
 /***/ }),
-/* 14 */
+/* 12 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* WEBPACK VAR INJECTION */(function(global) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__type_js__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__handle_js__ = __webpack_require__(23);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__handle_js__ = __webpack_require__(21);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__api_channel_js__ = __webpack_require__(20);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__api_channel_js__ = __webpack_require__(18);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__particle_spec_js__ = __webpack_require__(3);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__schema_js__ = __webpack_require__(4);
 /**
@@ -2386,16 +1899,16 @@ class InnerPEC {
 
 /* harmony default export */ __webpack_exports__["a"] = (InnerPEC);
 
-/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(17)))
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(15)))
 
 /***/ }),
-/* 15 */
+/* 13 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_inner_PEC_js__ = __webpack_require__(14);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__browser_cdn_loader_js__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_inner_PEC_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__browser_cdn_loader_js__ = __webpack_require__(11);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -2418,7 +1931,7 @@ self.onmessage = function(e) {
 
 
 /***/ }),
-/* 16 */
+/* 14 */
 /***/ (function(module, exports) {
 
 // shim for using process in browser
@@ -2608,7 +2121,7 @@ process.umask = function() { return 0; };
 
 
 /***/ }),
-/* 17 */
+/* 15 */
 /***/ (function(module, exports) {
 
 var g;
@@ -2635,7 +2148,7 @@ module.exports = g;
 
 
 /***/ }),
-/* 18 */
+/* 16 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2649,7 +2162,7 @@ module.exports = g;
  * http://polymer.github.io/PATENTS.txt
  */
 
-var supportedTypes = ["Text", "URL"];
+var supportedTypes = ["Text", "URL", "Number", "Boolean"];
 
 class JsonldToManifest {
   static convert(jsonld, theClass) {
@@ -2749,7 +2262,7 @@ class JsonldToManifest {
 
 
 /***/ }),
-/* 19 */
+/* 17 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2764,7 +2277,7 @@ class JsonldToManifest {
 
 
 /***/ }),
-/* 20 */
+/* 18 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3095,7 +2608,7 @@ class PECInnerPort extends APIPort {
 
 
 /***/ }),
-/* 21 */
+/* 19 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3208,7 +2721,7 @@ let nob = () => Object.create(null);
 
 
 /***/ }),
-/* 22 */
+/* 20 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3223,17 +2736,16 @@ let nob = () => Object.create(null);
 
 
 /***/ }),
-/* 23 */
+/* 21 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__identifier_js__ = __webpack_require__(24);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__identifier_js__ = __webpack_require__(22);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__entity_js__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__relation_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__relation_js__ = __webpack_require__(9);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__symbols_js__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__in_memory_storage_js__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__particle_spec_js__ = __webpack_require__(3);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__particle_spec_js__ = __webpack_require__(3);
 /** @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
  * This code may only be used under the BSD style license found at
@@ -3242,7 +2754,6 @@ let nob = () => Object.create(null);
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-
 
 
 
@@ -3297,12 +2808,12 @@ class Handle {
   }
 
   generateID() {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__["a" /* default */])(this._view.generateID);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__["a" /* default */])(this._view.generateID);
     return this._view.generateID();
   }
 
   generateIDComponents() {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__["a" /* default */])(this._view.generateIDComponents);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__["a" /* default */])(this._view.generateIDComponents);
     return this._view.generateIDComponents();
   }
 
@@ -3318,7 +2829,7 @@ class Handle {
   }
 
   _restore(entry) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__["a" /* default */])(this.entityClass, "Handles need entity classes for deserialization");
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__["a" /* default */])(this.entityClass, "Handles need entity classes for deserialization");
     return restore(entry, this.entityClass);
   }
 
@@ -3420,7 +2931,7 @@ class Variable extends Handle {
     if (this.type.isEntity)
       return this._restore(result);
     if (this.type.isInterface)
-      return __WEBPACK_IMPORTED_MODULE_6__particle_spec_js__["a" /* default */].fromLiteral(result);
+      return __WEBPACK_IMPORTED_MODULE_5__particle_spec_js__["a" /* default */].fromLiteral(result);
     return result;
   }
 
@@ -3468,7 +2979,7 @@ function handleFor(view, isSet, canRead, canWrite) {
 
 
 /***/ }),
-/* 24 */
+/* 22 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3506,17 +3017,17 @@ class Identifier {
 
 
 /***/ }),
-/* 25 */
+/* 23 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(8);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_vm_web_js__ = __webpack_require__(19);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__fetch_web_js__ = __webpack_require__(22);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_vm_web_js__ = __webpack_require__(17);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__fetch_web_js__ = __webpack_require__(20);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__particle_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__dom_particle_js__ = __webpack_require__(9);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__converters_jsonldToManifest_js__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__dom_particle_js__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__converters_jsonldToManifest_js__ = __webpack_require__(16);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -3613,83 +3124,16 @@ class Loader {
 
 
 /***/ }),
-/* 26 */
+/* 24 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-
-
-function compareNulls(o1, o2) {
-  if (o1 == o2) return 0;
-  if (o1 == null) return -1;
-  return 1;
-}
-function compareStrings(s1, s2) {
-  if (s1 == null || s2 == null) return compareNulls(s1, s2);
-  return s1.localeCompare(s2);
-}
-function compareNumbers(n1, n2) {
-  if (n1 == null || n2 == null) return compareNulls(n1, n2);
-  return n1 - n2;
-}
-function compareBools(b1, b2) {
-  if (b1 == null || b2 == null) return compareNulls(b1, b2);
-  return b1 - b2;
-}
-function compareArrays(a1, a2, compare) {
-  __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(a1 != null);
-  __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(a2 != null);
-  if (a1.length != a2.length) return compareNumbers(a1.length, a2.length);
-  for (let i = 0; i < a1.length; i++) {
-    let result;
-    if ((result = compare(a1[i], a2[i])) != 0) return result;
-  }
-  return 0;
-}
-function compareObjects(o1, o2, compare) {
-  let keys = Object.keys(o1);
-  let result;
-  if ((result = compareNumbers(keys.length, Object.keys(o2).length)) != 0) return result;
-  for (let key of keys) {
-    if ((result = compare(o1[key], o2[key])) != 0) return result;
-  }
-  return 0;
-}
-function compareComparables(o1, o2) {
-  if (o1 == null || o2 == null) return compareNulls(o1, o2);
-  return o1._compareTo(o2);
-}
-
-/* harmony default export */ __webpack_exports__["a"] = ({
-  compareNulls,
-  compareStrings,
-  compareNumbers,
-  compareBools,
-  compareArrays,
-  compareObjects,
-  compareComparables,
-});
-
-
-/***/ }),
-/* 27 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__in_memory_storage_js__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__symbols_js__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__entity_js__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__schema_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__type_js__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__relation_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__symbols_js__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__entity_js__ = __webpack_require__(2);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__schema_js__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__type_js__ = __webpack_require__(1);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__relation_js__ = __webpack_require__(9);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -3707,11 +3151,13 @@ function compareComparables(o1, o2) {
 
 
 
-
 function testEntityClass(type) {
-  return new __WEBPACK_IMPORTED_MODULE_4__schema_js__["a" /* default */]({
+  return new __WEBPACK_IMPORTED_MODULE_3__schema_js__["a" /* default */]({
     name: type,
-    sections: [],
+    sections: [{
+      sectionType: 'normative',
+      fields: {'id': 'Number', 'value': 'Text'}
+    }],
     parents: [],
   }).entityClass();
 }
@@ -3719,121 +3165,21 @@ function testEntityClass(type) {
 let BasicEntity = testEntityClass('BasicEntity');
 
 /* unused harmony default export */ var _unused_webpack_default_export = ({
-  Entity: __WEBPACK_IMPORTED_MODULE_3__entity_js__["a" /* default */],
+  Entity: __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */],
   BasicEntity,
-  Relation: __WEBPACK_IMPORTED_MODULE_6__relation_js__["a" /* default */],
+  Relation: __WEBPACK_IMPORTED_MODULE_5__relation_js__["a" /* default */],
   testing: {
     testEntityClass,
   },
   internals: {
-    identifier: __WEBPACK_IMPORTED_MODULE_2__symbols_js__["a" /* default */].identifier,
-    Type: __WEBPACK_IMPORTED_MODULE_5__type_js__["a" /* default */],
+    identifier: __WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier,
+    Type: __WEBPACK_IMPORTED_MODULE_4__type_js__["a" /* default */],
   }
 });
 
 
 /***/ }),
-/* 28 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__tracelib_trace_js__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__ = __webpack_require__(0);
-// @license
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-
-
-
-
-
-class Scheduler {
-  constructor() {
-    this.frameQueue = [];
-    this.targetMap = new Map();
-    this._finishNotifiers = [];
-    this._idle = Promise.resolve();
-    this._idleResolver = null;
-  }
-
-  enqueue(view, eventRecords) {
-    var trace = __WEBPACK_IMPORTED_MODULE_0__tracelib_trace_js__["a" /* default */].flow({cat: 'view', name: 'ViewBase::_fire flow'}).start();
-    if (this.frameQueue.length == 0 && eventRecords.length > 0)
-      this._asyncProcess();
-    if (!this._idleResolver) {
-      this._idle = new Promise((resolve, reject) => this._idleResolver = resolve);
-    }
-    for (var record of eventRecords) {
-      var frame = this.targetMap.get(record.target);
-      if (frame == undefined) {
-        frame = {target: record.target, views: new Map(), traces: []};
-        this.frameQueue.push(frame);
-        this.targetMap.set(record.target, frame);
-      }
-      frame.traces.push(trace);
-      var viewEvents = frame.views.get(view);
-      if (viewEvents == undefined) {
-        viewEvents = new Map();
-        frame.views.set(view, viewEvents);
-      }
-      var kindEvents = viewEvents.get(record.kind);
-      if (kindEvents == undefined) {
-        kindEvents = [];
-        viewEvents.set(record.kind, kindEvents);
-      }
-      kindEvents.push(record);
-    }
-  }
-
-  get busy() {
-    return this.frameQueue.length > 0;
-  }
-
-  get idle() {
-    return this._idle;
-  }
-
-  _asyncProcess() {
-    Promise.resolve().then(() => {
-      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(this.frameQueue.length > 0, "_asyncProcess should not be invoked with 0 length queue");
-      let frame = this.frameQueue.shift();
-      this.targetMap.delete(frame.target);
-      if (this.frameQueue.length > 0)
-        this._asyncProcess();
-      this._applyFrame(frame);
-      if (this.frameQueue.length == 0) {
-        this._idleResolver();
-        this._idleResolver = null;
-      }
-    });
-  }
-
-  _applyFrame(frame) {
-    var trace = __WEBPACK_IMPORTED_MODULE_0__tracelib_trace_js__["a" /* default */].start({cat: 'scheduler', name: 'Scheduler::_applyFrame', args: {target: frame.target ? frame.target.constructor.name : "NULL TARGET"}});
-
-    var totalRecords = 0;
-    for (let [view, kinds] of frame.views.entries()) {
-      for (let [kind, records] of kinds.entries()) {
-        var record = records[records.length - 1];
-        record.callback(record.details);
-      }
-    }
-
-    frame.traces.forEach(trace => trace.end());
-
-    trace.end();
-  }
-}
-
-/* harmony default export */ __webpack_exports__["a"] = (new Scheduler());
-
-
-/***/ }),
-/* 29 */
+/* 25 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3873,6 +3219,256 @@ class TypeVariable {
 
 /* harmony default export */ __webpack_exports__["a"] = (TypeVariable);
 
+
+/***/ }),
+/* 26 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(7);
+/*
+  Copyright 2015 Google Inc. All Rights Reserved.
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+      http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+
+
+var events = [];
+if (typeof document == 'object') {
+  var pid = 42;
+  var now = function() {
+    var t = performance.now();
+    return t;
+  }
+} else {
+  var pid = process.pid;
+  var now = function() {
+    var t = process.hrtime();
+    return t[0] * 1000000 + t[1] / 1000;
+  }
+}
+
+var flowId = 0;
+
+function parseInfo(info) {
+  if (!info)
+    return {};
+  if (typeof info == 'function')
+    return parseInfo(info());
+  if (info.toTraceInfo)
+    return parseInfo(info.toTraceInfo());
+  return info;
+}
+
+let module = {exports: {}};
+/* harmony default export */ __webpack_exports__["a"] = (module.exports);
+module.exports.enabled = false;
+module.exports.enable = function() {
+  module.exports.enabled = true;
+  init();
+};
+
+// TODO: Add back support for options.
+//module.exports.options = options;
+//var enabled = Boolean(options.traceFile);
+
+function init() {
+  var result = {
+    wait: function(f) {
+      if (f instanceof Function) {
+        return f();
+      }
+      return f;
+    },
+    resume: function() {
+      return this;
+    },
+    start: function() {
+      return this;
+    },
+    end: function() {
+      return this;
+    },
+    step: function() {
+      return this;
+    },
+    endWrap: function(fn) {
+      return fn;
+    },
+  };
+  module.exports.wrap = function(info, fn) {
+    return fn;
+  };
+  module.exports.start = function(info, fn) {
+    return result;
+  };
+  module.exports.async = function(info, fn) {
+    return result;
+  };
+  module.exports.flow = function(info, fn) {
+    return result;
+  };
+  module.exports.dump = function() {
+  };
+
+  if (!module.exports.enabled) {
+    return;
+  }
+
+  module.exports.wrap = function(info, fn) {
+    return function() {
+      var t = module.exports.start(info);
+      try {
+        return fn.apply(this, arguments);
+      } finally {
+        t.end();
+      }
+    };
+  };
+  module.exports.start = function(info) {
+    info = parseInfo(info);
+    let args = info.args || {};
+    let begin = now();
+    return {
+      end: function(endInfo) {
+        if (endInfo && endInfo.args) {
+          Object.assign(args, endInfo.args);
+        }
+        var end = now();
+        events.push({
+          ph: 'X',
+          ts: begin,
+          dur: end - begin,
+          cat: info.cat,
+          name: info.name,
+          args: args,
+        });
+      },
+    };
+  };
+  // TODO: perhaps this should just be the only API, it acts the same as
+  //       start() when there is no call to wait/resume().
+  module.exports.async = function(info) {
+    let trace = module.exports.start(info);
+    let flow;
+    let baseInfo = {cat: info.cat, name: info.name + ' (async)'};
+    let n = 0;
+    return {
+      async wait(v) {
+        let result;
+        if (v instanceof Promise) {
+          result = f;
+        } else {
+          result = v();
+        }
+        if (!flow) {
+          flow = module.exports.flow(baseInfo).start();
+        }
+        trace.end();
+        trace = null;
+        return result;
+      },
+      resume(info) {
+        if (info) {
+          Object.assign(info, baseInfo);
+        } else {
+          info = baseInfo;
+        }
+        trace = module.exports.start(info);
+        flow.step(baseInfo);
+      },
+      end(endInfo) {
+        if (flow) {
+          flow.end();
+        }
+        trace.end(endInfo);
+      },
+    };
+  };
+  module.exports.flow = function(info) {
+    info = parseInfo(info);
+    var id = flowId++;
+    var started = false;
+    return {
+      start: function() {
+        var begin = now();
+        started = true;
+        events.push({
+          ph: 's',
+          ts: begin,
+          cat: info.cat,
+          name: info.name,
+          args: info.args,
+          id: id,
+        });
+        return this;
+      },
+      end: function(endInfo) {
+        if (!started) return;
+        var end = now();
+        endInfo = parseInfo(endInfo);
+        events.push({
+          ph: 'f',
+          bp: 'e', // binding point is enclosing slice.
+          ts: end,
+          cat: info.cat,
+          name: info.name,
+          args: endInfo && endInfo.args,
+          id: id,
+        });
+        return this;
+      },
+      step: function(stepInfo) {
+        if (!started) return;
+        var step = now();
+        stepInfo = parseInfo(stepInfo);
+        events.push({
+          ph: 't',
+          ts: step,
+          cat: info.cat,
+          name: info.name,
+          args: stepInfo && stepInfo.args,
+          id: id,
+        });
+        return this;
+      },
+    };
+  };
+  module.exports.save = function() {
+    events.forEach(function(event) {
+      event.pid = pid;
+      event.tid = 0;
+      if (!event.args) {
+        delete event.args;
+      }
+      if (!event.cat) {
+        event.cat = '';
+      }
+    });
+    return {traceEvents: events};
+  };
+  module.exports.dump = function() {
+    __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__["a" /* default */].writeFileSync(options.traceFile, module.exports.save());
+  };
+  module.exports.download = function() {
+    let a = document.createElement('a');
+    a.download = 'trace.json';
+    a.href = 'data:text/plain;base64,' + btoa(JSON.stringify(module.exports.save()));
+    a.click();
+  };
+}
+
+init();
+
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(14)))
 
 /***/ })
 /******/ ]);

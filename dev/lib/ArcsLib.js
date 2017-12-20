@@ -63,7 +63,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 36);
+/******/ 	return __webpack_require__(__webpack_require__.s = 37);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -93,13 +93,13 @@ function assert(test, message) {
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__strategizer_strategizer_js__ = __webpack_require__(2);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__connection_constraint_js__ = __webpack_require__(53);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__particle_js__ = __webpack_require__(55);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__connection_constraint_js__ = __webpack_require__(55);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__particle_js__ = __webpack_require__(57);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__search_js__ = __webpack_require__(27);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__slot_js__ = __webpack_require__(57);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__view_js__ = __webpack_require__(60);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__slot_js__ = __webpack_require__(59);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__view_js__ = __webpack_require__(62);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__util_js__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__digest_web_js__ = __webpack_require__(54);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__digest_web_js__ = __webpack_require__(56);
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
 // http://polymer.github.io/LICENSE.txt
@@ -324,7 +324,9 @@ class Recipe {
     let seenParticles = new Set();
     let particles = [];
     let views = [];
-    for (let connection of connections) {
+    // Reorder connections so that interfaces come last.
+    // TODO: update view-connection comparison method instead?
+    for (let connection of connections.filter(c => !c.type || !c.type.isInterface).concat(connections.filter(c => !!c.type && !!c.type.isInterface))) {
       if (!seenParticles.has(connection.particle)) {
         particles.push(connection.particle);
         seenParticles.add(connection.particle);
@@ -811,7 +813,7 @@ class Strategy {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__recipe_js__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__walker_base_js__ = __webpack_require__(61);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__walker_base_js__ = __webpack_require__(63);
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
 // http://polymer.github.io/LICENSE.txt
@@ -888,9 +890,9 @@ Walker.Independent = __WEBPACK_IMPORTED_MODULE_1__walker_base_js__["a" /* defaul
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(17);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__schema_js__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(80);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(84);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -1023,9 +1025,7 @@ class Type {
     if (this.tag !== type.tag)
       return false;
     if (this.tag == 'Entity') {
-      // TODO: Remove this hack that allows the old resolver to match
-      //       types by schema name.
-      return this.data.name == type.data.name;
+      return this.data.equals(type.data);
     }
     if (this.isSetView) {
       return this.data.equals(type.data);
@@ -1109,9 +1109,13 @@ class Type {
       return `[${this.variableName}]`;
     if (this.isVariableReference)
       return `[${this.variableReferenceName}]`;
-    if (this.isEntity)
+    if (this.isEntity) {
       // Spit MyTypeFOO to My Type FOO
-      return this.entitySchema.name.replace(/([^A-Z])([A-Z])/g, "$1 $2").replace(/([A-Z][^A-Z])/g, " $1").trim();
+      if (this.entitySchema.name) {
+        return this.entitySchema.name.replace(/([^A-Z])([A-Z])/g, "$1 $2").replace(/([A-Z][^A-Z])/g, " $1").trim();
+      } 
+      return JSON.stringify(this.entitySchema._model);
+    }
     if (this.isManifestReference)
       return this.manifestReferenceName;
     if (this.isInterface)
@@ -1465,7 +1469,7 @@ class RecipeUtil {
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__type_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__entity_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__entity_js__ = __webpack_require__(12);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -1505,7 +1509,46 @@ class Schema {
   }
 
   equals(otherSchema) {
-    return this.toLiteral() == otherSchema.toLiteral();
+    return this === otherSchema || (this.name == otherSchema.name
+       // TODO: Check equality without calling contains.
+       && this.contains(otherSchema)
+       && otherSchema.contains(this));
+  }
+
+  contains(otherSchema) {
+    if (!this.containsAncestry(otherSchema)) {
+      return false;
+    }
+    for (let section of ['normative', 'optional']) {
+      let thisSection = this[section];
+      let otherSection = otherSchema[section];
+      for (let field in otherSection) {
+        if (thisSection[field] != otherSection[field]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  containsAncestry(otherSchema) {
+    if (this.name == otherSchema.name) {
+      nextOtherParent: for (let otherParent of otherSchema.parents) {
+        for (let parent of this.parents) {
+          if (parent.containsAncestry(otherParent)) {
+            continue nextOtherParent;
+          }
+        }
+        return false;
+      }
+      return true;
+    } else {
+      for (let parent of this.parents) {
+        if (parent.containsAncestry(otherSchema)) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   get type() {
@@ -1530,37 +1573,63 @@ class Schema {
 
   entityClass() {
     let schema = this;
-    const className = this.name;
-    var properties = Object.keys(this.normative).concat(Object.keys(this.optional));
-    var classJunk = ['toJSON', 'prototype', 'toString', 'inspect'];
+    let className = this.name;
+    let normative = this.normative;
+    let optional = this.optional;
+    let classJunk = ['toJSON', 'prototype', 'toString', 'inspect'];
 
-    var clazz = class extends __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */] {
+    let checkFieldIsValidAndGetTypes = (name, op) => {
+      let fieldType = normative[name] || optional[name];
+      switch (fieldType) {
+        case undefined:
+          throw new Error(`Can't ${op} field ${name} not in schema ${className}`);
+        case 'Number':
+          return [fieldType, 'number'];
+        case 'Boolean':
+          return [fieldType, 'boolean']
+        case 'Object':
+          return [fieldType, 'object']
+        default:
+          // Text, URL
+          return [fieldType, 'string'];
+      }
+    };
+
+    let clazz = class extends __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */] {
       constructor(data, userIDComponent) {
-        var p = new Proxy(data, {
+        super(userIDComponent);
+        this.rawData = new Proxy({}, {
           get: (target, name) => {
             if (classJunk.includes(name))
               return undefined;
             if (name.constructor == Symbol)
               return undefined;
-            if (!properties.includes(name))
-              throw new Error(`Can't access field ${name} not in schema ${className}`);
-            return target[name];
+            let [fieldType, jsType] = checkFieldIsValidAndGetTypes(name, 'get');
+            let value = target[name];
+            __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(value === undefined || value === null || typeof(value) == jsType,
+                   `Field ${name} (type ${fieldType}) has value ${value} (type ${typeof(value)})`);
+            return value;
           },
           set: (target, name, value) => {
-            if (!properties.includes(name)) {
-              throw new Error(`Can't write field ${name} not in schema ${className}`);
+            let [fieldType, jsType] = checkFieldIsValidAndGetTypes(name, 'set');
+            if (value !== undefined && value !== null && typeof(value) != jsType) {
+              throw new TypeError(
+                  `Can't set field ${name} (type ${fieldType}) to value ${value} (type ${typeof(value)})`);
             }
             target[name] = value;
             return true;
           }
         });
-        super(userIDComponent);
-        this.rawData = p;
+        for (let [name, value] of Object.entries(data)) {
+          this.rawData[name] = value;
+        }
       }
 
       dataClone() {
-        var clone = {};
-        properties.forEach(prop => clone[prop] = this.rawData[prop]);
+        let clone = {};
+        for (let propertyList of [normative, optional]) {
+          Object.keys(propertyList).forEach(prop => clone[prop] = this.rawData[prop]);
+        }
         return clone;
       }
 
@@ -1574,28 +1643,19 @@ class Schema {
 
     Object.defineProperty(clazz, 'type', {value: this.type});
     Object.defineProperty(clazz, 'name', {value: this.name});
-    for (let property in this.normative) {
-      // TODO: type checking, make a distinction between normative
-      // and optional properties.
-      // TODO: add query / getter functions for user properties
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
-    }
-    for (let property in this.optional) {
-      Object.defineProperty(clazz.prototype, property, {
-        get: function() {
-          return this.rawData[property];
-        },
-        set: function(v) {
-          this.rawData[property] = v;
-        }
-      });
+    // TODO: make a distinction between normative and optional properties.
+    // TODO: add query / getter functions for user properties
+    for (let propertyList of [normative, optional]) {
+      for (let property in propertyList) {
+        Object.defineProperty(clazz.prototype, property, {
+          get: function() {
+            return this.rawData[property];
+          },
+          set: function(v) {
+            this.rawData[property] = v;
+          }
+        });
+      }
     }
     return clazz;
   }
@@ -1635,7 +1695,7 @@ class Schema {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(21);
+/* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(20);
 /*
   Copyright 2015 Google Inc. All Rights Reserved.
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -1878,7 +1938,7 @@ function init() {
 
 init();
 
-/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(20)))
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(19)))
 
 /***/ }),
 /* 9 */
@@ -1886,9 +1946,9 @@ init();
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__type_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(17);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__ = __webpack_require__(0);
-  /**
+/**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
  * This code may only be used under the BSD style license found at
@@ -2010,8 +2070,9 @@ class ParticleSpec {
   }
 
   static fromLiteral(literal) {
-    literal.args.forEach(a => a.type = __WEBPACK_IMPORTED_MODULE_0__type_js__["a" /* default */].fromLiteral(a.type));
-    return new ParticleSpec(literal);
+    let {args, name, verbs, transient, description, implFile, affordance, slots} = literal;
+    args = args.map(({type, direction, name}) => ({type: __WEBPACK_IMPORTED_MODULE_0__type_js__["a" /* default */].fromLiteral(type), direction, name}));
+    return new ParticleSpec({args, name, verbs, transient, description, implFile, affordance, slots});
   }
 
   validateDescription(description) {
@@ -2073,16 +2134,455 @@ class ParticleSpec {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__build_manifest_parser_js__ = __webpack_require__(43);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__build_manifest_parser_js___default = __webpack_require__.n(__WEBPACK_IMPORTED_MODULE_1__build_manifest_parser_js__);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__type_js__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__particle_spec_js__ = __webpack_require__(9);
+/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+
+
+
+
+
+class Description {
+  constructor(arc) {
+    this._arc = arc;
+    this._recipe = arc._activeRecipe;
+    this._relevance = null;
+  }
+  get arc() { return this._arc; }
+  get recipe() { return this._recipe; }
+  get relevance() { return this._relevance; }
+  set relevance(relevance) { this._relevance = relevance; }
+
+  async getRecipeSuggestion(particles, formatterClass) {
+    let desc = await new (formatterClass || DescriptionFormatter)(this).getRecipeSuggestion(particles);
+    if (desc) {
+      return desc;
+    }
+
+    return this._recipe.name;
+  }
+
+  async getViewDescription(recipeView) {
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(recipeView.connections.length > 0, 'view has no connections?');
+
+    let formatter = new DescriptionFormatter(this);
+    formatter.excludeValues = true;
+    return await formatter.getViewDescription(recipeView);
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = Description;
+
+
+class DescriptionFormatter {
+  constructor(description) {
+    this._description = description;
+    this._arc = description._arc;
+    this._particleDescriptions = [];
+    // this._updateDescriptionHandles(description);
+
+    this.seenViews = new Set();
+    this.seenParticles = new Set();
+    this.excludeValues = false;
+  }
+
+  async getRecipeSuggestion(particles) {
+    await this._updateDescriptionHandles(this._description);
+
+    // Choose particles that render UI, sort them by rank and generate suggestions.
+    let particlesSet = new Set(particles || this._particleDescriptions.map(pDesc => pDesc._particle));
+    let selectedDescriptions = this._particleDescriptions
+      .filter(desc => { return particlesSet.has(desc._particle) && desc._particle.spec.slots.size > 0 && this._isSelectedDescription(desc); })
+      .sort(DescriptionFormatter.sort);
+
+    if (selectedDescriptions.length > 0) {
+      return this._combineSelectedDescriptions(selectedDescriptions);
+    }
+  }
+
+  _isSelectedDescription(desc) {
+    return !!desc.pattern;
+  }
+
+  async getViewDescription(recipeView) {
+    await this._updateDescriptionHandles(this._description);
+
+    let viewConnection = this._selectViewConnection(recipeView) || recipeView.connections[0];
+    let view = this._arc.findViewById(recipeView.id);
+    return this._formatDescription(viewConnection, view);
+  }
+
+  async _updateDescriptionHandles(description) {
+    await Promise.all(description.recipe.particles.map(async particle => {
+      let pDesc = {
+        _particle: particle,
+        _connections: {}
+      };
+      if (description.relevance) {
+        pDesc._rank = description.relevance.calcParticleRelevance(particle);
+      }
+
+      let descByName = await this._getPatternByNameFromDescriptionHandle(particle) || {};
+      pDesc = Object.assign(pDesc, this._populateParticleDescription(particle, descByName));
+      Object.values(particle.connections).forEach(viewConn => {
+        let specConn = particle.spec.connectionMap.get(viewConn.name);
+        let pattern = descByName[viewConn.name] || specConn.pattern;
+        if (pattern) {
+          let viewDescription = {pattern: pattern, _viewConn: viewConn, _view: this._arc.findViewById(viewConn.view.id)};
+          pDesc._connections[viewConn.name] = viewDescription;
+        }
+      });
+      this._particleDescriptions.push(pDesc);
+    }));
+  }
+
+  async _getPatternByNameFromDescriptionHandle(particle) {
+    let descriptionConn = particle.connections["descriptions"];
+    if (descriptionConn && descriptionConn.view && descriptionConn.view.id) {
+      let descView = this._arc.findViewById(descriptionConn.view.id);
+      if (descView) {
+        let descList = await descView.toList();
+        let descByName = {};
+        descList.forEach(d => descByName[d.rawData.key] = d.rawData.value);
+        return descByName;
+      }
+    }
+  }
+
+  _populateParticleDescription(particle, descriptionByName) {
+    let pattern = descriptionByName["_pattern_"] || particle.spec.pattern;
+    return pattern ? {pattern} : {};
+  }
+
+  async _combineSelectedDescriptions(selectedDescriptions) {
+    let suggestions = [];
+    await Promise.all(selectedDescriptions.map(async particle => {
+      if (!this.seenParticles.has(particle._particle)) {
+        suggestions.push(await this.patternToSuggestion(particle.pattern, particle));
+      }
+    }));
+    return this._capitalizeAndPunctuate(this._joinDescriptions(suggestions));
+  }
+
+  _joinDescriptions(strings) {
+    let nonEmptyStrings = strings.filter(str => !!str);
+    let count = nonEmptyStrings.length;
+    // Combine descriptions into a sentence:
+    // "A."
+    // "A and b."
+    // "A, b, ..., and z." (Oxford comma ftw)
+    let delim = ['', '', ' and ', ', and '][Math.min(3, count)];
+    return nonEmptyStrings.slice(0, -1).join(", ") + delim + strings.pop();
+  }
+
+  _joinTokens(tokens) {
+    return tokens.join('');
+  }
+
+  _capitalizeAndPunctuate(sentence) {
+    // "Capitalize, punctuate."
+    return sentence[0].toUpperCase() + sentence.slice(1) + '.';
+  }
+
+  async patternToSuggestion(pattern, particleDescription) {
+    this._tokens = this._initTokens(pattern, particleDescription._particle);
+    return this._joinTokens(await Promise.all(this._tokens.map(async token => await this.tokenToString(token))));
+  }
+
+  _initTokens(pattern, particle) {
+    pattern = pattern.replace(/</g, '&lt;');
+    let results = [];
+    while (pattern.length  > 0) {
+      let tokens = pattern.match(/\${[a-zA-Z0-9\.]+}(?:\.[_a-zA-Z]+)?/g);
+      if (tokens) {
+        var firstToken = tokens[0];
+        var tokenIndex = pattern.indexOf(firstToken);
+      } else {
+        var firstToken = "";
+        var tokenIndex = pattern.length;
+      }
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(tokenIndex >= 0);
+      let nextToken = pattern.substring(0, tokenIndex);
+      if (nextToken.length > 0)
+        results.push({text: nextToken});
+      if (firstToken.length > 0) {
+        results.push(this._initHandleToken(firstToken, particle));
+      }
+      pattern = pattern.substring(tokenIndex + firstToken.length);
+    }
+    return results;
+  }
+
+  _initHandleToken(pattern, particle) {
+    let valueTokens = pattern.match(/\${([a-zA-Z0-9\.]+)}(?:\.([_a-zA-Z]+))?/);
+    let handleNames = valueTokens[1].split('.');
+    let extra = valueTokens.length == 3 ? valueTokens[2] : undefined;
+    let valueToken;
+    let viewConn = particle.connections[handleNames[0]];
+    if (viewConn) {  // view connection
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(viewConn.view && viewConn.view.id, 'Missing id???');
+      return {
+        fullName: valueTokens[0],
+        viewName: viewConn.name,
+        properties: handleNames.splice(1),
+        extra,
+        _viewConn: viewConn,
+        _view: this._arc.findViewById(viewConn.view.id)};
+    }
+
+    // slot connection
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(handleNames.length == 2, 'slot connections tokens must have 2 names');
+    let providedSlotConn = particle.consumedSlotConnections[handleNames[0]].providedSlots[handleNames[1]];
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(providedSlotConn, `Could not find handle ${handleNames.join('.')}`);
+    return {fullName: valueTokens[0], consumeSlotName: handleNames[0], provideSlotName: handleNames[1], extra, _providedSlotConn: providedSlotConn};
+  }
+
+  async tokenToString(token) {
+    if (token.text) {
+      return token.text;
+    }
+    if (token.viewName) {
+      return this._viewTokenToString(token);
+    } else  if (token.consumeSlotName && token.provideSlotName) {
+      return this._slotTokenToString(token);
+    }
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(false, 'no view or slot name');
+  }
+
+  async _viewTokenToString(token) {
+    switch (token.extra) {
+      case "_type_":
+        return token._viewConn.type.toPrettyString().toLowerCase();
+      case "_values_":
+        return this._formatViewValue(token.viewName, token._view);
+      case "_name_":
+        return this._formatDescription(token._viewConn, token._view);
+      default:
+        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!token.extra, `Unrecognized extra ${token.extra}`);
+
+        // Transformation's hosted particle.
+        if (token._viewConn.type.isInterface) {
+          let particleSpec = __WEBPACK_IMPORTED_MODULE_2__particle_spec_js__["a" /* default */].fromLiteral(await token._view.get());
+          // TODO: call this.patternToSuggestion(...) to resolved expressions in the pattern template.
+          return particleSpec.pattern;
+        }
+
+        // singleton view property.
+        if (token.properties && token.properties.length > 0) {
+          return this._propertyTokenToString(token.viewName, token._view, token.properties);
+        }
+
+        // full view description
+        let description = (await this._formatDescriptionPattern(token._viewConn)) ||
+                          this._formatViewDescription(token._viewConn, token._view);
+        let viewValue = await this._formatViewValue(token.viewName, token._view);
+        if (!description) {
+          // For singleton view, if there is no real description (the type was used), use the plain value for description.
+          if (viewValue && !token._view.type.isSetView && !this.excludeValues) {
+            return viewValue;
+          }
+        }
+
+        description = description || this._formatViewType(token._viewConn);
+        if (viewValue && !this.excludeValues && !this.seenViews.has(token._view.id)) {
+          this.seenViews.add(token._view.id);
+          return this._combineDescriptionAndValue(token, description, viewValue);
+        }
+        return description;
+    }
+  }
+
+  _combineDescriptionAndValue(token, description, viewValue) {
+    return `${description} (${viewValue})`;
+  }
+
+  async _slotTokenToString(token) {
+    switch (token.extra) {
+      case '_empty_':
+        // TODO: also return false, if the consuming particles generate an empty description.
+        return token._providedSlotConn.consumeConnections.length == 0;
+      default:
+        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!token.extra, `Unrecognized slot extra ${token.extra}`);
+    }
+
+    let results = (await Promise.all(token._providedSlotConn.consumeConnections.map(async consumeConn => {
+      let particle = consumeConn.particle;
+      let particleDescription = this._particleDescriptions.find(desc => desc._particle == particle);
+      this.seenParticles.add(particle);
+      return this.patternToSuggestion(particle.spec.pattern, particleDescription);
+    })));
+
+    return this._joinDescriptions(results);
+  }
+
+  async _propertyTokenToString(viewName, view, properties) {
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!view.type.isSetView, `Cannot return property ${properties.join(",")} for set-view`);
+    // Use singleton value's property (eg. "09/15" for person's birthday)
+    let viewVar = await view.get();
+    if (viewVar) {
+      let value = viewVar.rawData;
+      properties.forEach(p => {
+        if (value) {
+          value = value[p];
+        }
+      });
+      if (value) {
+        return this._formatEntityProperty(viewName, properties, value);
+      }
+    }
+  }
+
+  _formatEntityProperty(viewName, properties, value) {
+    return value;
+  }
+
+  async _formatViewValue(viewName, view) {
+    if (!view) {
+      return;
+    }
+    if (view.type.isSetView) {
+      let viewList = await view.toList();
+      if (viewList && viewList.length > 0) {
+        return this._formatSetView(viewName, viewList);
+      }
+    } else {
+      let viewVar = await view.get();
+      if (viewVar) {
+        return this._formatSingleton(viewName, viewVar);
+      }
+    }
+  }
+
+  _formatSetView(viewName, viewList) {
+    if (viewList[0].rawData.name) {
+      if (viewList.length > 2) {
+        return `${viewList[0].rawData.name} plus ${viewList.length-1} other items`;
+      }
+      return viewList.map(v => v.rawData.name).join(", ");
+    } else {
+      return `${viewList.length} items`;
+    }
+  }
+
+  _formatSingleton(viewName, viewVar) {
+    if (viewVar.rawData.name) {
+      return viewVar.rawData.name;
+    }
+  }
+
+  async _formatDescription(viewConnection, view) {
+    return (await this._formatDescriptionPattern(viewConnection)) ||
+           this._formatViewDescription(viewConnection, view) ||
+           this._formatViewType(viewConnection);
+  }
+
+  async _formatDescriptionPattern(viewConnection) {
+    let chosenConnection = viewConnection;
+
+    // For "out" connection, use its own description
+    // For "in" connection, use description of the highest ranked out connection with description.
+    if (!chosenConnection.spec.isOutput) {
+      let otherConnection = this._selectViewConnection(viewConnection.view);
+      if (otherConnection) {
+        chosenConnection = otherConnection;
+      }
+    }
+
+    let chosenParticleDescription = this._particleDescriptions.find(desc => desc._particle == chosenConnection.particle);
+    let viewDescription = chosenParticleDescription ? chosenParticleDescription._connections[chosenConnection.name] : null;
+    // Add description to result array.
+    if (viewDescription) {
+      // Add the connection spec's description pattern.
+      return await this.patternToSuggestion(viewDescription.pattern, chosenParticleDescription)
+    }
+  }
+  _formatViewDescription(viewConn, view) {
+    if (view && view.description) {
+      let viewType = this._formatViewType(viewConn);
+      // Use the view description available in the arc (if it is different than type name.
+      if (view.description != viewType) {
+        return view.description;
+      }
+    }
+  }
+  _formatViewType(viewConnection) {
+    return viewConnection.type.toPrettyString().toLowerCase();
+  }
+
+  _selectViewConnection(recipeView) {
+    let possibleConnections = recipeView.connections.filter(connection => {
+      // Choose connections with patterns (manifest-based or dynamic).
+      let connectionSpec = connection.spec;
+      let particleDescription = this._particleDescriptions.find(desc => desc._particle == connection.particle);
+      return !!connectionSpec.pattern || !!particleDescription._connections[connection.name];
+    });
+
+    possibleConnections.sort((c1, c2) => {
+      let isOutput1 = c1.spec.isOutput;
+      let isOutput2 = c2.spec.isOutput;
+      if (isOutput1 != isOutput2) {
+        // Prefer output connections
+        return isOutput1 ? -1 : 1;
+      }
+
+      let d1 = this._particleDescriptions.find(desc => desc._particle == c1.particle);
+      let d2 = this._particleDescriptions.find(desc => desc._particle == c2.particle);
+      // Sort by particle's rank in descending order.
+      return d2._rank - d1._rank;
+    });
+
+    if (possibleConnections.length > 0) {
+      return possibleConnections[0];
+    }
+  }
+
+  static sort(p1, p2) {
+    // Root slot comes first.
+    let hasRoot1 = [...p1._particle.spec.slots.keys()].indexOf("root") >= 0;
+    let hasRoot2 = [...p2._particle.spec.slots.keys()].indexOf("root") >= 0;
+    if (hasRoot1 != hasRoot2) {
+      return hasRoot1 ? -1 : 1;
+    }
+
+    // Sort by rank
+    if (p1._rank != p2._rank) {
+      return p2._rank - p1._rank;
+    }
+
+    // Sort by number of singleton slots.
+    let p1Slots = 0, p2Slots = 0;
+    p1._particle.spec.slots.forEach((slotSpec) => { if (!slotSpec.isSet) ++p1Slots; });
+    p2._particle.spec.slots.forEach((slotSpec) => { if (!slotSpec.isSet) ++p2Slots; });
+    return p2Slots - p1Slots;
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["b"] = DescriptionFormatter;
+
+
+
+/***/ }),
+/* 11 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__build_manifest_parser_js__ = __webpack_require__(45);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__recipe_recipe_js__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__particle_spec_js__ = __webpack_require__(9);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__schema_js__ = __webpack_require__(7);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__recipe_search_js__ = __webpack_require__(27);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__shape_js__ = __webpack_require__(18);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__shape_js__ = __webpack_require__(17);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__type_js__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__recipe_util_js__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__storage_provider_factory_js__ = __webpack_require__(31);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__storage_storage_provider_factory_js__ = __webpack_require__(32);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -2105,7 +2605,7 @@ class ParticleSpec {
 
 
 class Manifest {
-  constructor() {
+  constructor({id}) {
     this._recipes = [];
     this._imports = [];
     // TODO: These should be lists, possibly with a separate flattened map.
@@ -2116,8 +2616,8 @@ class Manifest {
     this._viewTags = new Map();
     this._fileName = null;
     this._nextLocalID = 0;
-    this._id = null;
-    this._storageProviderFactory = new __WEBPACK_IMPORTED_MODULE_9__storage_provider_factory_js__["a" /* default */](this);
+    this._id = id;
+    this._storageProviderFactory = new __WEBPACK_IMPORTED_MODULE_9__storage_storage_provider_factory_js__["a" /* default */](this);
   }
   get id() {
     return this._id;
@@ -2147,8 +2647,8 @@ class Manifest {
 
   // TODO: newParticle, Schema, etc.
   // TODO: simplify() / isValid().
-  newView(type, name, id, tags) {
-    let view = this._storageProviderFactory.construct(id, type, 'in-memory');
+  async newView(type, name, id, tags) {
+    let view = await this._storageProviderFactory.construct(id, type, `in-memory://${this.id}`);
     view.name = name;
     this._views.push(view);
     this._viewTags.set(view, tags ? tags : []);
@@ -2174,6 +2674,15 @@ class Manifest {
   }
   findSchemaByName(name) {
     return this._find(manifest => manifest._schemas[name]);
+  }
+  findTypeByName(name) {
+    let schema = this.findSchemaByName(name);
+    if (schema)
+      return __WEBPACK_IMPORTED_MODULE_7__type_js__["a" /* default */].newEntity(schema);
+    let shape = this.findShapeByName(name);
+    if (shape)
+      return __WEBPACK_IMPORTED_MODULE_7__type_js__["a" /* default */].newInterface(shape);
+    return null;
   }
   findParticleByName(name) {
     return this._find(manifest => manifest._particles[name]);
@@ -2253,13 +2762,12 @@ ${e.message}
 
     let items = [];
     try{
-      items = __WEBPACK_IMPORTED_MODULE_1__build_manifest_parser_js___default.a.parse(content);
+      items = __WEBPACK_IMPORTED_MODULE_1__build_manifest_parser_js__["a" /* default */].parse(content);
     } catch (e) {
       throw processError(e);
     }
-    let manifest = new Manifest();
+    let manifest = new Manifest({id});
     manifest._fileName = fileName;
-    manifest._id = id;
 
     for (let item of items.filter(item => item.kind == 'import')) {
       let path = loader.path(manifest.fileName);
@@ -2281,7 +2789,7 @@ ${e.message}
         await this._processView(manifest, item, loader);
       }
       for (let item of items.filter(item => item.kind == 'recipe')) {
-        this._processRecipe(manifest, item);
+        await this._processRecipe(manifest, item);
       }
     } catch (e) {
       throw processError(e);
@@ -2330,6 +2838,19 @@ ${e.message}
   // TODO: Move this to a generic pass over the AST and merge with resolveReference.
   static _processType(typeItem) {
     switch (typeItem.kind) {
+      case 'schema-inline':
+        let fields = {};
+        for (let {name, type} of typeItem.fields) {
+          fields[name] = type;
+        }
+        return __WEBPACK_IMPORTED_MODULE_7__type_js__["a" /* default */].newEntity(new __WEBPACK_IMPORTED_MODULE_4__schema_js__["a" /* default */]({
+          name: typeItem.name,
+          parents: [],
+          sections: [{
+            sectionType: 'normative',
+            fields,
+          }],
+        }));
       case 'variable-type':
         return __WEBPACK_IMPORTED_MODULE_7__type_js__["a" /* default */].newVariableReference(typeItem.name);
       case 'reference-type':
@@ -2364,7 +2885,7 @@ ${e.message}
     shape.name = shapeItem.name;
     manifest._shapes.push(shape);
   }
-  static _processRecipe(manifest, recipeItem) {
+  static async _processRecipe(manifest, recipeItem) {
     let recipe = manifest._newRecipe(recipeItem.name);
     let items = {
       views: recipeItem.items.filter(item => item.kind == 'view'),
@@ -2488,7 +3009,7 @@ ${e.message}
         connection.tags = connectionItem.target ? connectionItem.target.tags : [];
         let direction = {'->': 'out', '<-': 'in', '=': 'inout'}[connectionItem.dir];
         if (connection.direction) {
-          if (connection.direction != direction && direction != 'inout') {
+          if (connection.direction != direction && direction != 'inout' && !(connection.direction == 'host' && direction == 'in')) {
             let error = new Error(`'${connectionItem.dir}' not compatible with '${connection.direction}' param of '${particle.name}'`);
             error.location = connectionItem.location;
             throw error;
@@ -2519,18 +3040,20 @@ ${e.message}
 
         // Handle implicit view connections in the form `param = SomeParticle`
         if (connectionItem.target && connectionItem.target.particle) {
-          let particle = manifest.findParticleByName(connectionItem.target.particle);
-          if (!particle) {
-            let error = new Error(`Could not find particle '${connectionItem.target.particle}'`);
+          let hostedParticle = manifest.findParticleByName(connectionItem.target.particle);
+          if (!hostedParticle) {
+            let error = new Error(`Could not find hosted particle '${connectionItem.target.particle}'`);
             error.location = connectionItem.target.location;
             throw error;
           }
           // TODO: Better ID.
-          let id = `${manifest._id}immediate${particle.name}`
+          let id = `${manifest._id}immediate${hostedParticle.name}`;  // ${manifest._views.length}`;
           // TODO: Mark as immediate.
           targetView = recipe.newView();
           targetView.fate = 'map';
-          targetView.mapToView(manifest.newView(connection.type, null, id, []));
+          var view = await manifest.newView(connection.type, null, id, []);
+          view.set(hostedParticle.toLiteral());
+          targetView.mapToView(view);
         }
 
         if (targetParticle) {
@@ -2602,7 +3125,7 @@ ${e.message}
 
     type = type.resolveReferences(name => manifest.resolveReference(name));
 
-    let view = manifest.newView(type, name, id, tags);
+    let view = await manifest.newView(type, name, id, tags);
     view.source = item.source;
     view.description = item.description;
     // TODO: How to set the version?
@@ -2674,12 +3197,12 @@ ${e.message}
 
 
 /***/ }),
-/* 11 */
+/* 12 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__symbols_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__symbols_js__ = __webpack_require__(13);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__type_js__ = __webpack_require__(4);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -2710,6 +3233,11 @@ class Entity {
 
   isIdentified() {
     return this[__WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier] !== undefined;
+  }
+  // TODO: entity should not be exposing its IDs.
+  get id() {
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!!this.isIdentified());
+    return this[__WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier];
   }
   identify(identifier) {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!this.isIdentified());
@@ -2745,7 +3273,7 @@ class Entity {
 
 
 /***/ }),
-/* 12 */
+/* 13 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -2762,686 +3290,17 @@ class Entity {
 
 
 /***/ }),
-/* 13 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__type_js__ = __webpack_require__(4);
-/**
- * @license
- * Copyright (c) 2017 Google Inc. All rights reserved.
- * This code may only be used under the BSD style license found at
- * http://polymer.github.io/LICENSE.txt
- * Code distributed by Google as part of this project is also
- * subject to an additional IP rights grant found at
- * http://polymer.github.io/PATENTS.txt
- */
-
-
-
-
-
-class Description {
-  constructor(arc) {
-    this._arc = arc;
-    this._recipe = arc._activeRecipe;
-
-    this.onRecipeUpdate();
-  }
-
-  onRecipeUpdate() {
-    this._particleDescriptions = this._recipe.particles.map(particle => { return {_particle: particle, _connections: {} }; });
-
-    this.setRelevance(this._relevance);
-  }
-
-  setRelevance(relevance) {
-    this._relevance = relevance;
-    if (this._relevance) {
-      this._particleDescriptions.forEach(pDesc => {
-        pDesc._rank = this._relevance.calcParticleRelevance(pDesc._particle);
-      });
-    }
-  }
-
-  async _updateDescriptionHandles() {
-    for (let pDesc of this._particleDescriptions) {
-      let particle = pDesc._particle;
-      let descByName = await this._getPatternByNameFromDescriptionHandle(particle) || {};
-      let pattern = descByName["_pattern_"] || particle.spec.pattern;
-      if (pattern) {
-        pDesc.pattern = pattern;
-      }
-
-      pDesc._connections = {};
-      Object.values(particle.connections).forEach(viewConn => {
-        let specConn = particle.spec.connectionMap.get(viewConn.name);
-        let pattern = descByName[viewConn.name] || specConn.pattern;
-        if (pattern) {
-          let viewDescription = {pattern: pattern, _viewConn: viewConn, _view: this._arc.findViewById(viewConn.view.id)};
-          pDesc._connections[viewConn.name] = viewDescription;
-        }
-      });
-    };
-  }
-
-  async _getPatternByNameFromDescriptionHandle(particle) {
-    let descriptionConn = particle.connections["descriptions"];
-    if (descriptionConn && descriptionConn.view && descriptionConn.view.id) {
-      let descView = this._arc.findViewById(descriptionConn.view.id);
-      if (descView) {
-        let descList = await descView.toList();
-        let descByName = {};
-        descList.forEach(d => descByName[d.rawData.key] = d.rawData.value);
-        return descByName;
-      }
-    }
-  }
-
-  async getRecipeSuggestion(particles) {
-    await this._updateDescriptionHandles();  // This is needed to get updates in description handle.
-
-    // Choose particles that render UI, sort them by rank and generate suggestions.
-    let particlesSet = new Set(particles || this._particleDescriptions.map(pDesc => pDesc._particle));
-    let selectedDescriptions = this._particleDescriptions
-      .filter(desc => { return particlesSet.has(desc._particle) && desc._particle.spec.slots.size > 0 && !!desc.pattern; })
-      .sort(Description.sort);
-
-    let options = { seenViews: new Set(), seenParticles: new Set() };
-    let suggestions = [];
-    for (let particle of selectedDescriptions) {
-      if (!options.seenParticles.has(particle._particle)) {
-        suggestions.push(await this.patternToSuggestion(particle.pattern, particle, options));
-      }
-    }
-
-    if (suggestions.length == 0) {
-      // Return recipe name by default.
-      return this._recipe.name;
-    }
-
-    return this._capitalizeAndPunctuate(this._joinStringsToSentence(suggestions));
-  }
-
-  _joinStringsToSentence(strings) {
-    let count = strings.length;
-    // Combine descriptions into a sentence:
-    // "A."
-    // "A and b."
-    // "A, b, ..., and z." (Oxford comma ftw)
-    let delim = ['', '', ' and ', ', and '][count > 2 ? 3 : count];
-    return strings.slice(0, -1).join(", ") + delim + strings.pop();
-  }
-
-  _capitalizeAndPunctuate(sentence) {
-    // "Capitalize, punctuate."
-    return sentence[0].toUpperCase() + sentence.slice(1) + '.';
-  }
-
-  async getViewDescription(recipeView) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(recipeView.connections.length > 0, 'view has no connections?');
-
-    await this._updateDescriptionHandles();  // This is needed to get updates in description handle.
-
-    let viewConnection = this._selectViewConnection(recipeView) || recipeView.connections[0];
-    let view = this._arc.findViewById(recipeView.id);
-    return this._formatDescription(viewConnection, view, { seenViews: new Set(), excludeValues: true });
-  }
-
-  async patternToSuggestion(pattern, particleDescription, options) {
-    this._tokens = this._initTokens(pattern, particleDescription._particle);
-    return (await Promise.all(this._tokens.map(async token => await this.tokenToString(token, options)))).join("");
-  }
-
-  _initTokens(pattern, particle) {
-    pattern = pattern.replace(/</g, '&lt;');
-    let results = [];
-    while (pattern.length  > 0) {
-      let tokens = pattern.match(/\${[a-zA-Z0-9::~\.\[\]_]+}/g);
-      if (tokens) {
-        var firstToken = pattern.match(/\${[a-zA-Z0-9::~\.\[\]_]+}/g)[0];
-        var tokenIndex = pattern.indexOf(firstToken);
-      } else {
-        var firstToken = "";
-        var tokenIndex = pattern.length;
-      }
-      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(tokenIndex >= 0);
-      let nextToken = pattern.substring(0, tokenIndex);
-      if (nextToken.length > 0)
-        results.push({text: nextToken});
-      if (firstToken.length > 0) {
-        let valueTokens = pattern.match(/\$\{([a-zA-Z]+)(?:\.([_a-zA-Z]+))?\}/);
-        let handleName = valueTokens[1];
-        let extra = valueTokens.length == 3 ? valueTokens[2] : undefined;
-        let valueToken;
-        let viewConn = particle.connections[handleName];
-        if (viewConn) {  // view connection
-          __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(viewConn.view && viewConn.view.id, 'Missing id???');
-          valueToken = {viewName: handleName, extra, _viewConn: viewConn, _view: this._arc.findViewById(viewConn.view.id)};
-        } else {  // slot connection
-          let providedSlotConn = particle.consumedSlotConnections[handleName].providedSlots[extra];
-          __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(providedSlotConn, `Could not find handle ${handleName}`);
-          valueToken = {slotName: handleName, _providedSlotConn: providedSlotConn};
-        }
-        results.push(valueToken);
-      }
-      pattern = pattern.substring(tokenIndex + firstToken.length);
-    }
-    return results;
-  }
-
-  async tokenToString(token, options) {
-    if (token.text) {
-      return token.text;
-    }
-    if (token.viewName) {
-      return this._viewTokenToString(token, options);
-    } else  if (token.slotName) {
-      return this._slotTokenToString(token, options);
-    }
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(false, `no view or slot name (${JSON.stringify(token)})`);
-  }
-
-  async _viewTokenToString(token, options) {
-    switch (token.extra) {
-      case "_type_":
-        return token._viewConn.type.toPrettyString().toLowerCase();
-      case "_values_":
-        return this._formatViewValue(token._view);
-      case "_name_": {
-        return (await this._formatDescription(token._viewConn, token._view, options)).toString();
-      }
-      case undefined:
-        // full view description
-        let descriptionToken = (await this._formatDescription(token._viewConn, token._view, options)) || {};
-        let viewValue = await this._formatViewValue(token._view);
-        if (!descriptionToken.pattern) {
-          // For singleton view, if there is no real description (the type was used), use the plain value for description.
-          if (viewValue && !token._view.type.isSetView && !options.excludeValues) {
-            return viewValue;
-          }
-        }
-
-        if (viewValue && !options.excludeValues && !options.seenViews.has(token._view.id)) {
-          options.seenViews.add(token._view.id);
-          return `${descriptionToken.toString()} (${viewValue})`;
-        }
-        return descriptionToken.toString();
-      default:  // property
-        return this._propertyTokenToString(token._view, token.extra.split('.'));
-      }
-  }
-
-  async _slotTokenToString(token, options) {
-    let results = (await Promise.all(token._providedSlotConn.consumeConnections.map(async consumeConn => {
-      let particle = consumeConn.particle;
-      let particleDescription = this._particleDescriptions.find(desc => desc._particle == particle);
-      options.seenParticles.add(particle);
-      return this.patternToSuggestion(particle.spec.pattern, particleDescription, options);
-    }))).filter(str => !!str);
-
-    return this._joinStringsToSentence(results);
-  }
-
-  async _propertyTokenToString(view, properties) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!view.type.isSetView, `Cannot return property ${properties.join(",")} for set-view`);
-    // Use singleton value's property (eg. "09/15" for person's birthday)
-    let viewVar = await view.get();
-    if (viewVar) {
-      let value = viewVar.rawData;
-      properties.forEach(p => {
-        if (value) {
-          value = value[p];
-        }
-      });
-      if (value) {
-        return `<b>${value}</b>`;
-      }
-    }
-  }
-
-  async _formatViewValue(view) {
-    if (!view) {
-      return;
-    }
-    if (view.type.isSetView) {
-      let viewList = await view.toList();
-      if (viewList && viewList.length > 0) {
-        if (viewList[0].rawData.name) {
-          if (viewList.length > 2) {
-            // TODO: configurable view display format.
-            return `<b>${viewList[0].rawData.name}</b> plus <b>${viewList.length-1}</b> other items`;
-          }
-          return viewList.map(v => `<b>${v.rawData.name}</b>`).join(", ");
-        } else {
-          return `<b>${viewList.length}</b> items`;
-        }
-      }
-    } else {
-      let viewVar = await view.get();
-      if (viewVar && viewVar.rawData.name) {
-        return `<b>${viewVar.rawData.name}</b>`;  // TODO: use type's Entity instead
-      }
-    }
-  }
-
-  async _formatDescription(viewConnection, view, options) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(viewConnection.view.id == view.id, `Mismatching view IDs ${viewConnection.view.id} and ${view.id}`);
-
-    let chosenConnection = viewConnection;
-    // For "out" connection, use its own description
-    // For "in" connection, use description of the highest ranked out connection with description.
-    if (!chosenConnection.spec.isOutput) {
-      let otherConnection = this._selectViewConnection(viewConnection.view);
-      if (otherConnection) {
-        chosenConnection = otherConnection;
-        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(chosenConnection.view.id == view.id, `Non matching views`);
-      }
-    }
-
-    let chosenParticleDescription = this._particleDescriptions.find(desc => desc._particle == chosenConnection.particle);
-    let viewDescription = chosenParticleDescription ? chosenParticleDescription._connections[chosenConnection.name] : null;
-    // Add description to result array.
-    if (viewDescription) {
-      // Add the connection spec's description pattern.
-      return DescriptionToken.fromPatternDescription(await this.patternToSuggestion(viewDescription.pattern, chosenParticleDescription, options));
-    } else if (view && view.description) {
-      // Use the view description available in the arc.
-      return view.description;
-    } else {
-      return DescriptionToken.fromTypeDescription(viewConnection.type.toPrettyString().toLowerCase());
-    }
-  }
-
-  _selectViewConnection(recipeView) {
-    let possibleConnections = recipeView.connections.filter(connection => {
-      // Choose connections with patterns (manifest-based or dynamic).
-      let connectionSpec = connection.spec;
-      let particleDescription = this._particleDescriptions.find(desc => desc._particle == connection.particle);
-      return !!connectionSpec.pattern || !!particleDescription._connections[connection.name];
-    });
-
-    possibleConnections.sort((c1, c2) => {
-      let isOutput1 = c1.spec.isOutput;
-      let isOutput2 = c2.spec.isOutput;
-      if (isOutput1 != isOutput2) {
-        // Prefer output connections
-        return isOutput1 ? -1 : 1;
-      }
-
-      let d1 = this._particleDescriptions.find(desc => desc._particle == c1.particle);
-      let d2 = this._particleDescriptions.find(desc => desc._particle == c2.particle);
-      // Sort by particle's rank in descending order.
-      return d2._rank - d1._rank;
-    });
-
-    if (possibleConnections.length > 0) {
-      return possibleConnections[0];
-    }
-  }
-
-  static sort(p1, p2) {
-    // Root slot comes first.
-    let hasRoot1 = [...p1._particle.spec.slots.keys()].indexOf("root") >= 0;
-    let hasRoot2 = [...p2._particle.spec.slots.keys()].indexOf("root") >= 0;
-    if (hasRoot1 != hasRoot2) {
-      return hasRoot1 ? -1 : 1;
-    }
-
-    // Sort by rank
-    if (p1._rank != p2._rank) {
-      return p1._rank != p2._rank;
-    }
-
-    // Sort by number of singleton slots.
-    let p1Slots = 0, p2Slots = 0;
-    p1._particle.spec.slots.forEach((slotSpec) => { if (!slotSpec.isSet) ++p1Slots; });
-    p2._particle.spec.slots.forEach((slotSpec) => { if (!slotSpec.isSet) ++p2Slots; });
-    return p2Slots - p1Slots;
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = Description;
-
-
-class DescriptionToken {
-  constructor(pattern, type) {
-    this._pattern = pattern;
-    this._type = type;
-  }
-  get pattern() { return this._pattern; }
-  get type() { return this._type; }
-  toString() {
-    return this._pattern || this._type;
-  }
-  static fromPatternDescription(patternDescription) {
-    return new DescriptionToken(patternDescription);
-  }
-  static fromTypeDescription(typeDescription) {
-    return new DescriptionToken(null, typeDescription);
-  }
-}
-
-
-/***/ }),
 /* 14 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__ = __webpack_require__(8);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__scheduler_js__ = __webpack_require__(29);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__ = __webpack_require__(5);
-// @
-// Copyright (c) 2017 Google Inc. All rights reserved.
-// This code may only be used under the BSD style license found at
-// http://polymer.github.io/LICENSE.txt
-// Code distributed by Google as part of this project is also
-// subject to an additional IP rights grant found at
-// http://polymer.github.io/PATENTS.txt
-
-
-
-
-
-
-
-class InMemoryKey {
-  constructor(key) {
-    var parts = key.split("://");
-    this.protocol = parts[0];
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.protocol == 'in-memory');
-    this.location = parts[1];
-  }
-  toString() {
-    return this.protocol + '://' + this.location;
-  }
-}
-
-class InMemoryStorage {
-  constructor(arc) {
-      this._arc = arc;
-      this._memoryMap = {};
-      this.localIDBase = 0;
-  }
-
-  construct(id, type, keyFragment) {
-    var key = new InMemoryKey(keyFragment);
-    if (key.location == undefined)
-      key.location = 'in-memory-' + this.localIDBase++;
-    var provider = InMemoryStorageProvider.newProvider(type, this._arc, undefined, id);
-    if (this._memoryMap[key.toString()] !== undefined)
-      return null;
-    this._memoryMap[key.toString()] = provider;
-    return provider;
-  }
-
-  connect(id, type, key) {
-    if (this._memoryMap[key] == undefined)
-      return null;
-    // TODO assert types match?
-    return this._memoryMap[key];
-  }
-}
-/* harmony export (immutable) */ __webpack_exports__["a"] = InMemoryStorage;
-
-
-class InMemoryStorageProvider {
-  constructor(type, arc, name, id) {
-    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: 'view', name: 'InMemoryStorageProvider::constructor', args: {type: type.key, name: name}});
-    this._type = type;
-    this._arc = arc;
-    this._listeners = new Map();
-    this.name = name;
-    this._version = 0;
-    this.id = id || this._arc.generateID();
-    this.source = null;
-    trace.end();
-  }
-
-  generateID() {
-    return this._arc.generateID();
-  }
-
-  generateIDComponents() {
-    return this._arc.generateIDComponents();
-  }
-
-  get type() {
-    return this._type;
-  }
-  // TODO: add 'once' which returns a promise.
-  on(kind,  callback, target) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(target !== undefined, "must provide a target to register a view event handler");
-    let listeners = this._listeners.get(kind) || new Map();
-    listeners.set(callback, {version: -Infinity, target});
-    this._listeners.set(kind, listeners);
-  }
-
-  _fire(kind, details) {
-    var listenerMap = this._listeners.get(kind);
-    if (!listenerMap || listenerMap.size == 0)
-      return;
-
-    var callTrace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: 'view', name: 'InMemoryStorageProvider::_fire', args: {kind, type: this._type.key,
-        name: this.name, listeners: listenerMap.size}});
-
-    // TODO: wire up a target (particle)
-    let eventRecords = [];
-
-    for (let [callback, registration] of listenerMap.entries()) {
-      let target = registration.target;
-      eventRecords.push({target, callback, kind, details});
-    }
-
-    __WEBPACK_IMPORTED_MODULE_2__scheduler_js__["a" /* default */].enqueue(this, eventRecords);
-
-    callTrace.end();
-  }
-
-  _compareTo(other) {
-    let cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.name, other.name)) != 0) return cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareNumbers(this._version, other._version)) != 0) return cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.source, other.source)) != 0) return cmp;
-    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.id, other.id)) != 0) return cmp;
-    return 0;
-  }
-
-  toString(viewTags) {
-    let results = [];
-    let viewStr = [];
-    viewStr.push(`view`);
-    if (this.name) {
-      viewStr.push(`${this.name}`);
-    }
-    viewStr.push(`of ${this.type.toString()}`);
-    if (this.id) {
-      viewStr.push(`'${this.id}'`);
-    }
-    if (viewTags && viewTags.length) {
-      viewStr.push(`${[...viewTags].join(' ')}`);
-    }
-    if (this.source) {
-      viewStr.push(`in '${this.source}'`);
-    }
-    results.push(viewStr.join(' '));
-    if (this.description)
-      results.push(`  description \`${this.description}\``)
-    return results.join('\n');
-  }
-
-  static newProvider(type, arc, name, id) {
-    if (type.isSetView)
-      return new InMemoryCollection(type, arc, name, id);
-    return new InMemoryVariable(type, arc, name, id);
-  }
-}
-
-class InMemoryCollection extends InMemoryStorageProvider {
-  constructor(type, arc, name, id) {
-    super(type, arc, name, id);
-    this._items = new Map();
-  }
-
-  clone() {
-    var view = new InMemoryCollection(this._type, this._arc, this.name, this.id);
-    view.cloneFrom(this);
-    return view;
-  }
-
-  cloneFrom(view) {
-    this.name = view.name;
-    this.source = view.source;
-    this._items = new Map(view._items);
-    this._version = view._version;
-    this.description = view.description;
-  }
-
-  async get(id) {
-    return this._items.get(id);
-  }
-  traceInfo() {
-    return {items: this._items.size};
-  }
-  // HACK: replace this with some kind of iterator thing?
-  async toList() {
-    return [...this._items.values()];
-  }
-
-  async store(entity) {
-    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: "view", name: "InMemoryCollection::store", args: {name: this.name}});
-    var entityWasPresent = this._items.has(entity.id);
-
-    this._items.set(entity.id, entity);
-    this._version++;
-    if (!entityWasPresent)
-      this._fire('change', {add: [entity], version: this._version});
-    trace.end({args: {entity}});
-  }
-
-  async remove(id) {
-    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: "view", name: "InMemoryCollection::remove", args: {name: this.name}});
-    if (!this._items.has(id)) {
-      return;
-    }
-    let entity = this._items.get(id);
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this._items.delete(id));
-    this._version++;
-    this._fire('change', {remove: [entity], version: this._version});
-    trace.end({args: {entity}});
-  }
-
-  // TODO: Something about iterators??
-  // TODO: Something about changing order?
-
-  extractEntities(set) {
-    this._items.forEach(a => set.add(a));
-  }
-
-  serialize(list) {
-    list.push({
-      id: this.id,
-      sort: 'view',
-      type: this.type.toLiteral(),
-      name: this.name,
-      values: this.toList().map(a => a.id),
-      version: this._version
-    });
-  }
-
-  serializeMappingRecord(list) {
-    list.push({
-      id: this.id,
-      sort: 'view',
-      type: this.type.toLiteral(),
-      name: this.name,
-      version: this._version,
-      arc: this._arc.id
-    })
-  }
-}
-
-class InMemoryVariable extends InMemoryStorageProvider {
-  constructor(type, arc, name, id) {
-    super(type, arc, name, id);
-    this._stored = null;
-  }
-
-  clone() {
-    var variable = new InMemoryVariable(this._type, this._arc, this.name, this.id);
-    variable.cloneFrom(this);
-    return variable;
-  }
-
-  cloneFrom(variable) {
-    this._stored = variable._stored;
-    this._version = variable._version;
-  }
-
-  traceInfo() {
-    return {stored: this._stored !== null};
-  }
-
-  async get() {
-    return this._stored;
-  }
-
-  async set(entity) {
-    this._stored = entity;
-    this._version++;
-    this._fire('change', {data: this._stored, version: this._version});
-  }
-
-  async clear() {
-    this.set(undefined);
-  }
-
-  extractEntities(set) {
-    if (!this._stored) {
-      return;
-    }
-    set.add(this._stored);
-  }
-
-  serialize(list) {
-    if (this._stored == undefined)
-      return;
-    list.push({
-      id: this.id,
-      sort: 'variable',
-      type: this.type.toLiteral(),
-      name: this.name,
-      value: this._stored.id,
-      version: this._version
-    });
-  }
-
-  serializeMappingRecord(list) {
-    list.push({
-      id: this.id,
-      sort: 'variable',
-      type: this.type.toLiteral(),
-      name: this.name,
-      version: this._version,
-      arc: this._arc.id
-    })
-  }
-}
-
-
-/***/ }),
-/* 15 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(21);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_vm_web_js__ = __webpack_require__(39);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__fetch_web_js__ = __webpack_require__(47);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(20);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_vm_web_js__ = __webpack_require__(41);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__fetch_web_js__ = __webpack_require__(49);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__particle_js__ = __webpack_require__(16);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__particle_js__ = __webpack_require__(15);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__dom_particle_js__ = __webpack_require__(25);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__converters_jsonldToManifest_js__ = __webpack_require__(38);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__converters_jsonldToManifest_js__ = __webpack_require__(39);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -3538,7 +3397,7 @@ class Loader {
 
 
 /***/ }),
-/* 16 */
+/* 15 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3727,7 +3586,6 @@ class Particle {
 
   setParticleDescription(pattern) {
     return this.setDescriptionPattern('_pattern_', pattern);
-
   }
   setDescriptionPattern(connectionName, pattern) {
     let descriptions = this._views.get('descriptions');
@@ -3789,14 +3647,14 @@ class StateChanges {
 
 
 /***/ }),
-/* 17 */
+/* 16 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__entity_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__entity_js__ = __webpack_require__(12);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__type_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__symbols_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__symbols_js__ = __webpack_require__(13);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -3830,7 +3688,7 @@ class Relation extends __WEBPACK_IMPORTED_MODULE_1__entity_js__["a" /* default *
 
 
 /***/ }),
-/* 18 */
+/* 17 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3973,7 +3831,7 @@ class Shape {
 
 
 /***/ }),
-/* 19 */
+/* 18 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -4071,7 +3929,7 @@ class ViewMapperBase extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategize
 
 
 /***/ }),
-/* 20 */
+/* 19 */
 /***/ (function(module, exports) {
 
 // shim for using process in browser
@@ -4261,7 +4119,7 @@ process.umask = function() { return 0; };
 
 
 /***/ }),
-/* 21 */
+/* 20 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -4276,7 +4134,7 @@ process.umask = function() { return 0; };
 
 
 /***/ }),
-/* 22 */
+/* 21 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -4607,7 +4465,7 @@ class PECInnerPort extends APIPort {
 
 
 /***/ }),
-/* 23 */
+/* 22 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -4720,7 +4578,7 @@ let nob = () => Object.create(null);
 
 
 /***/ }),
-/* 24 */
+/* 23 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -5071,13 +4929,234 @@ return {
 
 
 /***/ }),
+/* 24 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return DomContext; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "b", function() { return SetDomContext; });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__browser_lib_xen_template_js__ = __webpack_require__(23);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_x_list_js__ = __webpack_require__(43);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__browser_lib_model_select_js__ = __webpack_require__(42);
+/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+
+
+
+
+// TODO(sjmiles): should be elsewhere
+// TODO(sjmiles): using Node syntax to import custom-elements in strictly-browser context
+// TOOD(dstockwell): why was this only in browser context?
+
+
+
+class DomContext {
+  constructor(context, containerKind) {
+    this._context = context;
+    this._containerKind = containerKind;
+    // TODO(sjmiles): _liveDom needs new name
+    this._liveDom = null;
+    this._innerContextBySlotName = {};
+  }
+  static createContext(context, content) {
+    let domContext = new DomContext(context);
+    domContext.stampTemplate(DomContext.createTemplateElement(content.template), () => {});
+    domContext.updateModel(content.model);
+    return domContext;
+  }
+  initContext(context) {
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(context);
+    if (!this._context) {
+      this._context = document.createElement(this._containerKind || 'div');
+      context.appendChild(this._context);
+    } else {
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this._context.parentNode == context,
+             'TODO: add support for moving slot to different context');
+    }
+  }
+  get context() { return this._context; }
+  isEqual(context) {
+    return this._context.parentNode == context;
+  }
+  updateModel(model) {
+    if (this._liveDom) {
+      this._liveDom.set(model);
+    }
+  }
+  clear() {
+    if (this._liveDom) {
+      this._liveDom.root.textContent = "";
+    }
+    this._liveDom = null;
+    this._innerContextBySlotName = {};
+
+  }
+  static createTemplateElement(template) {
+    return Object.assign(document.createElement('template'), {innerHTML: template});
+  }
+  stampTemplate(template, eventHandler) {
+    if (!this._liveDom) {
+      // TODO(sjmiles): hack to allow subtree elements (e.g. x-list) to marshal events
+      this._context._eventMapper = this._eventMapper.bind(this, eventHandler);
+      this._liveDom = __WEBPACK_IMPORTED_MODULE_1__browser_lib_xen_template_js__["a" /* default */]
+          .stamp(template)
+          .events(this._context._eventMapper)
+          .appendTo(this._context);
+    }
+  }
+  observe(observer) {
+    observer.observe(this._context, {childList: true, subtree: true});
+  }
+  getInnerContext(innerSlotName) {
+    return this._innerContextBySlotName[innerSlotName];
+  }
+  isDirectInnerSlot(slot) {
+    let parentNode = slot.parentNode;
+    while (parentNode) {
+      if (parentNode == this._context) {
+        return true;
+      }
+      if (parentNode.getAttribute("slotid")) {
+        // this is an inner slot of an inner slot.
+        return false;
+      }
+      parentNode = parentNode.parentNode;
+    }
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(false);
+  }
+  initInnerContexts(slotSpec) {
+    this._innerContextBySlotName = {};
+    Array.from(this._context.querySelectorAll("[slotid]")).forEach(s => {
+      if (!this.isDirectInnerSlot(s)) {
+        // Skip inner slots of an inner slot of the given slot.
+        return;
+      }
+      let slotId = s.getAttribute('slotid');
+      let providedSlotSpec = slotSpec.providedSlots.find(ps => ps.name == slotId);
+      if (providedSlotSpec) {  // Skip non-declared slots
+        let subId = s.getAttribute('subid');
+        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!subId || providedSlotSpec.isSet,
+            `Slot provided in ${slotSpec.name} sub-id ${subId} doesn't match set spec: ${providedSlotSpec.isSet}`);
+        if (providedSlotSpec.isSet) {
+          if (!this._innerContextBySlotName[slotId]) {
+            this._innerContextBySlotName[slotId] = {};
+          }
+          __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!this._innerContextBySlotName[slotId][subId],
+                 `Slot ${slotSpec.name} cannot provide multiple ${slotId}:${subId} inner slots`);
+          this._innerContextBySlotName[slotId][subId] = s;
+        } else {
+          this._innerContextBySlotName[slotId] = s;
+        }
+      } else {
+        console.warn(`Slot ${slotSpec.name} has unexpected inner slot ${slotId}`);
+      }
+    });
+  }
+  findRootSlots() {
+    let innerSlotById = {};
+    Array.from(this._context.querySelectorAll("[slotid]")).forEach(s => {
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.isDirectInnerSlot(s), 'Unexpected inner slot');
+      let slotId = s.getAttribute('slotid');
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!innerSlotById[slotId], `Duplicate root slot ${slotId}`);
+      innerSlotById[slotId] = s;
+    });
+    return innerSlotById;
+  }
+  _eventMapper(eventHandler, node, eventName, handlerName) {
+    node.addEventListener(eventName, event => {
+      // TODO(sjmiles): we have an extremely minimalist approach to events here, this is useful IMO for
+      // finding the smallest set of features that we are going to need.
+      // First problem: click event firing multiple times as it bubbles up the tree, minimalist solution
+      // is to enforce a 'first listener' rule by executing `stopPropagation`.
+      event.stopPropagation();
+      eventHandler({
+        handler: handlerName,
+        data: {
+          key: node.key,
+          value: node.value
+        }
+      });
+    });
+  }
+}
+
+class SetDomContext {
+  constructor(containerKind) {
+    this._contextBySubId = {};
+    this._containerKind = containerKind;
+  }
+  initContext(context) {
+    Object.keys(context).forEach(subId => {
+      if (!this._contextBySubId[subId] || !this._contextBySubId[subId].isEqual(context[subId])) {
+        this._contextBySubId[subId] = new DomContext(null, this._containerKind);
+      }
+      this._contextBySubId[subId].initContext(context[subId]);
+    });
+    // Delete sub-contexts that are not found in the new context.
+    Object.keys(this._contextBySubId).forEach(subId => {
+      if (!context[subId]) {
+        delete this._contextBySubId[subId];
+      }
+    });
+  }
+  isEqual(context) {
+    return Object.keys(this._contextBySubId).length == Object.keys(context).length &&
+           !Object.keys(this._contextBySubId).find(c => this._contextBySubId[c] != context[c]);
+  }
+  updateModel(model) {
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(model.items, `Model must contain items`);
+    model.items.forEach(item => {
+      Object.keys(model).forEach(key => {
+        if (key != 'items') {
+          item[key] = model[key];
+        }
+      });
+      if (this._contextBySubId[item.subId]) {
+        this._contextBySubId[item.subId].updateModel(item);
+      }
+    });
+  }
+  clear() {
+    Object.values(this._contextBySubId).forEach(context => context.clear());
+  }
+  stampTemplate(template, eventHandler, eventMapper) {
+    Object.values(this._contextBySubId).forEach(context => context.stampTemplate(template, eventHandler, eventMapper));
+  }
+  observe(observer) {
+    Object.values(this._contextBySubId).forEach(context => context.observe(observer));
+  }
+  getInnerContext(innerSlotName) {
+    var innerContexts = {};
+    Object.keys(this._contextBySubId).forEach(subId => {
+      innerContexts[subId] = this._contextBySubId[subId].getInnerContext(innerSlotName);
+    });
+    return innerContexts;
+  }
+  initInnerContexts(slotSpec) {
+    Object.values(this._contextBySubId).forEach(context => context.initInnerContexts(slotSpec));
+  }
+}
+
+
+
+
+/***/ }),
 /* 25 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_js__ = __webpack_require__(16);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__ = __webpack_require__(23);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_js__ = __webpack_require__(15);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__ = __webpack_require__(22);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -5172,11 +5251,10 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
     this._setState({});
   }
   _update(props, state) {
-    let shouldRender = this._shouldRender(this._props, this._state);
-    if (shouldRender) {  // TODO: should _shouldRender be slot specific?
-      this.config.slotNames.forEach(s => this.render(s, ["model"]));
+    if (this._shouldRender(this._props, this._state)) {  // TODO: should _shouldRender be slot specific?
       this.relevance = 1;  // TODO: improve relevance signal.
     }
+    this.config.slotNames.forEach(s => this.render(s, ["model"]));
   }
 
   render(slotName, contentTypes) {
@@ -5261,6 +5339,14 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
     }
     return Array.from(handlers.keys());
   }
+  setParticleDescription(pattern) {
+    if (typeof pattern === "string") {
+      return super.setParticleDescription(pattern);
+    }
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!!pattern.template && !!pattern.model, 'Description pattern must either be string or have template and model');
+    super.setDescriptionPattern("_template_", pattern.template);
+    super.setDescriptionPattern("_model_", JSON.stringify(pattern.model));
+  }
 }
 
 /* harmony default export */ __webpack_exports__["a"] = (DomParticle);
@@ -5271,13 +5357,12 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__identifier_js__ = __webpack_require__(48);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__entity_js__ = __webpack_require__(11);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__relation_js__ = __webpack_require__(17);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__symbols_js__ = __webpack_require__(12);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__in_memory_storage_js__ = __webpack_require__(14);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__particle_spec_js__ = __webpack_require__(9);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__identifier_js__ = __webpack_require__(50);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__entity_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__relation_js__ = __webpack_require__(16);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__symbols_js__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__particle_spec_js__ = __webpack_require__(9);
 /** @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
  * This code may only be used under the BSD style license found at
@@ -5286,7 +5371,6 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-
 
 
 
@@ -5341,12 +5425,12 @@ class Handle {
   }
 
   generateID() {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__["a" /* default */])(this._view.generateID);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__["a" /* default */])(this._view.generateID);
     return this._view.generateID();
   }
 
   generateIDComponents() {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__["a" /* default */])(this._view.generateIDComponents);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__["a" /* default */])(this._view.generateIDComponents);
     return this._view.generateIDComponents();
   }
 
@@ -5362,7 +5446,7 @@ class Handle {
   }
 
   _restore(entry) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__["a" /* default */])(this.entityClass, "Handles need entity classes for deserialization");
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_4__platform_assert_web_js__["a" /* default */])(this.entityClass, "Handles need entity classes for deserialization");
     return restore(entry, this.entityClass);
   }
 
@@ -5464,7 +5548,7 @@ class Variable extends Handle {
     if (this.type.isEntity)
       return this._restore(result);
     if (this.type.isInterface)
-      return __WEBPACK_IMPORTED_MODULE_6__particle_spec_js__["a" /* default */].fromLiteral(result);
+      return __WEBPACK_IMPORTED_MODULE_5__particle_spec_js__["a" /* default */].fromLiteral(result);
     return result;
   }
 
@@ -5627,12 +5711,11 @@ class Search {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__in_memory_storage_js__ = __webpack_require__(14);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__symbols_js__ = __webpack_require__(12);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__entity_js__ = __webpack_require__(11);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__schema_js__ = __webpack_require__(7);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__type_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__relation_js__ = __webpack_require__(17);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__symbols_js__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__entity_js__ = __webpack_require__(12);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__schema_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__type_js__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__relation_js__ = __webpack_require__(16);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -5650,11 +5733,13 @@ class Search {
 
 
 
-
 function testEntityClass(type) {
-  return new __WEBPACK_IMPORTED_MODULE_4__schema_js__["a" /* default */]({
+  return new __WEBPACK_IMPORTED_MODULE_3__schema_js__["a" /* default */]({
     name: type,
-    sections: [],
+    sections: [{
+      sectionType: 'normative',
+      fields: {'id': 'Number', 'value': 'Text'}
+    }],
     parents: [],
   }).entityClass();
 }
@@ -5662,15 +5747,15 @@ function testEntityClass(type) {
 let BasicEntity = testEntityClass('BasicEntity');
 
 /* unused harmony default export */ var _unused_webpack_default_export = ({
-  Entity: __WEBPACK_IMPORTED_MODULE_3__entity_js__["a" /* default */],
+  Entity: __WEBPACK_IMPORTED_MODULE_2__entity_js__["a" /* default */],
   BasicEntity,
-  Relation: __WEBPACK_IMPORTED_MODULE_6__relation_js__["a" /* default */],
+  Relation: __WEBPACK_IMPORTED_MODULE_5__relation_js__["a" /* default */],
   testing: {
     testEntityClass,
   },
   internals: {
-    identifier: __WEBPACK_IMPORTED_MODULE_2__symbols_js__["a" /* default */].identifier,
-    Type: __WEBPACK_IMPORTED_MODULE_5__type_js__["a" /* default */],
+    identifier: __WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier,
+    Type: __WEBPACK_IMPORTED_MODULE_4__type_js__["a" /* default */],
   }
 });
 
@@ -5808,10 +5893,10 @@ class Slot {
   get consumeConn() { return this._consumeConn; }
   get arc() { return this._arc; }
   getContext() { return this._context; }
-  async setContext(context) { this._context = context; }
+  setContext(context) { this._context = context; }
   isSameContext(context) { return this._context == context; }
 
-  async updateContext(context) {
+  updateContext(context) {
     // do nothing, if context unchanged.
     if ((!this.getContext() && !context) ||
         (this.getContext() && context && this.isSameContext(context))) {
@@ -5820,7 +5905,7 @@ class Slot {
 
     // update the context;
     let wasNull = !this.getContext();
-    await this.setContext(context);
+    this.setContext(context);
     if (this.getContext()) {
       if (wasNull) {
         this.startRender();
@@ -5902,7 +5987,10 @@ class Slot {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__in_memory_storage_js__ = __webpack_require__(14);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__scheduler_js__ = __webpack_require__(29);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__ = __webpack_require__(5);
 // @
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -5914,10 +6002,125 @@ class Slot {
 
 
 
+
+
+class StorageProviderBase {
+  constructor(type, arc, name, id, key) {
+    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: 'view', name: 'InMemoryStorageProvider::constructor', args: {type: type.key, name: name}});
+    this._type = type;
+    this._arc = arc;
+    this._listeners = new Map();
+    this.name = name;
+    this._version = 0;
+    this.id = id || this._arc.generateID();
+    this.source = null;
+    this._storageKey = key;
+    trace.end();
+  }
+
+  get storageKey() {
+    return this._storageKey;
+  }
+
+  generateID() {
+    return this._arc.generateID();
+  }
+
+  generateIDComponents() {
+    return this._arc.generateIDComponents();
+  }
+
+  get type() {
+    return this._type;
+  }
+  // TODO: add 'once' which returns a promise.
+  on(kind,  callback, target) {
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(target !== undefined, "must provide a target to register a view event handler");
+    let listeners = this._listeners.get(kind) || new Map();
+    listeners.set(callback, {version: -Infinity, target});
+    this._listeners.set(kind, listeners);
+  }
+
+  _fire(kind, details) {
+    var listenerMap = this._listeners.get(kind);
+    if (!listenerMap || listenerMap.size == 0)
+      return;
+
+    var callTrace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: 'view', name: 'InMemoryStorageProvider::_fire', args: {kind, type: this._type.key,
+        name: this.name, listeners: listenerMap.size}});
+
+    // TODO: wire up a target (particle)
+    let eventRecords = [];
+
+    for (let [callback, registration] of listenerMap.entries()) {
+      let target = registration.target;
+      eventRecords.push({target, callback, kind, details});
+    }
+
+    __WEBPACK_IMPORTED_MODULE_2__scheduler_js__["a" /* default */].enqueue(this, eventRecords);
+
+    callTrace.end();
+  }
+
+  _compareTo(other) {
+    let cmp;
+    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.name, other.name)) != 0) return cmp;
+    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareNumbers(this._version, other._version)) != 0) return cmp;
+    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.source, other.source)) != 0) return cmp;
+    if ((cmp = __WEBPACK_IMPORTED_MODULE_3__recipe_util_js__["a" /* default */].compareStrings(this.id, other.id)) != 0) return cmp;
+    return 0;
+  }
+
+  toString(viewTags) {
+    let results = [];
+    let viewStr = [];
+    viewStr.push(`view`);
+    if (this.name) {
+      viewStr.push(`${this.name}`);
+    }
+    viewStr.push(`of ${this.type.toString()}`);
+    if (this.id) {
+      viewStr.push(`'${this.id}'`);
+    }
+    if (viewTags && viewTags.length) {
+      viewStr.push(`${[...viewTags].join(' ')}`);
+    }
+    if (this.source) {
+      viewStr.push(`in '${this.source}'`);
+    }
+    results.push(viewStr.join(' '));
+    if (this.description)
+      results.push(`  description \`${this.description}\``)
+    return results.join('\n');
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = StorageProviderBase;
+
+
+
+/***/ }),
+/* 32 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__in_memory_storage_js__ = __webpack_require__(67);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__firebase_storage_js__ = __webpack_require__(66);
+// @
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+
+
+
+
 class StorageProviderFactory {
   constructor(arc) {
     this._arc = arc;
-    this._storageInstances = {'in-memory': new __WEBPACK_IMPORTED_MODULE_0__in_memory_storage_js__["a" /* InMemoryStorage */](arc)};
+    this._storageInstances = {'in-memory': new __WEBPACK_IMPORTED_MODULE_0__in_memory_storage_js__["a" /* default */](arc), 'firebase': new __WEBPACK_IMPORTED_MODULE_1__firebase_storage_js__["a" /* default */](arc)};
   }
 
   _storageForKey(key) {
@@ -5925,12 +6128,12 @@ class StorageProviderFactory {
     return this._storageInstances[protocol];
   }
 
-  construct(id, type, keyFragment) {
+  async construct(id, type, keyFragment) {
     return this._storageForKey(keyFragment).construct(id, type, keyFragment);
   }
 
-  connect(id, type, key) {
-    return this._storageForKey(key).connect(id, type, keyFragment);
+  async connect(id, type, key) {
+    return this._storageForKey(key).connect(id, type, key);
   }
 
   newKey(id, associatedKeyFragment) {
@@ -5942,12 +6145,12 @@ class StorageProviderFactory {
 
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js__ = __webpack_require__(15);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__ = __webpack_require__(16);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js__ = __webpack_require__(14);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__ = __webpack_require__(15);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_dom_particle_js__ = __webpack_require__(25);
 /**
  * @license
@@ -6018,7 +6221,7 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
 
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -6026,15 +6229,15 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__tracelib_trace_js__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__relation_js__ = __webpack_require__(17);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__relation_js__ = __webpack_require__(16);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__handle_js__ = __webpack_require__(26);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__outer_PEC_js__ = __webpack_require__(51);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__outer_PEC_js__ = __webpack_require__(53);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__recipe_recipe_js__ = __webpack_require__(1);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__manifest_js__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__description_js__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__manifest_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__description_js__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__recipe_util_js__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11__fake_pec_factory_js__ = __webpack_require__(46);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_12__storage_provider_factory_js__ = __webpack_require__(31);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11__fake_pec_factory_js__ = __webpack_require__(48);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_12__storage_storage_provider_factory_js__ = __webpack_require__(32);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -6063,7 +6266,7 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
 class Arc {
   constructor({id, context, pecFactory, slotComposer, loader}) {
     // TODO: context should not be optional.
-    this._context = context || new __WEBPACK_IMPORTED_MODULE_8__manifest_js__["a" /* default */]();
+    this._context = context || new __WEBPACK_IMPORTED_MODULE_8__manifest_js__["a" /* default */]({id});
     // TODO: pecFactory should not be optional. update all callers and fix here.
     this._pecFactory = pecFactory ||  __WEBPACK_IMPORTED_MODULE_11__fake_pec_factory_js__["a" /* default */].bind(null);
     this.id = id;
@@ -6081,6 +6284,9 @@ class Arc {
     // information about last-seen-versions of views
     this._lastSeenVersion = new Map();
 
+    // storage keys for referenced views
+    this._storageKeys = {};
+
     this.particleViewMaps = new Map();
     let pecId = this.generateID();
     let innerPecPort = this._pecFactory(pecId);
@@ -6089,7 +6295,7 @@ class Arc {
       slotComposer.arc = this;
     }
     this.nextParticleHandle = 0;
-    this._storageProviderFactory = new __WEBPACK_IMPORTED_MODULE_12__storage_provider_factory_js__["a" /* default */](this);
+    this._storageProviderFactory = new __WEBPACK_IMPORTED_MODULE_12__storage_storage_provider_factory_js__["a" /* default */](this);
 
     // Dictionary from each tag string to a list of views
     this._tags = {};
@@ -6099,6 +6305,10 @@ class Arc {
     this._search = null;
     this._description = new __WEBPACK_IMPORTED_MODULE_9__description_js__["a" /* default */](this);
   }
+  get loader() {
+    return this._loader;
+  }
+
   set search(search) {
     this._search = search ? search.toLowerCase().trim() : null;
   }
@@ -6247,11 +6457,10 @@ class Arc {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(recipe.isResolved(), 'Cannot instantiate an unresolved recipe');
 
     let {views, particles, slots} = recipe.mergeInto(this._activeRecipe);
-    this.description.onRecipeUpdate();
 
     for (let recipeView of views) {
       if (['copy', 'create'].includes(recipeView.fate)) {
-        let view = this.createView(recipeView.type, /* name= */ null, /* id= */ null, recipeView.tags);
+        let view = await this.createView(recipeView.type, /* name= */ null, /* id= */ null, recipeView.tags);
         if (recipeView.fate === "copy") {
           var copiedView = this.findViewById(recipeView.id);
           view.cloneFrom(copiedView);
@@ -6260,7 +6469,10 @@ class Arc {
         recipeView.fate = "use";
         // TODO: move the call to OuterPEC's DefineView to here
       }
-      let view = this.findViewById(recipeView.id);
+      let storageKey = recipeView.storageKey;
+      if (!storageKey)
+        storageKey = this.keyForId(recipeView.id);
+      let view = await this._storageProviderFactory.connect(recipeView.id, recipeView.type, storageKey);
       __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(view, `view '${recipeView.id}' was not found`);
 
       view.description = await this.description.getViewDescription(recipeView);
@@ -6270,7 +6482,7 @@ class Arc {
 
     if (this.pec.slotComposer) {
       // TODO: pass slot-connections instead
-      await this.pec.slotComposer.initializeRecipe(particles);
+      this.pec.slotComposer.initializeRecipe(particles);
     }
 
     this._recipes.push({particles, views, slots});
@@ -6283,13 +6495,13 @@ class Arc {
     viewMap.views.set(name, targetView);
   }
 
-  createView(type, name, id, tags) {
+  async createView(type, name, id, tags) {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(type instanceof __WEBPACK_IMPORTED_MODULE_3__type_js__["a" /* default */], `can't createView with type ${type} that isn't a Type`);
 
     if (type.isRelation)
       type = __WEBPACK_IMPORTED_MODULE_3__type_js__["a" /* default */].newSetView(type);
 
-      let view = this._storageProviderFactory.construct(id, type, 'in-memory');
+      let view = await this._storageProviderFactory.construct(id, type, 'in-memory');
       view.name = name;
 
       this._registerView(view, tags);
@@ -6315,6 +6527,8 @@ class Arc {
       }
     }
     this._viewTags.set(view, new Set(tags));
+
+    this._storageKeys[view.id] = view.storageKey;
   }
 
   // TODO: Don't use this, we should be testing the schemas for compatiblity
@@ -6348,27 +6562,8 @@ class Arc {
     return view;
   }
 
-  // TODO: Remove this.
-  _viewFor(type) {
-    let views = this.findViewsByType(type);
-    if (views.length > 0) {
-      return views[0];
-    }
-
-    return this.createView(type, "automatically created for _viewFor");
-  }
-
-  commit(entities) {
-    let entityMap = new Map();
-    for (let entity of entities) {
-      entityMap.set(entity, this._viewFor(__WEBPACK_IMPORTED_MODULE_3__type_js__["a" /* default */].newSetView(entity.constructor.type)));
-    }
-    for (let entity of entities) {
-      if (entity instanceof __WEBPACK_IMPORTED_MODULE_4__relation_js__["a" /* default */]) {
-        entity.entities.forEach(entity => entityMap.set(entity, this._viewFor(__WEBPACK_IMPORTED_MODULE_3__type_js__["a" /* default */].newSetView(entity.constructor.type))));
-      }
-    }
-    this.newCommit(entityMap);
+  keyForId(id) {
+    return this._storageKeys[id];
   }
 
   newCommit(entityMap) {
@@ -6406,7 +6601,7 @@ class Arc {
 
 
 /***/ }),
-/* 34 */
+/* 35 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -6415,25 +6610,25 @@ class Arc {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__recipe_recipe_js__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__recipe_recipe_util_js__ = __webpack_require__(6);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__recipe_walker_js__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__strategies_convert_constraints_to_connections_js__ = __webpack_require__(68);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__strategies_assign_remote_views_js__ = __webpack_require__(65);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__strategies_copy_remote_views_js__ = __webpack_require__(69);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__strategies_assign_views_by_tag_and_type_js__ = __webpack_require__(66);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__strategies_init_population_js__ = __webpack_require__(73);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__strategies_map_consumed_slots_js__ = __webpack_require__(75);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11__strategies_map_remote_slots_js__ = __webpack_require__(76);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_12__strategies_match_particle_by_verb_js__ = __webpack_require__(77);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_13__strategies_name_unnamed_connections_js__ = __webpack_require__(78);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_14__strategies_add_use_views_js__ = __webpack_require__(64);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_15__strategies_create_description_handle_js__ = __webpack_require__(70);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_16__manifest_js__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_17__strategies_init_search_js__ = __webpack_require__(74);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_18__strategies_search_tokens_to_particles_js__ = __webpack_require__(79);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_19__strategies_fallback_fate_js__ = __webpack_require__(71);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_20__strategies_group_view_connections_js__ = __webpack_require__(72);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_21__strategies_combined_strategy_js__ = __webpack_require__(67);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_22__speculator_js__ = __webpack_require__(63);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_23__description_js__ = __webpack_require__(13);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__strategies_convert_constraints_to_connections_js__ = __webpack_require__(72);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__strategies_assign_remote_views_js__ = __webpack_require__(69);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__strategies_copy_remote_views_js__ = __webpack_require__(73);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_8__strategies_assign_views_by_tag_and_type_js__ = __webpack_require__(70);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_9__strategies_init_population_js__ = __webpack_require__(77);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_10__strategies_map_consumed_slots_js__ = __webpack_require__(79);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_11__strategies_map_remote_slots_js__ = __webpack_require__(80);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_12__strategies_match_particle_by_verb_js__ = __webpack_require__(81);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_13__strategies_name_unnamed_connections_js__ = __webpack_require__(82);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_14__strategies_add_use_views_js__ = __webpack_require__(68);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_15__strategies_create_description_handle_js__ = __webpack_require__(74);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_16__manifest_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_17__strategies_init_search_js__ = __webpack_require__(78);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_18__strategies_search_tokens_to_particles_js__ = __webpack_require__(83);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_19__strategies_fallback_fate_js__ = __webpack_require__(75);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_20__strategies_group_view_connections_js__ = __webpack_require__(76);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_21__strategies_combined_strategy_js__ = __webpack_require__(71);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_22__speculator_js__ = __webpack_require__(65);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_23__description_js__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_24__tracelib_trace_js__ = __webpack_require__(8);
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -6590,7 +6785,7 @@ class Planner {
       }
       let rank = relevance.calcRelevanceScore();
 
-      relevance.newArc.description.setRelevance(relevance);
+      relevance.newArc.description.relevance = relevance;
       let description = await relevance.newArc.description.getRecipeSuggestion(relevance.newArc.recipes[0].particles);
 
       this._updateGeneration(generations, hash, (g) => g.description = description);
@@ -6617,7 +6812,7 @@ class Planner {
       results.push({
         plan,
         rank,
-        description,
+        description: relevance.newArc.description,
         hash
       });
     }
@@ -6639,16 +6834,18 @@ class Planner {
 
 /* harmony default export */ __webpack_exports__["a"] = (Planner);
 
-/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(20)))
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(19)))
 
 /***/ }),
-/* 35 */
+/* 36 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__slot_js__ = __webpack_require__(30);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__dom_slot_js__ = __webpack_require__(45);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__dom_slot_js__ = __webpack_require__(47);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__dom_context_js__ = __webpack_require__(24);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__description_dom_formatter_js__ = __webpack_require__(46);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -6658,6 +6855,8 @@ class Planner {
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
+
+
 
 
 
@@ -6680,6 +6879,8 @@ class SlotComposer {
       this._contextById["root"] = options.rootContext;
     }
 
+    this._suggestionsContext = options.suggestionsContext;
+
     this._slots = [];
   }
   get affordance() { return this._affordance; }
@@ -6694,6 +6895,43 @@ class SlotComposer {
       default:
         __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])("unsupported affordance ", this._affordance);
     }
+  }
+  _getSuggestionContext() {
+    switch(this._affordance) {
+      case "dom":
+      case "dom-touch":
+      case "vr":
+        return __WEBPACK_IMPORTED_MODULE_3__dom_context_js__["a" /* DomContext */];
+      default:
+        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])("unsupported affordance ", this._affordance);
+    }
+  }
+  _getDescriptionFormatter() {
+    switch(this._affordance) {
+      case "dom":
+      case "dom-touch":
+      case "vr":
+        return __WEBPACK_IMPORTED_MODULE_4__description_dom_formatter_js__["a" /* default */];
+      default:
+        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])("unsupported affordance ", this._affordance);
+    }
+  }
+
+  async setSuggestions(suggestions) {
+    // TODO(mmandlis): slot composer should not be familiar with suggestions concept - they should just be slots.
+    if (!this._suggestionsContext) {
+      return;
+    }
+
+    this._suggestionsContext.clear();
+    suggestions.forEach(async suggestion => {
+      let suggestionContent =
+        await suggestion.description.getRecipeSuggestion(suggestion.description.arc.recipes[0].particles, this._getDescriptionFormatter());
+
+      this._getSuggestionContext().createContext(
+          this._suggestionsContext.createSuggestionElement({hash: suggestion.hash, plan: suggestion.plan}),
+          suggestionContent);
+    });
   }
 
   getSlot(particle, slotName) {
@@ -6726,7 +6964,7 @@ class SlotComposer {
     }
   }
 
-  async initializeRecipe(recipeParticles) {
+  initializeRecipe(recipeParticles) {
     let newSlots = [];
     // Create slots for each of the recipe's particles slot connections.
     recipeParticles.forEach(p => {
@@ -6747,7 +6985,7 @@ class SlotComposer {
     });
 
     // Attempt to set context for each of the slots.
-    await Promise.all(newSlots.map(async s => {
+    newSlots.forEach(s => {
       __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!s.getContext(), `Unexpected context in new slot`);
 
       let context = null;
@@ -6764,9 +7002,9 @@ class SlotComposer {
       this._slots.push(s);
 
       if (context) {
-        await s.updateContext(context);
+        s.updateContext(context);
       }
-    }));
+    });
   }
 
   _initHostedSlot(hostedSlotId, hostedParticle) {
@@ -6809,17 +7047,17 @@ class SlotComposer {
     return true;
   }
 
-  async updateInnerSlots(slot) {
+  updateInnerSlots(slot) {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(slot, 'Cannot update inner slots of null');
     // Update provided slot contexts.
-    await Promise.all(Object.keys(slot.consumeConn.providedSlots).map(async providedSlotName => {
+    Object.keys(slot.consumeConn.providedSlots).forEach(providedSlotName => {
       let providedContext = slot.getInnerContext(providedSlotName);
       let providedSlot = slot.consumeConn.providedSlots[providedSlotName];
-      await Promise.all(providedSlot.consumeConnections.map(async cc => {
+      providedSlot.consumeConnections.forEach(cc => {
         // This will trigger "start" or "stop" render, if applicable.
-        await this.getSlot(cc.particle, cc.name).updateContext(providedContext);
-      }));
-    }));
+        this.getSlot(cc.particle, cc.name).updateContext(providedContext);
+      });
+    });
   }
 
   getAvailableSlots() {
@@ -6856,18 +7094,18 @@ class SlotComposer {
 
 
 /***/ }),
-/* 36 */
+/* 37 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_arc_js__ = __webpack_require__(33);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_description_js__ = __webpack_require__(13);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_manifest_js__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__arcs_runtime_planner_js__ = __webpack_require__(34);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__arcs_runtime_slot_composer_js__ = __webpack_require__(35);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_arc_js__ = __webpack_require__(34);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_description_js__ = __webpack_require__(10);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_manifest_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__arcs_runtime_planner_js__ = __webpack_require__(35);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__arcs_runtime_slot_composer_js__ = __webpack_require__(36);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__arcs_runtime_type_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__browser_cdn_loader_js__ = __webpack_require__(32);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__browser_cdn_loader_js__ = __webpack_require__(33);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -6901,7 +7139,7 @@ window.Arcs = Arcs;
 
 
 /***/ }),
-/* 37 */
+/* 38 */
 /***/ (function(module, exports) {
 
 var g;
@@ -6928,7 +7166,7 @@ module.exports = g;
 
 
 /***/ }),
-/* 38 */
+/* 39 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -6942,7 +7180,7 @@ module.exports = g;
  * http://polymer.github.io/PATENTS.txt
  */
 
-var supportedTypes = ["Text", "URL"];
+var supportedTypes = ["Text", "URL", "Number", "Boolean"];
 
 class JsonldToManifest {
   static convert(jsonld, theClass) {
@@ -7042,7 +7280,24 @@ class JsonldToManifest {
 
 
 /***/ }),
-/* 39 */
+/* 40 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+// Assume firebase has been loaded. We can't `import` it here as it does not
+// support strict mode.
+/* harmony default export */ __webpack_exports__["a"] = (window.firebase);
+
+
+/***/ }),
+/* 41 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -7057,7 +7312,7 @@ class JsonldToManifest {
 
 
 /***/ }),
-/* 40 */
+/* 42 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -7109,13 +7364,13 @@ if (typeof customElements != 'undefined') {
 
 
 /***/ }),
-/* 41 */
+/* 43 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__xen_template_js__ = __webpack_require__(24);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__xen_element_js__ = __webpack_require__(42);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__xen_state_js__ = __webpack_require__(23);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__xen_template_js__ = __webpack_require__(23);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__xen_element_js__ = __webpack_require__(44);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__xen_state_js__ = __webpack_require__(22);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -7214,7 +7469,7 @@ if (typeof customElements != 'undefined') {
 
 
 /***/ }),
-/* 42 */
+/* 44 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -7308,17 +7563,12 @@ class XenElement extends HTMLElement {
 
 
 /***/ }),
-/* 43 */
-/***/ (function(module, exports) {
+/* 45 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
 
-module.exports = (function() {
+"use strict";
+/* harmony default export */ __webpack_exports__["a"] = ((function() {
   "use strict";
-
-  /*
-   * Generated by PEG.js 0.9.0.
-   *
-   * http://pegjs.org/
-   */
 
   function peg$subclass(child, parent) {
     function ctor() { this.constructor = child; }
@@ -7340,11 +7590,117 @@ module.exports = (function() {
 
   peg$subclass(peg$SyntaxError, Error);
 
-  function peg$parse(input) {
-    var options = arguments.length > 1 ? arguments[1] : {},
-        parser  = this,
+  peg$SyntaxError.buildMessage = function(expected, found) {
+    var DESCRIBE_EXPECTATION_FNS = {
+          literal: function(expectation) {
+            return "\"" + literalEscape(expectation.text) + "\"";
+          },
 
-        peg$FAILED = {},
+          "class": function(expectation) {
+            var escapedParts = "",
+                i;
+
+            for (i = 0; i < expectation.parts.length; i++) {
+              escapedParts += expectation.parts[i] instanceof Array
+                ? classEscape(expectation.parts[i][0]) + "-" + classEscape(expectation.parts[i][1])
+                : classEscape(expectation.parts[i]);
+            }
+
+            return "[" + (expectation.inverted ? "^" : "") + escapedParts + "]";
+          },
+
+          any: function(expectation) {
+            return "any character";
+          },
+
+          end: function(expectation) {
+            return "end of input";
+          },
+
+          other: function(expectation) {
+            return expectation.description;
+          }
+        };
+
+    function hex(ch) {
+      return ch.charCodeAt(0).toString(16).toUpperCase();
+    }
+
+    function literalEscape(s) {
+      return s
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g,  '\\"')
+        .replace(/\0/g, '\\0')
+        .replace(/\t/g, '\\t')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+        .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
+    }
+
+    function classEscape(s) {
+      return s
+        .replace(/\\/g, '\\\\')
+        .replace(/\]/g, '\\]')
+        .replace(/\^/g, '\\^')
+        .replace(/-/g,  '\\-')
+        .replace(/\0/g, '\\0')
+        .replace(/\t/g, '\\t')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/[\x00-\x0F]/g,          function(ch) { return '\\x0' + hex(ch); })
+        .replace(/[\x10-\x1F\x7F-\x9F]/g, function(ch) { return '\\x'  + hex(ch); });
+    }
+
+    function describeExpectation(expectation) {
+      return DESCRIBE_EXPECTATION_FNS[expectation.type](expectation);
+    }
+
+    function describeExpected(expected) {
+      var descriptions = new Array(expected.length),
+          i, j;
+
+      for (i = 0; i < expected.length; i++) {
+        descriptions[i] = describeExpectation(expected[i]);
+      }
+
+      descriptions.sort();
+
+      if (descriptions.length > 0) {
+        for (i = 1, j = 1; i < descriptions.length; i++) {
+          if (descriptions[i - 1] !== descriptions[i]) {
+            descriptions[j] = descriptions[i];
+            j++;
+          }
+        }
+        descriptions.length = j;
+      }
+
+      switch (descriptions.length) {
+        case 1:
+          return descriptions[0];
+
+        case 2:
+          return descriptions[0] + " or " + descriptions[1];
+
+        default:
+          return descriptions.slice(0, -1).join(", ")
+            + ", or "
+            + descriptions[descriptions.length - 1];
+      }
+    }
+
+    function describeFound(found) {
+      return found ? "\"" + literalEscape(found) + "\"" : "end of input";
+    }
+
+    return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
+  };
+
+  function peg$parse(input, options) {
+    options = options !== void 0 ? options : {};
+
+    var peg$FAILED = {},
 
         peg$startRuleFunctions = { Manifest: peg$parseManifest },
         peg$startRuleFunction  = peg$parseManifest,
@@ -7355,11 +7711,11 @@ module.exports = (function() {
             return result;
           },
         peg$c1 = "view",
-        peg$c2 = { type: "literal", value: "view", description: "\"view\"" },
+        peg$c2 = peg$literalExpectation("view", false),
         peg$c3 = "of",
-        peg$c4 = { type: "literal", value: "of", description: "\"of\"" },
+        peg$c4 = peg$literalExpectation("of", false),
         peg$c5 = "in",
-        peg$c6 = { type: "literal", value: "in", description: "\"in\"" },
+        peg$c6 = peg$literalExpectation("in", false),
         peg$c7 = function(name, type, id, version, tags, source, items) {
             items = optional(items, extractIndented, []);
             return {
@@ -7375,9 +7731,9 @@ module.exports = (function() {
             };
           },
         peg$c8 = "description",
-        peg$c9 = { type: "literal", value: "description", description: "\"description\"" },
+        peg$c9 = peg$literalExpectation("description", false),
         peg$c10 = "import",
-        peg$c11 = { type: "literal", value: "import", description: "\"import\"" },
+        peg$c11 = peg$literalExpectation("import", false),
         peg$c12 = function(path) {
             return {
               kind: 'import',
@@ -7386,11 +7742,11 @@ module.exports = (function() {
             };
           },
         peg$c13 = "shape",
-        peg$c14 = { type: "literal", value: "shape", description: "\"shape\"" },
+        peg$c14 = peg$literalExpectation("shape", false),
         peg$c15 = "<",
-        peg$c16 = { type: "literal", value: "<", description: "\"<\"" },
+        peg$c16 = peg$literalExpectation("<", false),
         peg$c17 = ">",
-        peg$c18 = { type: "literal", value: ">", description: "\">\"" },
+        peg$c18 = peg$literalExpectation(">", false),
         peg$c19 = function(name, typeVars, items) {
             return {
               kind: 'shape',
@@ -7401,7 +7757,7 @@ module.exports = (function() {
             }
           },
         peg$c20 = "particle",
-        peg$c21 = { type: "literal", value: "particle", description: "\"particle\"" },
+        peg$c21 = peg$literalExpectation("particle", false),
         peg$c22 = function(name, implFile, items) {
             let args = null;
             let verbs = [];
@@ -7450,9 +7806,9 @@ module.exports = (function() {
             };
           },
         peg$c23 = "(",
-        peg$c24 = { type: "literal", value: "(", description: "\"(\"" },
+        peg$c24 = peg$literalExpectation("(", false),
         peg$c25 = ")",
-        peg$c26 = { type: "literal", value: ")", description: "\")\"" },
+        peg$c26 = peg$literalExpectation(")", false),
         peg$c27 = function(verb, args) {
             return {
               kind: 'interface',
@@ -7462,80 +7818,85 @@ module.exports = (function() {
             };
           },
         peg$c28 = ",",
-        peg$c29 = { type: "literal", value: ",", description: "\",\"" },
+        peg$c29 = peg$literalExpectation(",", false),
         peg$c30 = function(head, tail) {
             return [head].concat(tail.map(a => a[2]));
           },
-        peg$c31 = function(direction, type, name) {
+        peg$c31 = "?",
+        peg$c32 = peg$literalExpectation("?", false),
+        peg$c33 = function(direction, type, isOptional, name) {
             return {
               kind: 'particle-argument',
               location: location(),
               direction,
               type: type,
+              isOptional: !!isOptional,
               name,
             };
           },
-        peg$c32 = "inout",
-        peg$c33 = { type: "literal", value: "inout", description: "\"inout\"" },
-        peg$c34 = "out",
-        peg$c35 = { type: "literal", value: "out", description: "\"out\"" },
-        peg$c36 = function() {
+        peg$c34 = "inout",
+        peg$c35 = peg$literalExpectation("inout", false),
+        peg$c36 = "out",
+        peg$c37 = peg$literalExpectation("out", false),
+        peg$c38 = "host",
+        peg$c39 = peg$literalExpectation("host", false),
+        peg$c40 = function() {
             return text();
           },
-        peg$c37 = "[",
-        peg$c38 = { type: "literal", value: "[", description: "\"[\"" },
-        peg$c39 = "]",
-        peg$c40 = { type: "literal", value: "]", description: "\"]\"" },
-        peg$c41 = function(type) {
+        peg$c41 = "[",
+        peg$c42 = peg$literalExpectation("[", false),
+        peg$c43 = "]",
+        peg$c44 = peg$literalExpectation("]", false),
+        peg$c45 = function(type) {
             return {
               kind: 'list-type',
               location: location(),
               type,
             };
           },
-        peg$c42 = "~",
-        peg$c43 = { type: "literal", value: "~", description: "\"~\"" },
-        peg$c44 = function(name) {
+        peg$c46 = "~",
+        peg$c47 = peg$literalExpectation("~", false),
+        peg$c48 = function(name) {
             return {
               kind: 'variable-type',
               location: location(),
               name,
             };
           },
-        peg$c45 = function(name) {
+        peg$c49 = function(name) {
             return {
               kind: 'reference-type',
               location: location(),
               name,
             };
           },
-        peg$c46 = function(head, tail) {
+        peg$c50 = function(head, tail) {
             return [head, ...tail.map(a => a[2])];
           },
-        peg$c47 = "affordance",
-        peg$c48 = { type: "literal", value: "affordance", description: "\"affordance\"" },
-        peg$c49 = "dom-touch",
-        peg$c50 = { type: "literal", value: "dom-touch", description: "\"dom-touch\"" },
-        peg$c51 = "dom",
-        peg$c52 = { type: "literal", value: "dom", description: "\"dom\"" },
-        peg$c53 = "vr",
-        peg$c54 = { type: "literal", value: "vr", description: "\"vr\"" },
-        peg$c55 = "voice",
-        peg$c56 = { type: "literal", value: "voice", description: "\"voice\"" },
-        peg$c57 = function(affordance) {
+        peg$c51 = "affordance",
+        peg$c52 = peg$literalExpectation("affordance", false),
+        peg$c53 = "dom-touch",
+        peg$c54 = peg$literalExpectation("dom-touch", false),
+        peg$c55 = "dom",
+        peg$c56 = peg$literalExpectation("dom", false),
+        peg$c57 = "vr",
+        peg$c58 = peg$literalExpectation("vr", false),
+        peg$c59 = "voice",
+        peg$c60 = peg$literalExpectation("voice", false),
+        peg$c61 = function(affordance) {
             return {
               kind: 'particle-affordance',
               location: location(),
               affordance,
             };
           },
-        peg$c58 = "must",
-        peg$c59 = { type: "literal", value: "must", description: "\"must\"" },
-        peg$c60 = "consume",
-        peg$c61 = { type: "literal", value: "consume", description: "\"consume\"" },
-        peg$c62 = "set of",
-        peg$c63 = { type: "literal", value: "set of", description: "\"set of\"" },
-        peg$c64 = function(isRequired, isSet, name, items) {
+        peg$c62 = "must",
+        peg$c63 = peg$literalExpectation("must", false),
+        peg$c64 = "consume",
+        peg$c65 = peg$literalExpectation("consume", false),
+        peg$c66 = "set of",
+        peg$c67 = peg$literalExpectation("set of", false),
+        peg$c68 = function(isRequired, isSet, name, items) {
             let formFactor = null;
             let providedSlots = [];
             items = optional(items, extractIndented, []);
@@ -7560,26 +7921,26 @@ module.exports = (function() {
               providedSlots
             };
           },
-        peg$c65 = "formFactor",
-        peg$c66 = { type: "literal", value: "formFactor", description: "\"formFactor\"" },
-        peg$c67 = "fullscreen",
-        peg$c68 = { type: "literal", value: "fullscreen", description: "\"fullscreen\"" },
-        peg$c69 = "big",
-        peg$c70 = { type: "literal", value: "big", description: "\"big\"" },
-        peg$c71 = "medium",
-        peg$c72 = { type: "literal", value: "medium", description: "\"medium\"" },
-        peg$c73 = "small",
-        peg$c74 = { type: "literal", value: "small", description: "\"small\"" },
-        peg$c75 = function(formFactor) {
+        peg$c69 = "formFactor",
+        peg$c70 = peg$literalExpectation("formFactor", false),
+        peg$c71 = "fullscreen",
+        peg$c72 = peg$literalExpectation("fullscreen", false),
+        peg$c73 = "big",
+        peg$c74 = peg$literalExpectation("big", false),
+        peg$c75 = "medium",
+        peg$c76 = peg$literalExpectation("medium", false),
+        peg$c77 = "small",
+        peg$c78 = peg$literalExpectation("small", false),
+        peg$c79 = function(formFactor) {
             return {
               kind: 'form-factor',
               location: location(),
               formFactor
             };
           },
-        peg$c76 = "provide",
-        peg$c77 = { type: "literal", value: "provide", description: "\"provide\"" },
-        peg$c78 = function(isSet, name, items) {
+        peg$c80 = "provide",
+        peg$c81 = peg$literalExpectation("provide", false),
+        peg$c82 = function(isSet, name, items) {
             let formFactor = null;
             let views = [];
             items = items ? extractIndented(items) : [];
@@ -7601,14 +7962,14 @@ module.exports = (function() {
               views
             };
           },
-        peg$c79 = function(view) {
+        peg$c83 = function(view) {
             return {
               kind: 'particle-provided-slot-view',
               location: location(),
               view,
             };
           },
-        peg$c80 = function(pattern, viewDescriptions) {
+        peg$c84 = function(pattern, viewDescriptions) {
             return {
               kind: 'description',
               location: location(),
@@ -7624,7 +7985,7 @@ module.exports = (function() {
               ],
             };
           },
-        peg$c81 = function(name, pattern) {
+        peg$c85 = function(name, pattern) {
             return {
               kind: 'view-description',
               location: location(),
@@ -7632,9 +7993,9 @@ module.exports = (function() {
               pattern,
             };
           },
-        peg$c82 = "recipe",
-        peg$c83 = { type: "literal", value: "recipe", description: "\"recipe\"" },
-        peg$c84 = function(name, tags, items) {
+        peg$c86 = "recipe",
+        peg$c87 = peg$literalExpectation("recipe", false),
+        peg$c88 = function(name, tags, items) {
             return {
               kind: 'recipe',
               location: location(),
@@ -7643,12 +8004,12 @@ module.exports = (function() {
               items: optional(items, extractIndented, []),
             };
           },
-        peg$c85 = "as",
-        peg$c86 = { type: "literal", value: "as", description: "\"as\"" },
-        peg$c87 = function(name) {
+        peg$c89 = "as",
+        peg$c90 = peg$literalExpectation("as", false),
+        peg$c91 = function(name) {
             return name;
           },
-        peg$c88 = function(ref, name, connections) {
+        peg$c92 = function(ref, name, connections) {
             let viewConnections = [];
             let slotConnections = [];
             if (connections) {
@@ -7669,9 +8030,9 @@ module.exports = (function() {
               slotConnections: slotConnections,
             };
           },
-        peg$c89 = "*",
-        peg$c90 = { type: "literal", value: "*", description: "\"*\"" },
-        peg$c91 = function(param, dir, target) {
+        peg$c93 = "*",
+        peg$c94 = peg$literalExpectation("*", false),
+        peg$c95 = function(param, dir, target) {
             return {
               kind: 'view-connection',
               location: location(),
@@ -7680,7 +8041,7 @@ module.exports = (function() {
               target: optional(target, target => target[1], null),
             };
           },
-        peg$c92 = function(param, name, providedSlots) {
+        peg$c96 = function(param, name, providedSlots) {
             return {
               kind: 'slot-connection',
               location: location(),
@@ -7689,7 +8050,7 @@ module.exports = (function() {
               providedSlots: optional(providedSlots, extractIndented, [])
             };
           },
-        peg$c93 = function(param, name) {
+        peg$c97 = function(param, name) {
             return {
               kind: 'provided-slot',
               location: location(),
@@ -7697,7 +8058,7 @@ module.exports = (function() {
               name: optional(name, name=>name[1], null)
             };
           },
-        peg$c94 = function(from, dir, to) {
+        peg$c98 = function(from, dir, to) {
             return {
               kind: 'connection',
               location: location(),
@@ -7706,11 +8067,11 @@ module.exports = (function() {
               to,
             };
           },
-        peg$c95 = "search",
-        peg$c96 = { type: "literal", value: "search", description: "\"search\"" },
-        peg$c97 = "tokens",
-        peg$c98 = { type: "literal", value: "tokens", description: "\"tokens\"" },
-        peg$c99 = function(phrase, tokens) {
+        peg$c99 = "search",
+        peg$c100 = peg$literalExpectation("search", false),
+        peg$c101 = "tokens",
+        peg$c102 = peg$literalExpectation("tokens", false),
+        peg$c103 = function(phrase, tokens) {
             return {
               kind: 'search',
               location: location(),
@@ -7718,15 +8079,15 @@ module.exports = (function() {
               tokens: optional(tokens, tokens => tokens[1][2].map(t => t[1]), null)
             };
           },
-        peg$c100 = "<-",
-        peg$c101 = { type: "literal", value: "<-", description: "\"<-\"" },
-        peg$c102 = "->",
-        peg$c103 = { type: "literal", value: "->", description: "\"->\"" },
-        peg$c104 = "=",
-        peg$c105 = { type: "literal", value: "=", description: "\"=\"" },
-        peg$c106 = ".",
-        peg$c107 = { type: "literal", value: ".", description: "\".\"" },
-        peg$c108 = function(ident, param, tags) {
+        peg$c104 = "<-",
+        peg$c105 = peg$literalExpectation("<-", false),
+        peg$c106 = "->",
+        peg$c107 = peg$literalExpectation("->", false),
+        peg$c108 = "=",
+        peg$c109 = peg$literalExpectation("=", false),
+        peg$c110 = ".",
+        peg$c111 = peg$literalExpectation(".", false),
+        peg$c112 = function(ident, param, tags) {
             let particle = null;
             let name = null;
             if (ident) {
@@ -7746,24 +8107,22 @@ module.exports = (function() {
               tags: optional(tags, tags => tags[1], []),
             }
           },
-        peg$c109 = function(tags) {
+        peg$c113 = function(tags) {
             return {
               kind: 'connection-target',
               location: location(),
               tags,
             };
           },
-        peg$c110 = "?",
-        peg$c111 = { type: "literal", value: "?", description: "\"?\"" },
-        peg$c112 = "use",
-        peg$c113 = { type: "literal", value: "use", description: "\"use\"" },
-        peg$c114 = "map",
-        peg$c115 = { type: "literal", value: "map", description: "\"map\"" },
-        peg$c116 = "create",
-        peg$c117 = { type: "literal", value: "create", description: "\"create\"" },
-        peg$c118 = "copy",
-        peg$c119 = { type: "literal", value: "copy", description: "\"copy\"" },
-        peg$c120 = function(type, ref, name) {
+        peg$c114 = "use",
+        peg$c115 = peg$literalExpectation("use", false),
+        peg$c116 = "map",
+        peg$c117 = peg$literalExpectation("map", false),
+        peg$c118 = "create",
+        peg$c119 = peg$literalExpectation("create", false),
+        peg$c120 = "copy",
+        peg$c121 = peg$literalExpectation("copy", false),
+        peg$c122 = function(type, ref, name) {
             return {
               kind: 'view',
               location: location(),
@@ -7772,16 +8131,16 @@ module.exports = (function() {
               fate: type
             }
           },
-        peg$c121 = "#",
-        peg$c122 = { type: "literal", value: "#", description: "\"#\"" },
-        peg$c123 = /^[a-zA-Z]/,
-        peg$c124 = { type: "class", value: "[a-zA-Z]", description: "[a-zA-Z]" },
-        peg$c125 = /^[a-zA-Z0-9_]/,
-        peg$c126 = { type: "class", value: "[a-zA-Z0-9_]", description: "[a-zA-Z0-9_]" },
-        peg$c127 = function() {return text()},
-        peg$c128 = function(head, tail) { return [head, ...(tail && tail[1] || [])]; },
-        peg$c129 = function(tags) { return tags; },
-        peg$c130 = function(name, tags) {
+        peg$c123 = "#",
+        peg$c124 = peg$literalExpectation("#", false),
+        peg$c125 = /^[a-zA-Z]/,
+        peg$c126 = peg$classExpectation([["a", "z"], ["A", "Z"]], false, false),
+        peg$c127 = /^[a-zA-Z0-9_]/,
+        peg$c128 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false),
+        peg$c129 = function() {return text()},
+        peg$c130 = function(head, tail) { return [head, ...(tail && tail[1] || [])]; },
+        peg$c131 = function(tags) { return tags; },
+        peg$c132 = function(name, tags) {
             return {
               kind: 'particle-ref',
               location: location(),
@@ -7790,7 +8149,7 @@ module.exports = (function() {
               verbs: [],
             };
           },
-        peg$c131 = function(tags) {
+        peg$c133 = function(tags) {
             return {
               kind: 'particle-ref',
               location: location(),
@@ -7798,9 +8157,9 @@ module.exports = (function() {
               verbs: [],
             };
           },
-        peg$c132 = "particle can",
-        peg$c133 = { type: "literal", value: "particle can", description: "\"particle can\"" },
-        peg$c134 = function(verb, tags) {
+        peg$c134 = "particle can",
+        peg$c135 = peg$literalExpectation("particle can", false),
+        peg$c136 = function(verb, tags) {
             return {
               kind: 'particle-ref',
               location: location(),
@@ -7808,7 +8167,7 @@ module.exports = (function() {
               tags: tags || [],
             };
           },
-        peg$c135 = function(id, tags) {
+        peg$c137 = function(id, tags) {
             return {
               kind: 'view-ref',
               location: location(),
@@ -7816,7 +8175,7 @@ module.exports = (function() {
               tags: tags || [],
             };
           },
-        peg$c136 = function(name, tags) {
+        peg$c138 = function(name, tags) {
             return {
               kind: 'view-ref',
               location: location(),
@@ -7824,16 +8183,16 @@ module.exports = (function() {
               tags: tags || [],
             };
           },
-        peg$c137 = function(tags) {
+        peg$c139 = function(tags) {
             return {
               kind: 'view-ref',
               location: location(),
               tags,
             };
           },
-        peg$c138 = "slot",
-        peg$c139 = { type: "literal", value: "slot", description: "\"slot\"" },
-        peg$c140 = function(id, name) {
+        peg$c140 = "slot",
+        peg$c141 = peg$literalExpectation("slot", false),
+        peg$c142 = function(id, name) {
             return {
               kind: 'slot',
               location: location(),
@@ -7841,18 +8200,41 @@ module.exports = (function() {
               name: optional(name, name => name[1], '')
             }
           },
-        peg$c141 = "extends",
-        peg$c142 = { type: "literal", value: "extends", description: "\"extends\"" },
-        peg$c143 = function(first, rest) {
+        peg$c143 = "extends",
+        peg$c144 = peg$literalExpectation("extends", false),
+        peg$c145 = function(first, rest) {
           var list = [first];
           for (let item of rest) {
             list.push(item[3]);
           }
           return list;
         },
-        peg$c144 = "schema",
-        peg$c145 = { type: "literal", value: "schema", description: "\"schema\"" },
-        peg$c146 = function(name, parent, sections) {
+        peg$c146 = " ",
+        peg$c147 = peg$literalExpectation(" ", false),
+        peg$c148 = "{",
+        peg$c149 = peg$literalExpectation("{", false),
+        peg$c150 = "}",
+        peg$c151 = peg$literalExpectation("}", false),
+        peg$c152 = function(name, fields) {
+            return {
+              kind: 'schema-inline',
+              location: location(),
+              name: optional(name, name => name[0], null),
+              fields: fields.map(field => field[0]),
+            }
+          },
+        peg$c153 = function(type, arity, name) {
+            return {
+              kind: 'schema-inline-field',
+              location: location(),
+              name,
+              type,
+              arity,
+            };
+          },
+        peg$c154 = "schema",
+        peg$c155 = peg$literalExpectation("schema", false),
+        peg$c156 = function(name, parent, sections) {
             return {
               kind: 'schema',
               location: location(),
@@ -7861,11 +8243,11 @@ module.exports = (function() {
               sections: optional(sections, extractIndented, []),
             };
           },
-        peg$c147 = "normative",
-        peg$c148 = { type: "literal", value: "normative", description: "\"normative\"" },
-        peg$c149 = "optional",
-        peg$c150 = { type: "literal", value: "optional", description: "\"optional\"" },
-        peg$c151 = function(sectionType, fields) {
+        peg$c157 = "normative",
+        peg$c158 = peg$literalExpectation("normative", false),
+        peg$c159 = "optional",
+        peg$c160 = peg$literalExpectation("optional", false),
+        peg$c161 = function(sectionType, fields) {
             return {
               kind: 'schema-section',
               location: location(),
@@ -7873,7 +8255,7 @@ module.exports = (function() {
               fields: extractIndented(fields),
             };
           },
-        peg$c152 = function(type, name) {
+        peg$c162 = function(type, name) {
             return {
               kind: 'schema-field',
               location: location(),
@@ -7881,29 +8263,33 @@ module.exports = (function() {
               name,
             };
           },
-        peg$c153 = "Text",
-        peg$c154 = { type: "literal", value: "Text", description: "\"Text\"" },
-        peg$c155 = "URL",
-        peg$c156 = { type: "literal", value: "URL", description: "\"URL\"" },
-        peg$c157 = "or",
-        peg$c158 = { type: "literal", value: "or", description: "\"or\"" },
-        peg$c159 = function(first, rest) {
+        peg$c163 = "Text",
+        peg$c164 = peg$literalExpectation("Text", false),
+        peg$c165 = "URL",
+        peg$c166 = peg$literalExpectation("URL", false),
+        peg$c167 = "Number",
+        peg$c168 = peg$literalExpectation("Number", false),
+        peg$c169 = "Boolean",
+        peg$c170 = peg$literalExpectation("Boolean", false),
+        peg$c171 = "Object",
+        peg$c172 = peg$literalExpectation("Object", false),
+        peg$c173 = "or",
+        peg$c174 = peg$literalExpectation("or", false),
+        peg$c175 = function(first, rest) {
           let typeList = [first];
           for (let type of rest) {
             typeList.push(type[3]);
           }
           return typeList;
         },
-        peg$c160 = "@",
-        peg$c161 = { type: "literal", value: "@", description: "\"@\"" },
-        peg$c162 = /^[0-9]/,
-        peg$c163 = { type: "class", value: "[0-9]", description: "[0-9]" },
-        peg$c164 = function(version) {
+        peg$c176 = "@",
+        peg$c177 = peg$literalExpectation("@", false),
+        peg$c178 = /^[0-9]/,
+        peg$c179 = peg$classExpectation([["0", "9"]], false, false),
+        peg$c180 = function(version) {
             return Number(version.join(''));
           },
-        peg$c165 = " ",
-        peg$c166 = { type: "literal", value: " ", description: "\" \"" },
-        peg$c167 = function(i) {
+        peg$c181 = function(i) {
           i = i.join('');
           if (i.length > indent.length) {
             indents.push(indent);
@@ -7911,7 +8297,7 @@ module.exports = (function() {
             return true;
           }
         },
-        peg$c168 = function(i) {
+        peg$c182 = function(i) {
           i = i.join('');
           if (i.length == indent.length) {
             return true;
@@ -7920,7 +8306,7 @@ module.exports = (function() {
             return false;
           }
         },
-        peg$c169 = function(i) {
+        peg$c183 = function(i) {
           i = i.join('');
           if (i.length >= indent.length) {
             return true;
@@ -7929,41 +8315,41 @@ module.exports = (function() {
             return false;
           }
         },
-        peg$c170 = function() {
+        peg$c184 = function() {
             let fixed = text();
             fixed = fixed.replace(/^(.)/, l => l.toUpperCase());
             expected(`a top level identifier (e.g. "${fixed}")`);
           },
-        peg$c171 = "`",
-        peg$c172 = { type: "literal", value: "`", description: "\"`\"" },
-        peg$c173 = /^[^`]/,
-        peg$c174 = { type: "class", value: "[^`]", description: "[^`]" },
-        peg$c175 = function(pattern) { return pattern.join(''); },
-        peg$c176 = "'",
-        peg$c177 = { type: "literal", value: "'", description: "\"'\"" },
-        peg$c178 = /^[^']/,
-        peg$c179 = { type: "class", value: "[^']", description: "[^']" },
-        peg$c180 = function(id) {return id.join('')},
-        peg$c181 = /^[A-Z]/,
-        peg$c182 = { type: "class", value: "[A-Z]", description: "[A-Z]" },
-        peg$c183 = /^[a-z0-9_]/i,
-        peg$c184 = { type: "class", value: "[a-z0-9_]i", description: "[a-z0-9_]i" },
-        peg$c185 = function(ident) {return text()},
-        peg$c186 = /^[a-z]/,
-        peg$c187 = { type: "class", value: "[a-z]", description: "[a-z]" },
-        peg$c188 = /^[ ]/,
-        peg$c189 = { type: "class", value: "[ ]", description: "[ ]" },
-        peg$c190 = { type: "any", description: "any character" },
-        peg$c191 = /^[^\n]/,
-        peg$c192 = { type: "class", value: "[^\\n]", description: "[^\\n]" },
-        peg$c193 = "\r",
-        peg$c194 = { type: "literal", value: "\r", description: "\"\\r\"" },
-        peg$c195 = "\n",
-        peg$c196 = { type: "literal", value: "\n", description: "\"\\n\"" },
+        peg$c185 = "`",
+        peg$c186 = peg$literalExpectation("`", false),
+        peg$c187 = /^[^`]/,
+        peg$c188 = peg$classExpectation(["`"], true, false),
+        peg$c189 = function(pattern) { return pattern.join(''); },
+        peg$c190 = "'",
+        peg$c191 = peg$literalExpectation("'", false),
+        peg$c192 = /^[^']/,
+        peg$c193 = peg$classExpectation(["'"], true, false),
+        peg$c194 = function(id) {return id.join('')},
+        peg$c195 = /^[A-Z]/,
+        peg$c196 = peg$classExpectation([["A", "Z"]], false, false),
+        peg$c197 = /^[a-z0-9_]/i,
+        peg$c198 = peg$classExpectation([["a", "z"], ["0", "9"], "_"], false, true),
+        peg$c199 = function(ident) {return text()},
+        peg$c200 = /^[a-z]/,
+        peg$c201 = peg$classExpectation([["a", "z"]], false, false),
+        peg$c202 = /^[ ]/,
+        peg$c203 = peg$classExpectation([" "], false, false),
+        peg$c204 = peg$anyExpectation(),
+        peg$c205 = /^[^\n]/,
+        peg$c206 = peg$classExpectation(["\n"], true, false),
+        peg$c207 = "\r",
+        peg$c208 = peg$literalExpectation("\r", false),
+        peg$c209 = "\n",
+        peg$c210 = peg$literalExpectation("\n", false),
 
         peg$currPos          = 0,
         peg$savedPos         = 0,
-        peg$posDetailsCache  = [{ line: 1, column: 1, seenCR: false }],
+        peg$posDetailsCache  = [{ line: 1, column: 1 }],
         peg$maxFailPos       = 0,
         peg$maxFailExpected  = [],
         peg$silentFails      = 0,
@@ -7986,27 +8372,44 @@ module.exports = (function() {
       return peg$computeLocation(peg$savedPos, peg$currPos);
     }
 
-    function expected(description) {
-      throw peg$buildException(
-        null,
-        [{ type: "other", description: description }],
+    function expected(description, location) {
+      location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
+
+      throw peg$buildStructuredError(
+        [peg$otherExpectation(description)],
         input.substring(peg$savedPos, peg$currPos),
-        peg$computeLocation(peg$savedPos, peg$currPos)
+        location
       );
     }
 
-    function error(message) {
-      throw peg$buildException(
-        message,
-        null,
-        input.substring(peg$savedPos, peg$currPos),
-        peg$computeLocation(peg$savedPos, peg$currPos)
-      );
+    function error(message, location) {
+      location = location !== void 0 ? location : peg$computeLocation(peg$savedPos, peg$currPos)
+
+      throw peg$buildSimpleError(message, location);
+    }
+
+    function peg$literalExpectation(text, ignoreCase) {
+      return { type: "literal", text: text, ignoreCase: ignoreCase };
+    }
+
+    function peg$classExpectation(parts, inverted, ignoreCase) {
+      return { type: "class", parts: parts, inverted: inverted, ignoreCase: ignoreCase };
+    }
+
+    function peg$anyExpectation() {
+      return { type: "any" };
+    }
+
+    function peg$endExpectation() {
+      return { type: "end" };
+    }
+
+    function peg$otherExpectation(description) {
+      return { type: "other", description: description };
     }
 
     function peg$computePosDetails(pos) {
-      var details = peg$posDetailsCache[pos],
-          p, ch;
+      var details = peg$posDetailsCache[pos], p;
 
       if (details) {
         return details;
@@ -8019,23 +8422,15 @@ module.exports = (function() {
         details = peg$posDetailsCache[p];
         details = {
           line:   details.line,
-          column: details.column,
-          seenCR: details.seenCR
+          column: details.column
         };
 
         while (p < pos) {
-          ch = input.charAt(p);
-          if (ch === "\n") {
-            if (!details.seenCR) { details.line++; }
-            details.column = 1;
-            details.seenCR = false;
-          } else if (ch === "\r" || ch === "\u2028" || ch === "\u2029") {
+          if (input.charCodeAt(p) === 10) {
             details.line++;
             details.column = 1;
-            details.seenCR = true;
           } else {
             details.column++;
-            details.seenCR = false;
           }
 
           p++;
@@ -8075,71 +8470,13 @@ module.exports = (function() {
       peg$maxFailExpected.push(expected);
     }
 
-    function peg$buildException(message, expected, found, location) {
-      function cleanupExpected(expected) {
-        var i = 1;
+    function peg$buildSimpleError(message, location) {
+      return new peg$SyntaxError(message, null, null, location);
+    }
 
-        expected.sort(function(a, b) {
-          if (a.description < b.description) {
-            return -1;
-          } else if (a.description > b.description) {
-            return 1;
-          } else {
-            return 0;
-          }
-        });
-
-        while (i < expected.length) {
-          if (expected[i - 1] === expected[i]) {
-            expected.splice(i, 1);
-          } else {
-            i++;
-          }
-        }
-      }
-
-      function buildMessage(expected, found) {
-        function stringEscape(s) {
-          function hex(ch) { return ch.charCodeAt(0).toString(16).toUpperCase(); }
-
-          return s
-            .replace(/\\/g,   '\\\\')
-            .replace(/"/g,    '\\"')
-            .replace(/\x08/g, '\\b')
-            .replace(/\t/g,   '\\t')
-            .replace(/\n/g,   '\\n')
-            .replace(/\f/g,   '\\f')
-            .replace(/\r/g,   '\\r')
-            .replace(/[\x00-\x07\x0B\x0E\x0F]/g, function(ch) { return '\\x0' + hex(ch); })
-            .replace(/[\x10-\x1F\x80-\xFF]/g,    function(ch) { return '\\x'  + hex(ch); })
-            .replace(/[\u0100-\u0FFF]/g,         function(ch) { return '\\u0' + hex(ch); })
-            .replace(/[\u1000-\uFFFF]/g,         function(ch) { return '\\u'  + hex(ch); });
-        }
-
-        var expectedDescs = new Array(expected.length),
-            expectedDesc, foundDesc, i;
-
-        for (i = 0; i < expected.length; i++) {
-          expectedDescs[i] = expected[i].description;
-        }
-
-        expectedDesc = expected.length > 1
-          ? expectedDescs.slice(0, -1).join(", ")
-              + " or "
-              + expectedDescs[expected.length - 1]
-          : expectedDescs[0];
-
-        foundDesc = found ? "\"" + stringEscape(found) + "\"" : "end of input";
-
-        return "Expected " + expectedDesc + " but " + foundDesc + " found.";
-      }
-
-      if (expected !== null) {
-        cleanupExpected(expected);
-      }
-
+    function peg$buildStructuredError(expected, found, location) {
       return new peg$SyntaxError(
-        message !== null ? message : buildMessage(expected, found),
+        peg$SyntaxError.buildMessage(expected, found),
         expected,
         found,
         location
@@ -9040,22 +9377,37 @@ module.exports = (function() {
     }
 
     function peg$parseParticleArgument() {
-      var s0, s1, s2, s3, s4, s5;
+      var s0, s1, s2, s3, s4, s5, s6;
 
       s0 = peg$currPos;
       s1 = peg$parseParticleArgumentDirection();
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
         if (s2 !== peg$FAILED) {
-          s3 = peg$parseType();
+          s3 = peg$parseParticleArgumentType();
           if (s3 !== peg$FAILED) {
-            s4 = peg$parsewhiteSpace();
+            if (input.charCodeAt(peg$currPos) === 63) {
+              s4 = peg$c31;
+              peg$currPos++;
+            } else {
+              s4 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c32); }
+            }
+            if (s4 === peg$FAILED) {
+              s4 = null;
+            }
             if (s4 !== peg$FAILED) {
-              s5 = peg$parselowerIdent();
+              s5 = peg$parsewhiteSpace();
               if (s5 !== peg$FAILED) {
-                peg$savedPos = s0;
-                s1 = peg$c31(s1, s3, s5);
-                s0 = s1;
+                s6 = peg$parselowerIdent();
+                if (s6 !== peg$FAILED) {
+                  peg$savedPos = s0;
+                  s1 = peg$c33(s1, s3, s4, s6);
+                  s0 = s1;
+                } else {
+                  peg$currPos = s0;
+                  s0 = peg$FAILED;
+                }
               } else {
                 peg$currPos = s0;
                 s0 = peg$FAILED;
@@ -9083,12 +9435,12 @@ module.exports = (function() {
     function peg$parseParticleArgumentDirection() {
       var s0, s1;
 
-      if (input.substr(peg$currPos, 5) === peg$c32) {
-        s0 = peg$c32;
+      if (input.substr(peg$currPos, 5) === peg$c34) {
+        s0 = peg$c34;
         peg$currPos += 5;
       } else {
         s0 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c33); }
+        if (peg$silentFails === 0) { peg$fail(peg$c35); }
       }
       if (s0 === peg$FAILED) {
         if (input.substr(peg$currPos, 2) === peg$c5) {
@@ -9099,33 +9451,45 @@ module.exports = (function() {
           if (peg$silentFails === 0) { peg$fail(peg$c6); }
         }
         if (s0 === peg$FAILED) {
-          s0 = peg$currPos;
-          if (input.substr(peg$currPos, 3) === peg$c34) {
-            s1 = peg$c34;
+          if (input.substr(peg$currPos, 3) === peg$c36) {
+            s0 = peg$c36;
             peg$currPos += 3;
           } else {
-            s1 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c35); }
+            s0 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c37); }
           }
-          if (s1 !== peg$FAILED) {
-            peg$savedPos = s0;
-            s1 = peg$c36();
+          if (s0 === peg$FAILED) {
+            s0 = peg$currPos;
+            if (input.substr(peg$currPos, 4) === peg$c38) {
+              s1 = peg$c38;
+              peg$currPos += 4;
+            } else {
+              s1 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c39); }
+            }
+            if (s1 !== peg$FAILED) {
+              peg$savedPos = s0;
+              s1 = peg$c40();
+            }
+            s0 = s1;
           }
-          s0 = s1;
         }
       }
 
       return s0;
     }
 
-    function peg$parseType() {
+    function peg$parseParticleArgumentType() {
       var s0;
 
       s0 = peg$parseVariableType();
       if (s0 === peg$FAILED) {
-        s0 = peg$parseReferenceType();
+        s0 = peg$parseSchemaInline();
         if (s0 === peg$FAILED) {
-          s0 = peg$parseListType();
+          s0 = peg$parseReferenceType();
+          if (s0 === peg$FAILED) {
+            s0 = peg$parseListType();
+          }
         }
       }
 
@@ -9137,25 +9501,25 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 91) {
-        s1 = peg$c37;
+        s1 = peg$c41;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c38); }
+        if (peg$silentFails === 0) { peg$fail(peg$c42); }
       }
       if (s1 !== peg$FAILED) {
-        s2 = peg$parseType();
+        s2 = peg$parseParticleArgumentType();
         if (s2 !== peg$FAILED) {
           if (input.charCodeAt(peg$currPos) === 93) {
-            s3 = peg$c39;
+            s3 = peg$c43;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c40); }
+            if (peg$silentFails === 0) { peg$fail(peg$c44); }
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c41(s2);
+            s1 = peg$c45(s2);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -9178,17 +9542,17 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 126) {
-        s1 = peg$c42;
+        s1 = peg$c46;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c43); }
+        if (peg$silentFails === 0) { peg$fail(peg$c47); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parselowerIdent();
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c44(s2);
+          s1 = peg$c48(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -9209,7 +9573,7 @@ module.exports = (function() {
       s1 = peg$parseupperIdent();
       if (s1 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c45(s1);
+        s1 = peg$c49(s1);
       }
       s0 = s1;
 
@@ -9282,7 +9646,7 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c46(s1, s2);
+          s1 = peg$c50(s1, s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -9300,46 +9664,46 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 10) === peg$c47) {
-        s1 = peg$c47;
+      if (input.substr(peg$currPos, 10) === peg$c51) {
+        s1 = peg$c51;
         peg$currPos += 10;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c48); }
+        if (peg$silentFails === 0) { peg$fail(peg$c52); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
         if (s2 !== peg$FAILED) {
-          if (input.substr(peg$currPos, 9) === peg$c49) {
-            s3 = peg$c49;
+          if (input.substr(peg$currPos, 9) === peg$c53) {
+            s3 = peg$c53;
             peg$currPos += 9;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c50); }
+            if (peg$silentFails === 0) { peg$fail(peg$c54); }
           }
           if (s3 === peg$FAILED) {
-            if (input.substr(peg$currPos, 3) === peg$c51) {
-              s3 = peg$c51;
+            if (input.substr(peg$currPos, 3) === peg$c55) {
+              s3 = peg$c55;
               peg$currPos += 3;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c52); }
+              if (peg$silentFails === 0) { peg$fail(peg$c56); }
             }
             if (s3 === peg$FAILED) {
-              if (input.substr(peg$currPos, 2) === peg$c53) {
-                s3 = peg$c53;
+              if (input.substr(peg$currPos, 2) === peg$c57) {
+                s3 = peg$c57;
                 peg$currPos += 2;
               } else {
                 s3 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c54); }
+                if (peg$silentFails === 0) { peg$fail(peg$c58); }
               }
               if (s3 === peg$FAILED) {
-                if (input.substr(peg$currPos, 5) === peg$c55) {
-                  s3 = peg$c55;
+                if (input.substr(peg$currPos, 5) === peg$c59) {
+                  s3 = peg$c59;
                   peg$currPos += 5;
                 } else {
                   s3 = peg$FAILED;
-                  if (peg$silentFails === 0) { peg$fail(peg$c56); }
+                  if (peg$silentFails === 0) { peg$fail(peg$c60); }
                 }
               }
             }
@@ -9348,7 +9712,7 @@ module.exports = (function() {
             s4 = peg$parseeolWhiteSpace();
             if (s4 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c57(s3);
+              s1 = peg$c61(s3);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -9375,12 +9739,12 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       s1 = peg$currPos;
-      if (input.substr(peg$currPos, 4) === peg$c58) {
-        s2 = peg$c58;
+      if (input.substr(peg$currPos, 4) === peg$c62) {
+        s2 = peg$c62;
         peg$currPos += 4;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c59); }
+        if (peg$silentFails === 0) { peg$fail(peg$c63); }
       }
       if (s2 !== peg$FAILED) {
         s3 = peg$parsewhiteSpace();
@@ -9399,23 +9763,23 @@ module.exports = (function() {
         s1 = null;
       }
       if (s1 !== peg$FAILED) {
-        if (input.substr(peg$currPos, 7) === peg$c60) {
-          s2 = peg$c60;
+        if (input.substr(peg$currPos, 7) === peg$c64) {
+          s2 = peg$c64;
           peg$currPos += 7;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c61); }
+          if (peg$silentFails === 0) { peg$fail(peg$c65); }
         }
         if (s2 !== peg$FAILED) {
           s3 = peg$parsewhiteSpace();
           if (s3 !== peg$FAILED) {
             s4 = peg$currPos;
-            if (input.substr(peg$currPos, 6) === peg$c62) {
-              s5 = peg$c62;
+            if (input.substr(peg$currPos, 6) === peg$c66) {
+              s5 = peg$c66;
               peg$currPos += 6;
             } else {
               s5 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c63); }
+              if (peg$silentFails === 0) { peg$fail(peg$c67); }
             }
             if (s5 !== peg$FAILED) {
               s6 = peg$parsewhiteSpace();
@@ -9491,7 +9855,7 @@ module.exports = (function() {
                   }
                   if (s7 !== peg$FAILED) {
                     peg$savedPos = s0;
-                    s1 = peg$c64(s1, s4, s5, s7);
+                    s1 = peg$c68(s1, s4, s5, s7);
                     s0 = s1;
                   } else {
                     peg$currPos = s0;
@@ -9540,46 +9904,46 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 10) === peg$c65) {
-        s1 = peg$c65;
+      if (input.substr(peg$currPos, 10) === peg$c69) {
+        s1 = peg$c69;
         peg$currPos += 10;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c66); }
+        if (peg$silentFails === 0) { peg$fail(peg$c70); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
         if (s2 !== peg$FAILED) {
-          if (input.substr(peg$currPos, 10) === peg$c67) {
-            s3 = peg$c67;
+          if (input.substr(peg$currPos, 10) === peg$c71) {
+            s3 = peg$c71;
             peg$currPos += 10;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c68); }
+            if (peg$silentFails === 0) { peg$fail(peg$c72); }
           }
           if (s3 === peg$FAILED) {
-            if (input.substr(peg$currPos, 3) === peg$c69) {
-              s3 = peg$c69;
+            if (input.substr(peg$currPos, 3) === peg$c73) {
+              s3 = peg$c73;
               peg$currPos += 3;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c70); }
+              if (peg$silentFails === 0) { peg$fail(peg$c74); }
             }
             if (s3 === peg$FAILED) {
-              if (input.substr(peg$currPos, 6) === peg$c71) {
-                s3 = peg$c71;
+              if (input.substr(peg$currPos, 6) === peg$c75) {
+                s3 = peg$c75;
                 peg$currPos += 6;
               } else {
                 s3 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c72); }
+                if (peg$silentFails === 0) { peg$fail(peg$c76); }
               }
               if (s3 === peg$FAILED) {
-                if (input.substr(peg$currPos, 5) === peg$c73) {
-                  s3 = peg$c73;
+                if (input.substr(peg$currPos, 5) === peg$c77) {
+                  s3 = peg$c77;
                   peg$currPos += 5;
                 } else {
                   s3 = peg$FAILED;
-                  if (peg$silentFails === 0) { peg$fail(peg$c74); }
+                  if (peg$silentFails === 0) { peg$fail(peg$c78); }
                 }
               }
             }
@@ -9588,7 +9952,7 @@ module.exports = (function() {
             s4 = peg$parseeolWhiteSpace();
             if (s4 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c75(s3);
+              s1 = peg$c79(s3);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -9614,23 +9978,23 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 7) === peg$c76) {
-        s1 = peg$c76;
+      if (input.substr(peg$currPos, 7) === peg$c80) {
+        s1 = peg$c80;
         peg$currPos += 7;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c77); }
+        if (peg$silentFails === 0) { peg$fail(peg$c81); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
         if (s2 !== peg$FAILED) {
           s3 = peg$currPos;
-          if (input.substr(peg$currPos, 6) === peg$c62) {
-            s4 = peg$c62;
+          if (input.substr(peg$currPos, 6) === peg$c66) {
+            s4 = peg$c66;
             peg$currPos += 6;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c63); }
+            if (peg$silentFails === 0) { peg$fail(peg$c67); }
           }
           if (s4 !== peg$FAILED) {
             s5 = peg$parsewhiteSpace();
@@ -9706,7 +10070,7 @@ module.exports = (function() {
                 }
                 if (s6 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c78(s3, s4, s6);
+                  s1 = peg$c82(s3, s4, s6);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -9766,7 +10130,7 @@ module.exports = (function() {
             s4 = peg$parseeolWhiteSpace();
             if (s4 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c79(s3);
+              s1 = peg$c83(s3);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -9863,7 +10227,7 @@ module.exports = (function() {
               }
               if (s5 !== peg$FAILED) {
                 peg$savedPos = s0;
-                s1 = peg$c80(s3, s5);
+                s1 = peg$c84(s3, s5);
                 s0 = s1;
               } else {
                 peg$currPos = s0;
@@ -9902,7 +10266,7 @@ module.exports = (function() {
             s4 = peg$parseeolWhiteSpace();
             if (s4 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c81(s1, s3);
+              s1 = peg$c85(s1, s3);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -9928,12 +10292,12 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 6) === peg$c82) {
-        s1 = peg$c82;
+      if (input.substr(peg$currPos, 6) === peg$c86) {
+        s1 = peg$c86;
         peg$currPos += 6;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c83); }
+        if (peg$silentFails === 0) { peg$fail(peg$c87); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$currPos;
@@ -10029,7 +10393,7 @@ module.exports = (function() {
               }
               if (s5 !== peg$FAILED) {
                 peg$savedPos = s0;
-                s1 = peg$c84(s2, s3, s5);
+                s1 = peg$c88(s2, s3, s5);
                 s0 = s1;
               } else {
                 peg$currPos = s0;
@@ -10079,12 +10443,12 @@ module.exports = (function() {
       var s0, s1, s2, s3;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 2) === peg$c85) {
-        s1 = peg$c85;
+      if (input.substr(peg$currPos, 2) === peg$c89) {
+        s1 = peg$c89;
         peg$currPos += 2;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c86); }
+        if (peg$silentFails === 0) { peg$fail(peg$c90); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
@@ -10092,7 +10456,7 @@ module.exports = (function() {
           s3 = peg$parselowerIdent();
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c87(s3);
+            s1 = peg$c91(s3);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -10190,7 +10554,7 @@ module.exports = (function() {
             }
             if (s4 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c88(s1, s2, s4);
+              s1 = peg$c92(s1, s2, s4);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -10230,11 +10594,11 @@ module.exports = (function() {
       s1 = peg$parselowerIdent();
       if (s1 === peg$FAILED) {
         if (input.charCodeAt(peg$currPos) === 42) {
-          s1 = peg$c89;
+          s1 = peg$c93;
           peg$currPos++;
         } else {
           s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c90); }
+          if (peg$silentFails === 0) { peg$fail(peg$c94); }
         }
       }
       if (s1 !== peg$FAILED) {
@@ -10264,7 +10628,7 @@ module.exports = (function() {
               s5 = peg$parseeolWhiteSpace();
               if (s5 !== peg$FAILED) {
                 peg$savedPos = s0;
-                s1 = peg$c91(s1, s3, s4);
+                s1 = peg$c95(s1, s3, s4);
                 s0 = s1;
               } else {
                 peg$currPos = s0;
@@ -10294,12 +10658,12 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 7) === peg$c60) {
-        s1 = peg$c60;
+      if (input.substr(peg$currPos, 7) === peg$c64) {
+        s1 = peg$c64;
         peg$currPos += 7;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c61); }
+        if (peg$silentFails === 0) { peg$fail(peg$c65); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
@@ -10380,7 +10744,7 @@ module.exports = (function() {
                 }
                 if (s6 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c92(s3, s4, s6);
+                  s1 = peg$c96(s3, s4, s6);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -10414,12 +10778,12 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5, s6;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 7) === peg$c76) {
-        s1 = peg$c76;
+      if (input.substr(peg$currPos, 7) === peg$c80) {
+        s1 = peg$c80;
         peg$currPos += 7;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c77); }
+        if (peg$silentFails === 0) { peg$fail(peg$c81); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
@@ -10448,7 +10812,7 @@ module.exports = (function() {
               s5 = peg$parseeolWhiteSpace();
               if (s5 !== peg$FAILED) {
                 peg$savedPos = s0;
-                s1 = peg$c93(s3, s4);
+                s1 = peg$c97(s3, s4);
                 s0 = s1;
               } else {
                 peg$currPos = s0;
@@ -10491,7 +10855,7 @@ module.exports = (function() {
                 s6 = peg$parseeolWhiteSpace();
                 if (s6 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c94(s1, s3, s5);
+                  s1 = peg$c98(s1, s3, s5);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -10525,12 +10889,12 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 6) === peg$c95) {
-        s1 = peg$c95;
+      if (input.substr(peg$currPos, 6) === peg$c99) {
+        s1 = peg$c99;
         peg$currPos += 6;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c96); }
+        if (peg$silentFails === 0) { peg$fail(peg$c100); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
@@ -10545,12 +10909,12 @@ module.exports = (function() {
                 s7 = peg$currPos;
                 s8 = peg$parseSameIndent();
                 if (s8 !== peg$FAILED) {
-                  if (input.substr(peg$currPos, 6) === peg$c97) {
-                    s9 = peg$c97;
+                  if (input.substr(peg$currPos, 6) === peg$c101) {
+                    s9 = peg$c101;
                     peg$currPos += 6;
                   } else {
                     s9 = peg$FAILED;
-                    if (peg$silentFails === 0) { peg$fail(peg$c98); }
+                    if (peg$silentFails === 0) { peg$fail(peg$c102); }
                   }
                   if (s9 !== peg$FAILED) {
                     s10 = [];
@@ -10628,7 +10992,7 @@ module.exports = (function() {
               }
               if (s5 !== peg$FAILED) {
                 peg$savedPos = s0;
-                s1 = peg$c99(s3, s5);
+                s1 = peg$c103(s3, s5);
                 s0 = s1;
               } else {
                 peg$currPos = s0;
@@ -10657,28 +11021,28 @@ module.exports = (function() {
     function peg$parseDirection() {
       var s0;
 
-      if (input.substr(peg$currPos, 2) === peg$c100) {
-        s0 = peg$c100;
+      if (input.substr(peg$currPos, 2) === peg$c104) {
+        s0 = peg$c104;
         peg$currPos += 2;
       } else {
         s0 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c101); }
+        if (peg$silentFails === 0) { peg$fail(peg$c105); }
       }
       if (s0 === peg$FAILED) {
-        if (input.substr(peg$currPos, 2) === peg$c102) {
-          s0 = peg$c102;
+        if (input.substr(peg$currPos, 2) === peg$c106) {
+          s0 = peg$c106;
           peg$currPos += 2;
         } else {
           s0 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c103); }
+          if (peg$silentFails === 0) { peg$fail(peg$c107); }
         }
         if (s0 === peg$FAILED) {
           if (input.charCodeAt(peg$currPos) === 61) {
-            s0 = peg$c104;
+            s0 = peg$c108;
             peg$currPos++;
           } else {
             s0 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c105); }
+            if (peg$silentFails === 0) { peg$fail(peg$c109); }
           }
         }
       }
@@ -10697,11 +11061,11 @@ module.exports = (function() {
       if (s1 !== peg$FAILED) {
         s2 = peg$currPos;
         if (input.charCodeAt(peg$currPos) === 46) {
-          s3 = peg$c106;
+          s3 = peg$c110;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c107); }
+          if (peg$silentFails === 0) { peg$fail(peg$c111); }
         }
         if (s3 !== peg$FAILED) {
           s4 = peg$parselowerIdent();
@@ -10740,7 +11104,7 @@ module.exports = (function() {
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c108(s1, s2, s3);
+            s1 = peg$c112(s1, s2, s3);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -10759,7 +11123,7 @@ module.exports = (function() {
         s1 = peg$parseTagList();
         if (s1 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c109(s1);
+          s1 = peg$c113(s1);
         }
         s0 = s1;
       }
@@ -10772,43 +11136,43 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 63) {
-        s1 = peg$c110;
+        s1 = peg$c31;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c111); }
+        if (peg$silentFails === 0) { peg$fail(peg$c32); }
       }
       if (s1 === peg$FAILED) {
-        if (input.substr(peg$currPos, 3) === peg$c112) {
-          s1 = peg$c112;
+        if (input.substr(peg$currPos, 3) === peg$c114) {
+          s1 = peg$c114;
           peg$currPos += 3;
         } else {
           s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c113); }
+          if (peg$silentFails === 0) { peg$fail(peg$c115); }
         }
         if (s1 === peg$FAILED) {
-          if (input.substr(peg$currPos, 3) === peg$c114) {
-            s1 = peg$c114;
+          if (input.substr(peg$currPos, 3) === peg$c116) {
+            s1 = peg$c116;
             peg$currPos += 3;
           } else {
             s1 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c115); }
+            if (peg$silentFails === 0) { peg$fail(peg$c117); }
           }
           if (s1 === peg$FAILED) {
-            if (input.substr(peg$currPos, 6) === peg$c116) {
-              s1 = peg$c116;
+            if (input.substr(peg$currPos, 6) === peg$c118) {
+              s1 = peg$c118;
               peg$currPos += 6;
             } else {
               s1 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c117); }
+              if (peg$silentFails === 0) { peg$fail(peg$c119); }
             }
             if (s1 === peg$FAILED) {
-              if (input.substr(peg$currPos, 4) === peg$c118) {
-                s1 = peg$c118;
+              if (input.substr(peg$currPos, 4) === peg$c120) {
+                s1 = peg$c120;
                 peg$currPos += 4;
               } else {
                 s1 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c119); }
+                if (peg$silentFails === 0) { peg$fail(peg$c121); }
               }
             }
           }
@@ -10856,7 +11220,7 @@ module.exports = (function() {
             s4 = peg$parseeolWhiteSpace();
             if (s4 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c120(s1, s2, s3);
+              s1 = peg$c122(s1, s2, s3);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -10883,42 +11247,42 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 35) {
-        s1 = peg$c121;
+        s1 = peg$c123;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c122); }
+        if (peg$silentFails === 0) { peg$fail(peg$c124); }
       }
       if (s1 !== peg$FAILED) {
-        if (peg$c123.test(input.charAt(peg$currPos))) {
+        if (peg$c125.test(input.charAt(peg$currPos))) {
           s2 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c124); }
+          if (peg$silentFails === 0) { peg$fail(peg$c126); }
         }
         if (s2 !== peg$FAILED) {
           s3 = [];
-          if (peg$c125.test(input.charAt(peg$currPos))) {
+          if (peg$c127.test(input.charAt(peg$currPos))) {
             s4 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c126); }
+            if (peg$silentFails === 0) { peg$fail(peg$c128); }
           }
           while (s4 !== peg$FAILED) {
             s3.push(s4);
-            if (peg$c125.test(input.charAt(peg$currPos))) {
+            if (peg$c127.test(input.charAt(peg$currPos))) {
               s4 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s4 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c126); }
+              if (peg$silentFails === 0) { peg$fail(peg$c128); }
             }
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c127();
+            s1 = peg$c129();
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -10962,7 +11326,7 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c128(s1, s2);
+          s1 = peg$c130(s1, s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -10985,7 +11349,7 @@ module.exports = (function() {
         s2 = peg$parseTagList();
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c129(s2);
+          s1 = peg$c131(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -11011,7 +11375,7 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c130(s1, s2);
+          s1 = peg$c132(s1, s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -11026,17 +11390,17 @@ module.exports = (function() {
         s1 = peg$parseTagList();
         if (s1 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c131(s1);
+          s1 = peg$c133(s1);
         }
         s0 = s1;
         if (s0 === peg$FAILED) {
           s0 = peg$currPos;
-          if (input.substr(peg$currPos, 12) === peg$c132) {
-            s1 = peg$c132;
+          if (input.substr(peg$currPos, 12) === peg$c134) {
+            s1 = peg$c134;
             peg$currPos += 12;
           } else {
             s1 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c133); }
+            if (peg$silentFails === 0) { peg$fail(peg$c135); }
           }
           if (s1 !== peg$FAILED) {
             s2 = peg$parsewhiteSpace();
@@ -11049,7 +11413,7 @@ module.exports = (function() {
                 }
                 if (s4 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c134(s3, s4);
+                  s1 = peg$c136(s3, s4);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -11085,7 +11449,7 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c135(s1, s2);
+          s1 = peg$c137(s1, s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -11105,7 +11469,7 @@ module.exports = (function() {
           }
           if (s2 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c136(s1, s2);
+            s1 = peg$c138(s1, s2);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -11120,7 +11484,7 @@ module.exports = (function() {
           s1 = peg$parseTagList();
           if (s1 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c137(s1);
+            s1 = peg$c139(s1);
           }
           s0 = s1;
         }
@@ -11133,12 +11497,12 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 4) === peg$c138) {
-        s1 = peg$c138;
+      if (input.substr(peg$currPos, 4) === peg$c140) {
+        s1 = peg$c140;
         peg$currPos += 4;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c139); }
+        if (peg$silentFails === 0) { peg$fail(peg$c141); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$currPos;
@@ -11182,7 +11546,7 @@ module.exports = (function() {
             s4 = peg$parseeolWhiteSpace();
             if (s4 !== peg$FAILED) {
               peg$savedPos = s0;
-              s1 = peg$c140(s2, s3);
+              s1 = peg$c142(s2, s3);
               s0 = s1;
             } else {
               peg$currPos = s0;
@@ -11210,12 +11574,12 @@ module.exports = (function() {
       s0 = peg$currPos;
       s1 = peg$parsewhiteSpace();
       if (s1 !== peg$FAILED) {
-        if (input.substr(peg$currPos, 7) === peg$c141) {
-          s2 = peg$c141;
+        if (input.substr(peg$currPos, 7) === peg$c143) {
+          s2 = peg$c143;
           peg$currPos += 7;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c142); }
+          if (peg$silentFails === 0) { peg$fail(peg$c144); }
         }
         if (s2 !== peg$FAILED) {
           s3 = peg$parsewhiteSpace();
@@ -11300,7 +11664,7 @@ module.exports = (function() {
               }
               if (s5 !== peg$FAILED) {
                 peg$savedPos = s0;
-                s1 = peg$c143(s4, s5);
+                s1 = peg$c145(s4, s5);
                 s0 = s1;
               } else {
                 peg$currPos = s0;
@@ -11326,16 +11690,207 @@ module.exports = (function() {
       return s0;
     }
 
+    function peg$parseSchemaInline() {
+      var s0, s1, s2, s3, s4, s5, s6, s7, s8;
+
+      s0 = peg$currPos;
+      s1 = peg$currPos;
+      s2 = peg$parseupperIdent();
+      if (s2 !== peg$FAILED) {
+        if (input.charCodeAt(peg$currPos) === 32) {
+          s3 = peg$c146;
+          peg$currPos++;
+        } else {
+          s3 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c147); }
+        }
+        if (s3 !== peg$FAILED) {
+          s2 = [s2, s3];
+          s1 = s2;
+        } else {
+          peg$currPos = s1;
+          s1 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s1;
+        s1 = peg$FAILED;
+      }
+      if (s1 === peg$FAILED) {
+        s1 = null;
+      }
+      if (s1 !== peg$FAILED) {
+        if (input.charCodeAt(peg$currPos) === 123) {
+          s2 = peg$c148;
+          peg$currPos++;
+        } else {
+          s2 = peg$FAILED;
+          if (peg$silentFails === 0) { peg$fail(peg$c149); }
+        }
+        if (s2 !== peg$FAILED) {
+          s3 = [];
+          s4 = peg$currPos;
+          s5 = peg$parseSchemaInlineField();
+          if (s5 !== peg$FAILED) {
+            s6 = peg$currPos;
+            if (input.charCodeAt(peg$currPos) === 44) {
+              s7 = peg$c28;
+              peg$currPos++;
+            } else {
+              s7 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c29); }
+            }
+            if (s7 !== peg$FAILED) {
+              s8 = peg$parsewhiteSpace();
+              if (s8 !== peg$FAILED) {
+                s7 = [s7, s8];
+                s6 = s7;
+              } else {
+                peg$currPos = s6;
+                s6 = peg$FAILED;
+              }
+            } else {
+              peg$currPos = s6;
+              s6 = peg$FAILED;
+            }
+            if (s6 === peg$FAILED) {
+              s6 = null;
+            }
+            if (s6 !== peg$FAILED) {
+              s5 = [s5, s6];
+              s4 = s5;
+            } else {
+              peg$currPos = s4;
+              s4 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s4;
+            s4 = peg$FAILED;
+          }
+          if (s4 !== peg$FAILED) {
+            while (s4 !== peg$FAILED) {
+              s3.push(s4);
+              s4 = peg$currPos;
+              s5 = peg$parseSchemaInlineField();
+              if (s5 !== peg$FAILED) {
+                s6 = peg$currPos;
+                if (input.charCodeAt(peg$currPos) === 44) {
+                  s7 = peg$c28;
+                  peg$currPos++;
+                } else {
+                  s7 = peg$FAILED;
+                  if (peg$silentFails === 0) { peg$fail(peg$c29); }
+                }
+                if (s7 !== peg$FAILED) {
+                  s8 = peg$parsewhiteSpace();
+                  if (s8 !== peg$FAILED) {
+                    s7 = [s7, s8];
+                    s6 = s7;
+                  } else {
+                    peg$currPos = s6;
+                    s6 = peg$FAILED;
+                  }
+                } else {
+                  peg$currPos = s6;
+                  s6 = peg$FAILED;
+                }
+                if (s6 === peg$FAILED) {
+                  s6 = null;
+                }
+                if (s6 !== peg$FAILED) {
+                  s5 = [s5, s6];
+                  s4 = s5;
+                } else {
+                  peg$currPos = s4;
+                  s4 = peg$FAILED;
+                }
+              } else {
+                peg$currPos = s4;
+                s4 = peg$FAILED;
+              }
+            }
+          } else {
+            s3 = peg$FAILED;
+          }
+          if (s3 !== peg$FAILED) {
+            if (input.charCodeAt(peg$currPos) === 125) {
+              s4 = peg$c150;
+              peg$currPos++;
+            } else {
+              s4 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c151); }
+            }
+            if (s4 !== peg$FAILED) {
+              peg$savedPos = s0;
+              s1 = peg$c152(s1, s3);
+              s0 = s1;
+            } else {
+              peg$currPos = s0;
+              s0 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
+          }
+        } else {
+          peg$currPos = s0;
+          s0 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s0;
+        s0 = peg$FAILED;
+      }
+
+      return s0;
+    }
+
+    function peg$parseSchemaInlineField() {
+      var s0, s1, s2, s3, s4;
+
+      s0 = peg$currPos;
+      s1 = peg$parseSchemaType();
+      if (s1 !== peg$FAILED) {
+        s2 = peg$parseSchemaArity();
+        if (s2 === peg$FAILED) {
+          s2 = null;
+        }
+        if (s2 !== peg$FAILED) {
+          s3 = peg$parsewhiteSpace();
+          if (s3 !== peg$FAILED) {
+            s4 = peg$parselowerIdent();
+            if (s4 !== peg$FAILED) {
+              peg$savedPos = s0;
+              s1 = peg$c153(s1, s2, s4);
+              s0 = s1;
+            } else {
+              peg$currPos = s0;
+              s0 = peg$FAILED;
+            }
+          } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
+          }
+        } else {
+          peg$currPos = s0;
+          s0 = peg$FAILED;
+        }
+      } else {
+        peg$currPos = s0;
+        s0 = peg$FAILED;
+      }
+
+      return s0;
+    }
+
     function peg$parseSchema() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 6) === peg$c144) {
-        s1 = peg$c144;
+      if (input.substr(peg$currPos, 6) === peg$c154) {
+        s1 = peg$c154;
         peg$currPos += 6;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c145); }
+        if (peg$silentFails === 0) { peg$fail(peg$c155); }
       }
       if (s1 !== peg$FAILED) {
         s2 = peg$parsewhiteSpace();
@@ -11402,7 +11957,7 @@ module.exports = (function() {
                 }
                 if (s6 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c146(s3, s4, s6);
+                  s1 = peg$c156(s3, s4, s6);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -11436,20 +11991,20 @@ module.exports = (function() {
       var s0, s1, s2, s3, s4, s5, s6, s7, s8, s9;
 
       s0 = peg$currPos;
-      if (input.substr(peg$currPos, 9) === peg$c147) {
-        s1 = peg$c147;
+      if (input.substr(peg$currPos, 9) === peg$c157) {
+        s1 = peg$c157;
         peg$currPos += 9;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c148); }
+        if (peg$silentFails === 0) { peg$fail(peg$c158); }
       }
       if (s1 === peg$FAILED) {
-        if (input.substr(peg$currPos, 8) === peg$c149) {
-          s1 = peg$c149;
+        if (input.substr(peg$currPos, 8) === peg$c159) {
+          s1 = peg$c159;
           peg$currPos += 8;
         } else {
           s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c150); }
+          if (peg$silentFails === 0) { peg$fail(peg$c160); }
         }
       }
       if (s1 !== peg$FAILED) {
@@ -11521,7 +12076,7 @@ module.exports = (function() {
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c151(s1, s3);
+            s1 = peg$c161(s1, s3);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -11539,6 +12094,20 @@ module.exports = (function() {
       return s0;
     }
 
+    function peg$parseSchemaArity() {
+      var s0;
+
+      if (input.charCodeAt(peg$currPos) === 63) {
+        s0 = peg$c31;
+        peg$currPos++;
+      } else {
+        s0 = peg$FAILED;
+        if (peg$silentFails === 0) { peg$fail(peg$c32); }
+      }
+
+      return s0;
+    }
+
     function peg$parseSchemaField() {
       var s0, s1, s2, s3;
 
@@ -11550,7 +12119,7 @@ module.exports = (function() {
           s3 = peg$parselowerIdent();
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c152(s1, s3);
+            s1 = peg$c162(s1, s3);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -11571,23 +12140,58 @@ module.exports = (function() {
     function peg$parseSchemaType() {
       var s0;
 
-      if (input.substr(peg$currPos, 4) === peg$c153) {
-        s0 = peg$c153;
+      s0 = peg$parseSchemaPrimitiveType();
+      if (s0 === peg$FAILED) {
+        s0 = peg$parseSchemaUnionType();
+      }
+
+      return s0;
+    }
+
+    function peg$parseSchemaPrimitiveType() {
+      var s0;
+
+      if (input.substr(peg$currPos, 4) === peg$c163) {
+        s0 = peg$c163;
         peg$currPos += 4;
       } else {
         s0 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c154); }
+        if (peg$silentFails === 0) { peg$fail(peg$c164); }
       }
       if (s0 === peg$FAILED) {
-        if (input.substr(peg$currPos, 3) === peg$c155) {
-          s0 = peg$c155;
+        if (input.substr(peg$currPos, 3) === peg$c165) {
+          s0 = peg$c165;
           peg$currPos += 3;
         } else {
           s0 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c156); }
+          if (peg$silentFails === 0) { peg$fail(peg$c166); }
         }
         if (s0 === peg$FAILED) {
-          s0 = peg$parseSchemaUnionType();
+          if (input.substr(peg$currPos, 6) === peg$c167) {
+            s0 = peg$c167;
+            peg$currPos += 6;
+          } else {
+            s0 = peg$FAILED;
+            if (peg$silentFails === 0) { peg$fail(peg$c168); }
+          }
+          if (s0 === peg$FAILED) {
+            if (input.substr(peg$currPos, 7) === peg$c169) {
+              s0 = peg$c169;
+              peg$currPos += 7;
+            } else {
+              s0 = peg$FAILED;
+              if (peg$silentFails === 0) { peg$fail(peg$c170); }
+            }
+            if (s0 === peg$FAILED) {
+              if (input.substr(peg$currPos, 6) === peg$c171) {
+                s0 = peg$c171;
+                peg$currPos += 6;
+              } else {
+                s0 = peg$FAILED;
+                if (peg$silentFails === 0) { peg$fail(peg$c172); }
+              }
+            }
+          }
         }
       }
 
@@ -11611,23 +12215,23 @@ module.exports = (function() {
           s2 = null;
         }
         if (s2 !== peg$FAILED) {
-          s3 = peg$parseSchemaType();
+          s3 = peg$parseSchemaPrimitiveType();
           if (s3 !== peg$FAILED) {
             s4 = [];
             s5 = peg$currPos;
             s6 = peg$parsewhiteSpace();
             if (s6 !== peg$FAILED) {
-              if (input.substr(peg$currPos, 2) === peg$c157) {
-                s7 = peg$c157;
+              if (input.substr(peg$currPos, 2) === peg$c173) {
+                s7 = peg$c173;
                 peg$currPos += 2;
               } else {
                 s7 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c158); }
+                if (peg$silentFails === 0) { peg$fail(peg$c174); }
               }
               if (s7 !== peg$FAILED) {
                 s8 = peg$parsewhiteSpace();
                 if (s8 !== peg$FAILED) {
-                  s9 = peg$parseSchemaType();
+                  s9 = peg$parseSchemaPrimitiveType();
                   if (s9 !== peg$FAILED) {
                     s6 = [s6, s7, s8, s9];
                     s5 = s6;
@@ -11652,17 +12256,17 @@ module.exports = (function() {
               s5 = peg$currPos;
               s6 = peg$parsewhiteSpace();
               if (s6 !== peg$FAILED) {
-                if (input.substr(peg$currPos, 2) === peg$c157) {
-                  s7 = peg$c157;
+                if (input.substr(peg$currPos, 2) === peg$c173) {
+                  s7 = peg$c173;
                   peg$currPos += 2;
                 } else {
                   s7 = peg$FAILED;
-                  if (peg$silentFails === 0) { peg$fail(peg$c158); }
+                  if (peg$silentFails === 0) { peg$fail(peg$c174); }
                 }
                 if (s7 !== peg$FAILED) {
                   s8 = peg$parsewhiteSpace();
                   if (s8 !== peg$FAILED) {
-                    s9 = peg$parseSchemaType();
+                    s9 = peg$parseSchemaPrimitiveType();
                     if (s9 !== peg$FAILED) {
                       s6 = [s6, s7, s8, s9];
                       s5 = s6;
@@ -11698,7 +12302,7 @@ module.exports = (function() {
                 }
                 if (s6 !== peg$FAILED) {
                   peg$savedPos = s0;
-                  s1 = peg$c159(s3, s4);
+                  s1 = peg$c175(s3, s4);
                   s0 = s1;
                 } else {
                   peg$currPos = s0;
@@ -11733,30 +12337,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 64) {
-        s1 = peg$c160;
+        s1 = peg$c176;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c161); }
+        if (peg$silentFails === 0) { peg$fail(peg$c177); }
       }
       if (s1 !== peg$FAILED) {
         s2 = [];
-        if (peg$c162.test(input.charAt(peg$currPos))) {
+        if (peg$c178.test(input.charAt(peg$currPos))) {
           s3 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c163); }
+          if (peg$silentFails === 0) { peg$fail(peg$c179); }
         }
         if (s3 !== peg$FAILED) {
           while (s3 !== peg$FAILED) {
             s2.push(s3);
-            if (peg$c162.test(input.charAt(peg$currPos))) {
+            if (peg$c178.test(input.charAt(peg$currPos))) {
               s3 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c163); }
+              if (peg$silentFails === 0) { peg$fail(peg$c179); }
             }
           }
         } else {
@@ -11764,7 +12368,7 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c164(s2);
+          s1 = peg$c180(s2);
           s0 = s1;
         } else {
           peg$currPos = s0;
@@ -11786,21 +12390,21 @@ module.exports = (function() {
       s1 = peg$currPos;
       s2 = [];
       if (input.charCodeAt(peg$currPos) === 32) {
-        s3 = peg$c165;
+        s3 = peg$c146;
         peg$currPos++;
       } else {
         s3 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c166); }
+        if (peg$silentFails === 0) { peg$fail(peg$c147); }
       }
       if (s3 !== peg$FAILED) {
         while (s3 !== peg$FAILED) {
           s2.push(s3);
           if (input.charCodeAt(peg$currPos) === 32) {
-            s3 = peg$c165;
+            s3 = peg$c146;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c166); }
+            if (peg$silentFails === 0) { peg$fail(peg$c147); }
           }
         }
       } else {
@@ -11808,7 +12412,7 @@ module.exports = (function() {
       }
       if (s2 !== peg$FAILED) {
         peg$savedPos = peg$currPos;
-        s3 = peg$c167(s2);
+        s3 = peg$c181(s2);
         if (s3) {
           s3 = void 0;
         } else {
@@ -11845,25 +12449,25 @@ module.exports = (function() {
       s2 = peg$currPos;
       s3 = [];
       if (input.charCodeAt(peg$currPos) === 32) {
-        s4 = peg$c165;
+        s4 = peg$c146;
         peg$currPos++;
       } else {
         s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c166); }
+        if (peg$silentFails === 0) { peg$fail(peg$c147); }
       }
       while (s4 !== peg$FAILED) {
         s3.push(s4);
         if (input.charCodeAt(peg$currPos) === 32) {
-          s4 = peg$c165;
+          s4 = peg$c146;
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c166); }
+          if (peg$silentFails === 0) { peg$fail(peg$c147); }
         }
       }
       if (s3 !== peg$FAILED) {
         peg$savedPos = peg$currPos;
-        s4 = peg$c168(s3);
+        s4 = peg$c182(s3);
         if (s4) {
           s4 = void 0;
         } else {
@@ -11890,20 +12494,20 @@ module.exports = (function() {
       if (s1 !== peg$FAILED) {
         s2 = [];
         if (input.charCodeAt(peg$currPos) === 32) {
-          s3 = peg$c165;
+          s3 = peg$c146;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c166); }
+          if (peg$silentFails === 0) { peg$fail(peg$c147); }
         }
         while (s3 !== peg$FAILED) {
           s2.push(s3);
           if (input.charCodeAt(peg$currPos) === 32) {
-            s3 = peg$c165;
+            s3 = peg$c146;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c166); }
+            if (peg$silentFails === 0) { peg$fail(peg$c147); }
           }
         }
         if (s2 !== peg$FAILED) {
@@ -11930,25 +12534,25 @@ module.exports = (function() {
       s2 = peg$currPos;
       s3 = [];
       if (input.charCodeAt(peg$currPos) === 32) {
-        s4 = peg$c165;
+        s4 = peg$c146;
         peg$currPos++;
       } else {
         s4 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c166); }
+        if (peg$silentFails === 0) { peg$fail(peg$c147); }
       }
       while (s4 !== peg$FAILED) {
         s3.push(s4);
         if (input.charCodeAt(peg$currPos) === 32) {
-          s4 = peg$c165;
+          s4 = peg$c146;
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c166); }
+          if (peg$silentFails === 0) { peg$fail(peg$c147); }
         }
       }
       if (s3 !== peg$FAILED) {
         peg$savedPos = peg$currPos;
-        s4 = peg$c169(s3);
+        s4 = peg$c183(s3);
         if (s4) {
           s4 = void 0;
         } else {
@@ -11975,20 +12579,20 @@ module.exports = (function() {
       if (s1 !== peg$FAILED) {
         s2 = [];
         if (input.charCodeAt(peg$currPos) === 32) {
-          s3 = peg$c165;
+          s3 = peg$c146;
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c166); }
+          if (peg$silentFails === 0) { peg$fail(peg$c147); }
         }
         while (s3 !== peg$FAILED) {
           s2.push(s3);
           if (input.charCodeAt(peg$currPos) === 32) {
-            s3 = peg$c165;
+            s3 = peg$c146;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c166); }
+            if (peg$silentFails === 0) { peg$fail(peg$c147); }
           }
         }
         if (s2 !== peg$FAILED) {
@@ -12015,7 +12619,7 @@ module.exports = (function() {
         s1 = peg$parselowerIdent();
         if (s1 !== peg$FAILED) {
           peg$savedPos = s0;
-          s1 = peg$c170();
+          s1 = peg$c184();
         }
         s0 = s1;
       }
@@ -12028,30 +12632,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 96) {
-        s1 = peg$c171;
+        s1 = peg$c185;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c172); }
+        if (peg$silentFails === 0) { peg$fail(peg$c186); }
       }
       if (s1 !== peg$FAILED) {
         s2 = [];
-        if (peg$c173.test(input.charAt(peg$currPos))) {
+        if (peg$c187.test(input.charAt(peg$currPos))) {
           s3 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c174); }
+          if (peg$silentFails === 0) { peg$fail(peg$c188); }
         }
         if (s3 !== peg$FAILED) {
           while (s3 !== peg$FAILED) {
             s2.push(s3);
-            if (peg$c173.test(input.charAt(peg$currPos))) {
+            if (peg$c187.test(input.charAt(peg$currPos))) {
               s3 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c174); }
+              if (peg$silentFails === 0) { peg$fail(peg$c188); }
             }
           }
         } else {
@@ -12059,15 +12663,15 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           if (input.charCodeAt(peg$currPos) === 96) {
-            s3 = peg$c171;
+            s3 = peg$c185;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c172); }
+            if (peg$silentFails === 0) { peg$fail(peg$c186); }
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c175(s2);
+            s1 = peg$c189(s2);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -12090,30 +12694,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       if (input.charCodeAt(peg$currPos) === 39) {
-        s1 = peg$c176;
+        s1 = peg$c190;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c177); }
+        if (peg$silentFails === 0) { peg$fail(peg$c191); }
       }
       if (s1 !== peg$FAILED) {
         s2 = [];
-        if (peg$c178.test(input.charAt(peg$currPos))) {
+        if (peg$c192.test(input.charAt(peg$currPos))) {
           s3 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c179); }
+          if (peg$silentFails === 0) { peg$fail(peg$c193); }
         }
         if (s3 !== peg$FAILED) {
           while (s3 !== peg$FAILED) {
             s2.push(s3);
-            if (peg$c178.test(input.charAt(peg$currPos))) {
+            if (peg$c192.test(input.charAt(peg$currPos))) {
               s3 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s3 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c179); }
+              if (peg$silentFails === 0) { peg$fail(peg$c193); }
             }
           }
         } else {
@@ -12121,15 +12725,15 @@ module.exports = (function() {
         }
         if (s2 !== peg$FAILED) {
           if (input.charCodeAt(peg$currPos) === 39) {
-            s3 = peg$c176;
+            s3 = peg$c190;
             peg$currPos++;
           } else {
             s3 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c177); }
+            if (peg$silentFails === 0) { peg$fail(peg$c191); }
           }
           if (s3 !== peg$FAILED) {
             peg$savedPos = s0;
-            s1 = peg$c180(s2);
+            s1 = peg$c194(s2);
             s0 = s1;
           } else {
             peg$currPos = s0;
@@ -12152,30 +12756,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       s1 = peg$currPos;
-      if (peg$c181.test(input.charAt(peg$currPos))) {
+      if (peg$c195.test(input.charAt(peg$currPos))) {
         s2 = input.charAt(peg$currPos);
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c182); }
+        if (peg$silentFails === 0) { peg$fail(peg$c196); }
       }
       if (s2 !== peg$FAILED) {
         s3 = [];
-        if (peg$c183.test(input.charAt(peg$currPos))) {
+        if (peg$c197.test(input.charAt(peg$currPos))) {
           s4 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c184); }
+          if (peg$silentFails === 0) { peg$fail(peg$c198); }
         }
         while (s4 !== peg$FAILED) {
           s3.push(s4);
-          if (peg$c183.test(input.charAt(peg$currPos))) {
+          if (peg$c197.test(input.charAt(peg$currPos))) {
             s4 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c184); }
+            if (peg$silentFails === 0) { peg$fail(peg$c198); }
           }
         }
         if (s3 !== peg$FAILED) {
@@ -12191,7 +12795,7 @@ module.exports = (function() {
       }
       if (s1 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c185(s1);
+        s1 = peg$c199(s1);
       }
       s0 = s1;
 
@@ -12203,30 +12807,30 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       s1 = peg$currPos;
-      if (peg$c186.test(input.charAt(peg$currPos))) {
+      if (peg$c200.test(input.charAt(peg$currPos))) {
         s2 = input.charAt(peg$currPos);
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c187); }
+        if (peg$silentFails === 0) { peg$fail(peg$c201); }
       }
       if (s2 !== peg$FAILED) {
         s3 = [];
-        if (peg$c183.test(input.charAt(peg$currPos))) {
+        if (peg$c197.test(input.charAt(peg$currPos))) {
           s4 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s4 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c184); }
+          if (peg$silentFails === 0) { peg$fail(peg$c198); }
         }
         while (s4 !== peg$FAILED) {
           s3.push(s4);
-          if (peg$c183.test(input.charAt(peg$currPos))) {
+          if (peg$c197.test(input.charAt(peg$currPos))) {
             s4 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s4 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c184); }
+            if (peg$silentFails === 0) { peg$fail(peg$c198); }
           }
         }
         if (s3 !== peg$FAILED) {
@@ -12242,7 +12846,7 @@ module.exports = (function() {
       }
       if (s1 !== peg$FAILED) {
         peg$savedPos = s0;
-        s1 = peg$c185(s1);
+        s1 = peg$c199(s1);
       }
       s0 = s1;
 
@@ -12254,21 +12858,21 @@ module.exports = (function() {
 
       s0 = [];
       if (input.charCodeAt(peg$currPos) === 32) {
-        s1 = peg$c165;
+        s1 = peg$c146;
         peg$currPos++;
       } else {
         s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c166); }
+        if (peg$silentFails === 0) { peg$fail(peg$c147); }
       }
       if (s1 !== peg$FAILED) {
         while (s1 !== peg$FAILED) {
           s0.push(s1);
           if (input.charCodeAt(peg$currPos) === 32) {
-            s1 = peg$c165;
+            s1 = peg$c146;
             peg$currPos++;
           } else {
             s1 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c166); }
+            if (peg$silentFails === 0) { peg$fail(peg$c147); }
           }
         }
       } else {
@@ -12283,21 +12887,21 @@ module.exports = (function() {
 
       s0 = peg$currPos;
       s1 = [];
-      if (peg$c188.test(input.charAt(peg$currPos))) {
+      if (peg$c202.test(input.charAt(peg$currPos))) {
         s2 = input.charAt(peg$currPos);
         peg$currPos++;
       } else {
         s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$c189); }
+        if (peg$silentFails === 0) { peg$fail(peg$c203); }
       }
       while (s2 !== peg$FAILED) {
         s1.push(s2);
-        if (peg$c188.test(input.charAt(peg$currPos))) {
+        if (peg$c202.test(input.charAt(peg$currPos))) {
           s2 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c189); }
+          if (peg$silentFails === 0) { peg$fail(peg$c203); }
         }
       }
       if (s1 !== peg$FAILED) {
@@ -12308,7 +12912,7 @@ module.exports = (function() {
           peg$currPos++;
         } else {
           s3 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c190); }
+          if (peg$silentFails === 0) { peg$fail(peg$c204); }
         }
         peg$silentFails--;
         if (s3 === peg$FAILED) {
@@ -12331,48 +12935,48 @@ module.exports = (function() {
       if (s0 === peg$FAILED) {
         s0 = peg$currPos;
         s1 = [];
-        if (peg$c188.test(input.charAt(peg$currPos))) {
+        if (peg$c202.test(input.charAt(peg$currPos))) {
           s2 = input.charAt(peg$currPos);
           peg$currPos++;
         } else {
           s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$c189); }
+          if (peg$silentFails === 0) { peg$fail(peg$c203); }
         }
         while (s2 !== peg$FAILED) {
           s1.push(s2);
-          if (peg$c188.test(input.charAt(peg$currPos))) {
+          if (peg$c202.test(input.charAt(peg$currPos))) {
             s2 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s2 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c189); }
+            if (peg$silentFails === 0) { peg$fail(peg$c203); }
           }
         }
         if (s1 !== peg$FAILED) {
           if (input.charCodeAt(peg$currPos) === 35) {
-            s2 = peg$c121;
+            s2 = peg$c123;
             peg$currPos++;
           } else {
             s2 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c122); }
+            if (peg$silentFails === 0) { peg$fail(peg$c124); }
           }
           if (s2 !== peg$FAILED) {
             s3 = [];
-            if (peg$c191.test(input.charAt(peg$currPos))) {
+            if (peg$c205.test(input.charAt(peg$currPos))) {
               s4 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s4 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c192); }
+              if (peg$silentFails === 0) { peg$fail(peg$c206); }
             }
             while (s4 !== peg$FAILED) {
               s3.push(s4);
-              if (peg$c191.test(input.charAt(peg$currPos))) {
+              if (peg$c205.test(input.charAt(peg$currPos))) {
                 s4 = input.charAt(peg$currPos);
                 peg$currPos++;
               } else {
                 s4 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c192); }
+                if (peg$silentFails === 0) { peg$fail(peg$c206); }
               }
             }
             if (s3 !== peg$FAILED) {
@@ -12399,49 +13003,49 @@ module.exports = (function() {
         if (s0 === peg$FAILED) {
           s0 = peg$currPos;
           s1 = [];
-          if (peg$c188.test(input.charAt(peg$currPos))) {
+          if (peg$c202.test(input.charAt(peg$currPos))) {
             s2 = input.charAt(peg$currPos);
             peg$currPos++;
           } else {
             s2 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$c189); }
+            if (peg$silentFails === 0) { peg$fail(peg$c203); }
           }
           while (s2 !== peg$FAILED) {
             s1.push(s2);
-            if (peg$c188.test(input.charAt(peg$currPos))) {
+            if (peg$c202.test(input.charAt(peg$currPos))) {
               s2 = input.charAt(peg$currPos);
               peg$currPos++;
             } else {
               s2 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c189); }
+              if (peg$silentFails === 0) { peg$fail(peg$c203); }
             }
           }
           if (s1 !== peg$FAILED) {
             if (input.charCodeAt(peg$currPos) === 13) {
-              s2 = peg$c193;
+              s2 = peg$c207;
               peg$currPos++;
             } else {
               s2 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$c194); }
+              if (peg$silentFails === 0) { peg$fail(peg$c208); }
             }
             if (s2 === peg$FAILED) {
               s2 = null;
             }
             if (s2 !== peg$FAILED) {
               if (input.charCodeAt(peg$currPos) === 10) {
-                s3 = peg$c195;
+                s3 = peg$c209;
                 peg$currPos++;
               } else {
                 s3 = peg$FAILED;
-                if (peg$silentFails === 0) { peg$fail(peg$c196); }
+                if (peg$silentFails === 0) { peg$fail(peg$c210); }
               }
               if (s3 !== peg$FAILED) {
                 if (input.charCodeAt(peg$currPos) === 13) {
-                  s4 = peg$c193;
+                  s4 = peg$c207;
                   peg$currPos++;
                 } else {
                   s4 = peg$FAILED;
-                  if (peg$silentFails === 0) { peg$fail(peg$c194); }
+                  if (peg$silentFails === 0) { peg$fail(peg$c208); }
                 }
                 if (s4 === peg$FAILED) {
                   s4 = null;
@@ -12496,8 +13100,11 @@ module.exports = (function() {
         return defaultValue == null ? null : defaultValue;
       }
       function checkNormal(result) {
-        if (['string', 'number', 'boolean'].includes(typeof result) || result === null) {
+        if (['string', 'number', 'boolean', 'object'].includes(typeof result) || result === null) {
           return;
+        }
+        if (result === undefined) {
+          throw new Error(`result was undefined`);
         }
         if (Array.isArray(result)) {
           for (let item of result) {
@@ -12526,11 +13133,10 @@ module.exports = (function() {
       return peg$result;
     } else {
       if (peg$result !== peg$FAILED && peg$currPos < input.length) {
-        peg$fail({ type: "end", description: "end of input" });
+        peg$fail(peg$endExpectation());
       }
 
-      throw peg$buildException(
-        null,
+      throw peg$buildStructuredError(
         peg$maxFailExpected,
         peg$maxFailPos < input.length ? input.charAt(peg$maxFailPos) : null,
         peg$maxFailPos < input.length
@@ -12544,19 +13150,15 @@ module.exports = (function() {
     SyntaxError: peg$SyntaxError,
     parse:       peg$parse
   };
-})();
+})());
 
 /***/ }),
-/* 44 */
+/* 46 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "b", function() { return DomContext; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "a", function() { return SetDomContext; });
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__browser_lib_xen_template_js__ = __webpack_require__(24);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_x_list_js__ = __webpack_require__(41);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__browser_lib_model_select_js__ = __webpack_require__(40);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__description_js__ = __webpack_require__(10);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -12571,200 +13173,198 @@ module.exports = (function() {
 
 
 
-// TODO(sjmiles): should be elsewhere
-// TODO(sjmiles): using Node syntax to import custom-elements in strictly-browser context
-// TOOD(dstockwell): why was this only in browser context?
+class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_js__["b" /* DescriptionFormatter */] {
+  constructor(description) {
+    super(description);
+    this._nextID = 0;
+  }
 
+  _isSelectedDescription(desc) {
+    return super._isSelectedDescription(desc) || (!!desc.template && !!desc.model);
+  }
 
+  _populateParticleDescription(particle, descriptionByName) {
+    let result = super._populateParticleDescription(particle, descriptionByName);
 
-class DomContext {
-  constructor(context, containerKind) {
-    this._context = context;
-    this._containerKind = containerKind;
-    // TODO(sjmiles): _liveDom needs new name
-    this._liveDom = null;
-    this._innerContextBySlotName = {};
-  }
-  initContext(context) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(context);
-    if (!this._context) {
-      this._context = document.createElement(this._containerKind || 'div');
-      context.appendChild(this._context);
-    } else {
-      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this._context.parentNode == context,
-             'TODO: add support for moving slot to different context');
+    if (descriptionByName["_template_"]) {
+      result = Object.assign(result, {
+        template: descriptionByName["_template_"],
+        model: JSON.parse(descriptionByName["_model_"])
+      });
     }
-  }
-  isEqual(context) {
-    return this._context.parentNode == context;
-  }
-  updateModel(model) {
-    if (this._liveDom) {
-      this._liveDom.set(model);
-    }
-  }
-  clear() {
-    if (this._liveDom) {
-      this._liveDom.root.textContent = "";
-    }
-    this._liveDom = null;
-    this._innerContextBySlotName = {};
 
+    return result;
   }
-  stampTemplate(template, eventHandler) {
-    if (!this._liveDom) {
-      // TODO(sjmiles): hack to allow subtree elements (e.g. x-list) to marshal events
-      this._context._eventMapper = this._eventMapper.bind(this, eventHandler);
-      this._liveDom = __WEBPACK_IMPORTED_MODULE_1__browser_lib_xen_template_js__["a" /* default */]
-          .stamp(template)
-          .events(this._context._eventMapper)
-          .appendTo(this._context);
-    }
-  }
-  observe(observer) {
-    observer.observe(this._context, {childList: true, subtree: true});
-  }
-  getInnerContext(innerSlotName) {
-    return this._innerContextBySlotName[innerSlotName];
-  }
-  isDirectInnerSlot(slot) {
-    let parentNode = slot.parentNode;
-    while (parentNode) {
-      if (parentNode == this._context) {
-        return true;
-      }
-      if (parentNode.getAttribute("slotid")) {
-        // this is an inner slot of an inner slot.
-        return false;
-      }
-      parentNode = parentNode.parentNode;
-    }
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(false);
-  }
-  initInnerContexts(slotSpec) {
-    this._innerContextBySlotName = {};
-    Array.from(this._context.querySelectorAll("[slotid]")).forEach(s => {
-      if (!this.isDirectInnerSlot(s)) {
-        // Skip inner slots of an inner slot of the given slot.
+
+  async _combineSelectedDescriptions(selectedDescriptions) {
+    let suggestions = [];
+    await Promise.all(selectedDescriptions.map(async (particleDesc, index) => {
+      if (this.seenParticles.has(particleDesc._particle)) {
         return;
       }
-      let slotId = s.getAttribute('slotid');
-      let providedSlotSpec = slotSpec.providedSlots.find(ps => ps.name == slotId);
-      if (providedSlotSpec) {  // Skip non-declared slots
-        let subId = s.getAttribute('subid');
-        __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!subId || providedSlotSpec.isSet,
-            `Slot provided in ${slotSpec.name} sub-id ${subId} doesn't match set spec: ${providedSlotSpec.isSet}`);
-        if (providedSlotSpec.isSet) {
-          if (!this._innerContextBySlotName[slotId]) {
-            this._innerContextBySlotName[slotId] = {};
-          }
-          __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!this._innerContextBySlotName[slotId][subId],
-                 `Slot ${slotSpec.name} cannot provide multiple ${slotId}:${subId} inner slots`);
-          this._innerContextBySlotName[slotId][subId] = s;
-        } else {
-          this._innerContextBySlotName[slotId] = s;
+
+      let {template, model} = this._retrieveTemplateAndModel(particleDesc, index);
+
+      await Promise.all(Object.keys(model).map(async tokenKey => {
+        let token = this._initHandleToken(model[tokenKey], particleDesc._particle);
+        let tokenValue = await this.tokenToString(token);
+
+        if (tokenValue.template && tokenValue.model) {
+          // Dom token.
+          template = template.replace(`{{${tokenKey}}}`, tokenValue.template);
+          delete model[tokenKey];
+          model = Object.assign(model, tokenValue.model);
+        } else {  // Text token.
+          // Replace tokenKey, in case multiple selected suggestions use the same key.
+          let newTokenKey = `${tokenKey}${++this._nextID}`;
+          template = template.replace(`{{${tokenKey}}}`, `{{${newTokenKey}}}`);
+          delete model[tokenKey];
+          model[newTokenKey] = tokenValue;
         }
-      } else {
-        console.warn(`Slot ${slotSpec.name} has unexpected inner slot ${slotId}`);
+      }));
+      suggestions.push({template, model});
+    }));
+
+    let result = this._joinDescriptions(suggestions);
+    result.template += '.';
+    return result;
+  }
+
+  _retrieveTemplateAndModel(particleDesc, index) {
+    if (particleDesc.template && particleDesc.model) {
+      return {template: particleDesc.template, model: particleDesc.model};
+    }
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(particleDesc.pattern, 'Description must contain template and model, or pattern');
+    let template = '';
+    let model = {};
+    let tokens = this._initTokens(particleDesc.pattern, particleDesc._particle);
+
+    tokens.forEach((token, i) => {
+      if (token.text) {
+        template = template.concat(`${index == 0 && i == 0 ? token.text[0].toUpperCase() + token.text.slice(1) : token.text}`);
+      } else {  // view or slot handle.
+        let sanitizedFullName = token.fullName.replace(/[.{}_\$]/g, '');
+        template = template.concat(`<span>{{${sanitizedFullName}}}</span>`);
+        model[sanitizedFullName] = token.fullName;
       }
     });
+
+    return {template, model};
   }
-  findRootSlots() {
-    let innerSlotById = {};
-    Array.from(this._context.querySelectorAll("[slotid]")).forEach(s => {
-      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.isDirectInnerSlot(s), 'Unexpected inner slot');
-      let slotId = s.getAttribute('slotid');
-      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!innerSlotById[slotId], `Duplicate root slot ${slotId}`);
-      innerSlotById[slotId] = s;
+
+  _joinDescriptions(descs) {
+    // // If all tokens are strings, just join them.
+    if (descs.every(desc => typeof desc === 'string')) {
+      return super._joinDescriptions(descs);
+    }
+
+    let result = {template: '', model: {}};
+    let count = descs.length;
+    descs.forEach((desc, i) => {
+      if (!desc.template || !desc.model) {
+        return;
+      }
+
+      result.template += desc.template;
+      result.model = Object.assign(result.model, desc.model);
+      let delim;
+      if (i < count - 2) {
+        delim = ', ';
+      } else if (i == count - 2) {
+        delim = ['', '', ' and ', ', and '][Math.min(3, count)];
+      }
+      if (delim) {
+        result.template += delim;
+      }
     });
-    return innerSlotById;
+    return result;
   }
-  _eventMapper(eventHandler, node, eventName, handlerName) {
-    node.addEventListener(eventName, event => {
-      // TODO(sjmiles): we have an extremely minimalist approach to events here, this is useful IMO for
-      // finding the smallest set of features that we are going to need.
-      // First problem: click event firing multiple times as it bubbles up the tree, minimalist solution
-      // is to enforce a 'first listener' rule by executing `stopPropagation`.
-      event.stopPropagation();
-      eventHandler({
-        handler: handlerName,
-        data: {
-          key: node.key,
-          value: node.value
-        }
-      });
+
+  _joinTokens(tokens) {
+    // If all tokens are strings, just join them.
+    if (tokens.every(token => typeof token === 'string')) {
+      return super._joinTokens(tokens);
+    }
+
+    tokens = tokens.map(token => {
+      if (typeof token !== 'object') {
+        return {
+          template: `<span>{{text${++this._nextID}}}</span>`,
+          model: {[`text${this._nextID}`]: token}
+        };
+      }
+      return token;
     });
+
+    let nonEmptyTokens = tokens.filter(token => token && !!token.template && !!token.model);
+    return {
+      template: nonEmptyTokens.map(token => token.template).join(''),
+      model: nonEmptyTokens.map(token => token.model).reduce((prev, curr) => Object.assign(prev, curr), {})
+    };
+  }
+
+  _combineDescriptionAndValue(token, description, viewValue) {
+    if (!!description.template && !!description.model) {
+      return {
+        template: `${description.template} (${viewValue.template})`,
+        model: Object.assign(description.model, viewValue.model)
+      }
+    }
+    let descKey = `${token.viewName}Description${++this._nextID}`;
+    return {
+      template: `<span>{{${descKey}}}</span> (${viewValue.template})`,
+      model: Object.assign({[descKey]: description}, viewValue.model)
+    }
+  }
+
+  _formatEntityProperty(viewName, properties, value) {
+    let key = `${viewName}${properties.join('')}Value${++this._nextID}`;
+    return {
+      template: `<b>{{${key}}}</b>`,
+      model: {[`${key}`]: value }
+    };
+  }
+
+  _formatSetView(viewName, viewList) {
+    let viewKey = `${viewName}${++this._nextID}`;
+    if (viewList[0].rawData.name) {
+      if (viewList.length > 2) {
+        return {
+          template: `<b>{{${viewKey}FirstName}}</b> plus <b>{{${viewKey}OtherCount}}</b> other items`,
+          model: { [`${viewKey}FirstName`]: viewList[0].rawData.name, [`${viewKey}OtherCount`] : viewList.length - 1}
+        };
+      }
+      return {
+        template: viewList.map((v, i) => `<b>{{${viewKey}${i}}}</b>`).join(", "),
+        model: Object.assign(...viewList.map((v, i) => ({[`${viewKey}${i}`]: v.rawData.name} )))
+      }
+    }
+    return {
+      template: `<b>{{${viewKey}Length}}</b> items`,
+      model: { [`${viewKey}Length`]: viewList.length}
+    };
+  }
+  _formatSingleton(viewName, viewVar) {
+    if (viewVar.rawData.name) {
+      return {
+        template: `<b>{{${viewName}Var}}</b>`,
+        model: {[`${viewName}Var`]: viewVar.rawData.name}
+      }
+    }
   }
 }
-
-class SetDomContext {
-  constructor(containerKind) {
-    this._contextBySubId = {};
-    this._containerKind = containerKind;
-  }
-  initContext(context) {
-    Object.keys(context).forEach(subId => {
-      if (!this._contextBySubId[subId] || !this._contextBySubId[subId].isEqual(context[subId])) {
-        this._contextBySubId[subId] = new DomContext(null, this._containerKind);
-      }
-      this._contextBySubId[subId].initContext(context[subId]);
-    });
-    // Delete sub-contexts that are not found in the new context.
-    Object.keys(this._contextBySubId).forEach(subId => {
-      if (!context[subId]) {
-        delete this._contextBySubId[subId];
-      }
-    });
-  }
-  isEqual(context) {
-    return Object.keys(this._contextBySubId).length == Object.keys(context).length &&
-           !Object.keys(this._contextBySubId).find(c => this._contextBySubId[c] != context[c]);
-  }
-  updateModel(model) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(model.items, `Model must contain items`);
-    model.items.forEach(item => {
-      Object.keys(model).forEach(key => {
-        if (key != 'items') {
-          item[key] = model[key];
-        }
-      });
-      if (this._contextBySubId[item.subId]) {
-        this._contextBySubId[item.subId].updateModel(item);
-      }
-    });
-  }
-  clear() {
-    Object.values(this._contextBySubId).forEach(context => context.clear());
-  }
-  stampTemplate(template, eventHandler, eventMapper) {
-    Object.values(this._contextBySubId).forEach(context => context.stampTemplate(template, eventHandler, eventMapper));
-  }
-  observe(observer) {
-    Object.values(this._contextBySubId).forEach(context => context.observe(observer));
-  }
-  getInnerContext(innerSlotName) {
-    var innerContexts = {};
-    Object.keys(this._contextBySubId).forEach(subId => {
-      innerContexts[subId] = this._contextBySubId[subId].getInnerContext(innerSlotName);
-    });
-    return innerContexts;
-  }
-  initInnerContexts(slotSpec) {
-    Object.values(this._contextBySubId).forEach(context => context.initInnerContexts(slotSpec));
-  }
-}
-
+/* harmony export (immutable) */ __webpack_exports__["a"] = DescriptionDomFormatter;
 
 
 
 /***/ }),
-/* 45 */
+/* 47 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__slot_js__ = __webpack_require__(30);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__dom_context_js__ = __webpack_require__(44);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__dom_context_js__ = __webpack_require__(24);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -12791,7 +13391,7 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
     this._containerKind = containerKind;
   }
 
-  async setContext(context) {
+  setContext(context) {
     let wasNull = true;
     if (this.getContext()) {
       this.getContext().clear();
@@ -12804,7 +13404,7 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
       }
       this.getContext().initContext(context);
       if (!wasNull) {
-        await this._doRender();
+        this._doRender();
       }
     } else {
       this._context = null;
@@ -12812,9 +13412,9 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
   }
   _createDomContext() {
     if (this.consumeConn.slotSpec.isSet) {
-      return new __WEBPACK_IMPORTED_MODULE_2__dom_context_js__["a" /* SetDomContext */](this._containerKind);
+      return new __WEBPACK_IMPORTED_MODULE_2__dom_context_js__["b" /* SetDomContext */](this._containerKind);
     }
-    return new __WEBPACK_IMPORTED_MODULE_2__dom_context_js__["b" /* DomContext */](null, this._containerKind);
+    return new __WEBPACK_IMPORTED_MODULE_2__dom_context_js__["a" /* DomContext */](null, this._containerKind);
   }
   _initMutationObserver() {
     return new MutationObserver(async () => {
@@ -12823,15 +13423,12 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
       if (this.getContext()) {
         // Update inner slots.
         this.getContext().initInnerContexts(this.consumeConn.slotSpec);
-        await this.innerSlotsUpdateCallback(this);
+        this.innerSlotsUpdateCallback(this);
 
         // Reactivate the observer.
         this.getContext().observe(this._observer);
       }
     });
-  }
-  _createTemplateElement(template) {
-    return Object.assign(document.createElement('template'), { innerHTML: template});
   }
   isSameContext(context) {
     return this.getContext().isEqual(context);
@@ -12860,15 +13457,20 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
         // Template is being replaced.
         this.getContext().clear();
       }
-      templates.set(this._templateName, this._createTemplateElement(content.template));
+      templates.set(this._templateName, __WEBPACK_IMPORTED_MODULE_2__dom_context_js__["a" /* DomContext */].createTemplateElement(content.template));
     }
     this.eventHandler = handler;
     if (Object.keys(content).indexOf("model") >= 0) {
-      this._model = content.model;
+      if (content.model) {
+        this._model = Object.assign(content.model, await this.populateViewDescriptions());
+      } else {
+        this._model = undefined;
+      }
     }
-    await this._doRender();
+    this._doRender();
   }
-  async _doRender() {
+
+  _doRender() {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.getContext());
 
     this.getContext().observe(this._observer);
@@ -12882,8 +13484,6 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
     //}
 
     if (this._model) {
-      let update = await this.populateViewDescriptions();
-      this._model = Object.assign(this._model, update);
       this.getContext().updateModel(this._model);
     }
   }
@@ -12898,7 +13498,7 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
     return request;
   }
   static findRootSlots(context) {
-    return new __WEBPACK_IMPORTED_MODULE_2__dom_context_js__["b" /* DomContext */](context, this._containerKind).findRootSlots(context);
+    return new __WEBPACK_IMPORTED_MODULE_2__dom_context_js__["a" /* DomContext */](context, this._containerKind).findRootSlots(context);
   }
 }
 
@@ -12906,13 +13506,13 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
 
 
 /***/ }),
-/* 46 */
+/* 48 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__inner_PEC_js__ = __webpack_require__(49);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__message_channel_js__ = __webpack_require__(50);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__loader_js__ = __webpack_require__(15);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__inner_PEC_js__ = __webpack_require__(51);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__message_channel_js__ = __webpack_require__(52);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__loader_js__ = __webpack_require__(14);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -12937,7 +13537,7 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
 
 
 /***/ }),
-/* 47 */
+/* 49 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -12952,7 +13552,7 @@ class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] 
 
 
 /***/ }),
-/* 48 */
+/* 50 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -12990,14 +13590,14 @@ class Identifier {
 
 
 /***/ }),
-/* 49 */
+/* 51 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* WEBPACK VAR INJECTION */(function(global) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__type_js__ = __webpack_require__(4);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__handle_js__ = __webpack_require__(26);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__api_channel_js__ = __webpack_require__(22);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__api_channel_js__ = __webpack_require__(21);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__particle_spec_js__ = __webpack_require__(9);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__schema_js__ = __webpack_require__(7);
 /**
@@ -13311,10 +13911,10 @@ class InnerPEC {
 
 /* harmony default export */ __webpack_exports__["a"] = (InnerPEC);
 
-/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(37)))
+/* WEBPACK VAR INJECTION */}.call(__webpack_exports__, __webpack_require__(38)))
 
 /***/ }),
-/* 50 */
+/* 52 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -13381,15 +13981,15 @@ class MessageChannel {
 
 
 /***/ }),
-/* 51 */
+/* 53 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_js__ = __webpack_require__(52);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_js__ = __webpack_require__(54);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__api_channel_js__ = __webpack_require__(22);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__manifest_js__ = __webpack_require__(10);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__loader_js__ = __webpack_require__(15);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__api_channel_js__ = __webpack_require__(21);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__manifest_js__ = __webpack_require__(11);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__loader_js__ = __webpack_require__(14);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -13459,8 +14059,8 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
       this._apiPort.ConstructArcCallback({callback, arc});
     }
 
-    this._apiPort.onArcCreateHandle = ({callback, arc, type, name}) => {
-      var view = this._arc.createView(type, name);
+    this._apiPort.onArcCreateHandle = async ({callback, arc, type, name}) => {
+      var view = await this._arc.createView(type, name);
       this._apiPort.CreateHandleCallback(view, {type, name, callback, id: view.id});
     }
 
@@ -13553,7 +14153,7 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
 
 
 /***/ }),
-/* 52 */
+/* 54 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -13601,7 +14201,7 @@ class ParticleExecutionContext {
 
 
 /***/ }),
-/* 53 */
+/* 55 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -13646,7 +14246,7 @@ class ConnectionConstraint {
 
 
 /***/ }),
-/* 54 */
+/* 56 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -13665,13 +14265,13 @@ class ConnectionConstraint {
 
 
 /***/ }),
-/* 55 */
+/* 57 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__slot_connection_js__ = __webpack_require__(56);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__view_connection_js__ = __webpack_require__(59);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__slot_connection_js__ = __webpack_require__(58);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__view_connection_js__ = __webpack_require__(61);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__util_js__ = __webpack_require__(5);
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -13921,7 +14521,7 @@ class Particle {
 
 
 /***/ }),
-/* 56 */
+/* 58 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -14096,7 +14696,7 @@ class SlotConnection {
 
 
 /***/ }),
-/* 57 */
+/* 59 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -14222,7 +14822,7 @@ class Slot {
 
 
 /***/ }),
-/* 58 */
+/* 60 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -14297,24 +14897,14 @@ class TypeChecker {
     if (!(subtype.isEntity && supertype.isEntity))
       return false;
 
-    function checkSuper(schema) {
-      if (!schema)
-        return false;
-      if (schema.equals(supertype.entitySchema))
-        return true;
-      for (let parent of schema.parents)
-        if (checkSuper(parent))
-          return true;
-      return false;
-    }
-
-    return checkSuper(subtype.entitySchema);
+    return subtype.entitySchema.contains(supertype.entitySchema);
   }
 
   // left, right: {type, direction, connection}
   static compareTypes(left, right) {
-    if (left.type.equals(right.type))
+    if (left.type.equals(right.type)) {
       return {type: left, valid: true};
+    }
 
     if (TypeChecker.isSubclass(left, right)) {
       var subclass = left;
@@ -14365,7 +14955,7 @@ class TypeChecker {
 
 
 /***/ }),
-/* 59 */
+/* 61 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -14556,13 +15146,13 @@ class ViewConnection {
 
 
 /***/ }),
-/* 60 */
+/* 62 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__util_js__ = __webpack_require__(5);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__type_checker_js__ = __webpack_require__(58);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__type_checker_js__ = __webpack_require__(60);
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
 // http://polymer.github.io/LICENSE.txt
@@ -14588,6 +15178,7 @@ class View {
     this._originalFate = null;
     this._connections = [];
     this._mappedType = undefined;
+    this._storageKey = undefined;
   }
 
   _copyInto(recipe) {
@@ -14603,6 +15194,7 @@ class View {
       view._fate = this._fate;
       view._originalFate = this._originalFate;
       view._mappedType = this._mappedType;
+      view._storageKey = this._storageKey;
 
       // the connections are re-established when Particles clone their
       // attached ViewConnection objects.
@@ -14654,10 +15246,12 @@ class View {
     this._id = view.id;
     this._type = undefined;
     this._mappedType = view.type;
+    this._storageKey = view.storageKey;
   }
   get localName() { return this._localName; }
   set localName(name) { this._localName = name; }
-  get connections() { return this._connections } // ViewConnection*
+  get connections() { return this._connections; } // ViewConnection*
+  get storageKey() { return this._storageKey; }
 
   _isValid() {
     var typeSet = [];
@@ -14744,7 +15338,7 @@ class View {
 
 
 /***/ }),
-/* 61 */
+/* 63 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -14856,7 +15450,7 @@ WalkerBase.Independent = "independent";
 
 
 /***/ }),
-/* 62 */
+/* 64 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -14946,14 +15540,14 @@ class Relevance {
 
 
 /***/ }),
-/* 63 */
+/* 65 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__scheduler_js__ = __webpack_require__(29);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__relevance_js__ = __webpack_require__(62);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__relevance_js__ = __webpack_require__(64);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -14999,7 +15593,432 @@ class Speculator {
 
 
 /***/ }),
-/* 64 */
+/* 66 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__storage_provider_base_js__ = __webpack_require__(31);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_firebase_web_js__ = __webpack_require__(40);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__ = __webpack_require__(0);
+// @
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+
+
+
+
+class FirebaseKey {
+  constructor(key) {
+    var parts = key.split('://');
+    this.protocol = parts[0];
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__["a" /* default */])(this.protocol == 'firebase');
+    if (parts[1]) {
+      parts = parts[1].split('/');
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__["a" /* default */])(parts[0].endsWith('.firebaseio.com'));
+      this.databaseUrl = parts[0];
+      this.projectId = this.databaseUrl.split('.')[0];
+      this.apiKey = parts[1];
+      this.location = parts.slice(2).join('/');
+    } else {
+      this.databaseUrl = undefined;
+      this.projectId = undefined;
+      this.apiKey = undefined;
+      this.location = "";
+    }
+  }
+
+  toString() {
+    if (this.databaseUrl && this.apiKey)
+      return `${this.protocol}://${this.databaseUrl}/${this.apiKey}`;
+    return `${this.protocol}://`;
+  }
+}
+
+async function realTransaction(reference, transactionFunction) {
+  let realData = undefined;
+  await reference.once('value', data => {realData = data.val(); });
+  return reference.transaction(data => {
+    if (data == null)
+      data = realData;
+    return transactionFunction(data);
+  }, undefined, false);
+}
+
+class FirebaseStorage {
+  constructor(arc) {
+    this._arc = arc;
+    this._apps = {};
+    this._nextAppNameSuffix = 0;
+  }
+
+  async construct(id, type, keyFragment) {
+    return this._join(id, type, keyFragment, false);
+  }
+
+  async connect(id, type, key) {
+    return this._join(id, type, key, true);
+  }
+
+  async _join(id, type, key, shouldExist) {
+    key = new FirebaseKey(key);
+    // TODO: is it ever going to be possible to autoconstruct new firebase datastores? 
+    if (key.databaseUrl == undefined || key.apiKey == undefined)
+      throw new Error("Can't complete partial firebase keys");
+
+    if (this._apps[key.projectId] == undefined)
+      this._apps[key.projectId] = __WEBPACK_IMPORTED_MODULE_1__platform_firebase_web_js__["a" /* default */].initializeApp({
+        apiKey: key.apiKey,
+        databaseURL: key.databaseUrl
+      }, `app${this._nextAppNameSuffix++}`);
+
+    var reference = __WEBPACK_IMPORTED_MODULE_1__platform_firebase_web_js__["a" /* default */].database(this._apps[key.projectId]).ref(key.location);
+    
+    let result = await realTransaction(reference, data => {
+      if ((data == null) == shouldExist)
+        return; // abort transaction
+      if (!shouldExist) {
+        return {version: 0};
+      }
+      return data;
+    });
+    
+
+    if (!result.committed)
+      return null;
+
+    return FirebaseStorageProvider.newProvider(type, this._arc, id, reference, key);
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = FirebaseStorage;
+
+
+class FirebaseStorageProvider extends __WEBPACK_IMPORTED_MODULE_0__storage_provider_base_js__["a" /* default */] {
+  constructor(type, arc, id, reference, key) {
+    super(type, arc, undefined, id, key.toString());
+    this.firebaseKey = key;
+    this.reference = reference;
+  }
+
+  static newProvider(type, arc, id, reference, key) {
+    if (type.isSetView)
+      return new FirebaseCollection(type, arc, id, reference, key);
+    return new FirebaseVariable(type, arc, id, reference, key);
+  }
+}
+
+class FirebaseVariable extends FirebaseStorageProvider {
+  constructor(type, arc, id, reference, firebaseKey) {
+    super(type, arc, id, reference, firebaseKey);
+    this.dataSnapshot = undefined;
+    this.reference.on('value', dataSnapshot => {
+      this.dataSnapshot = dataSnapshot;
+      let data = dataSnapshot.val();
+      this._fire('change', {data: data.data, version: data.version});
+    });
+  }
+
+  async get() {
+    return this.dataSnapshot.val().data;
+  }
+
+  async set(value) {
+    return realTransaction(this.reference, data => ({data: value, version: data.version + 1}));
+  }
+
+  async clear() {
+    return this.set(undefined);
+  }
+}
+
+class FirebaseCollection extends FirebaseStorageProvider {
+  constructor(type, arc, id, reference, firebaseKey) {
+    super(type, arc, id, reference, firebaseKey);
+    this.dataSnapshot = undefined;
+    this.reference.on('value', dataSnapshot => {
+      this.dataSnapshot = dataSnapshot;
+      let data = dataSnapshot.val();
+      this._fire('change', {data: this._setToList(data.data), version: data.version});
+    });
+  }
+
+  async get(id) {
+    var set = this.dataSnapshot.val().data;
+    if (set)
+      return set[id];
+    return undefined;
+  }
+
+  async store(entity) { 
+    return realTransaction(this.reference, data => {
+      if (!data.data)
+        data.data = {};
+      data.data[entity.id] = entity;
+      data.version += 1;
+      return data;
+    });
+  }
+
+  async toList() {
+    return this._setToList(this.dataSnapshot.val().data);
+  }
+
+  _setToList(set) {
+    var list = [];
+    if (set) {
+      for (let key in set) {
+        list.push(set[key]);
+      }
+    }
+    return list;
+  }
+}
+
+/***/ }),
+/* 67 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__recipe_util_js__ = __webpack_require__(5);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__storage_provider_base_js__ = __webpack_require__(31);
+// @
+// Copyright (c) 2017 Google Inc. All rights reserved.
+// This code may only be used under the BSD style license found at
+// http://polymer.github.io/LICENSE.txt
+// Code distributed by Google as part of this project is also
+// subject to an additional IP rights grant found at
+// http://polymer.github.io/PATENTS.txt
+
+
+
+
+
+
+
+class InMemoryKey {
+  constructor(key) {
+    var parts = key.split("://");
+    this.protocol = parts[0];
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.protocol == 'in-memory');
+    parts = parts[1] ? parts[1].split('^^') : [];
+    this.arcId = parts[0];
+    this.location = parts[1];
+  }
+  toString() {
+    return `${this.protocol}://${this.arcId}^^${this.location}`;
+  }
+}
+
+let __storageCache = {};
+
+class InMemoryStorage {
+  constructor(arc) {
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(arc.id !== undefined, "Arcs with storage must have ids");
+      this._arc = arc;
+      this._memoryMap = {};
+      this.localIDBase = 0;
+      // TODO(shans): re-add this assert once we have a runtime object to put it on.
+      // assert(__storageCache[this._arc.id] == undefined, `${this._arc.id} already exists in local storage cache`);
+      __storageCache[this._arc.id] = this;
+  }
+
+  async construct(id, type, keyFragment) {
+    var key = new InMemoryKey(keyFragment);
+    if (key.arcId == undefined)
+      key.arcId = this._arc.id;
+    if (key.location == undefined)
+      key.location = 'in-memory-' + this.localIDBase++;
+    var provider = InMemoryStorageProvider.newProvider(type, this._arc, undefined, id, key.toString());
+    if (this._memoryMap[key.toString()] !== undefined)
+      return null;
+    this._memoryMap[key.toString()] = provider;
+    return provider;
+  }
+
+  async connect(id, type, keyString) {
+    let key = new InMemoryKey(keyString);
+    if (key.arcId !== this._arc.id) {
+      if (__storageCache[key.arcId] == undefined)
+        return null;
+      return __storageCache[key.arcId].connect(id, type, keyString);
+    }
+    if (this._memoryMap[keyString] == undefined)
+      return null;
+    // TODO assert types match?
+    return this._memoryMap[keyString];
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = InMemoryStorage;
+
+
+class InMemoryStorageProvider extends __WEBPACK_IMPORTED_MODULE_3__storage_provider_base_js__["a" /* default */] {
+  static newProvider(type, arc, name, id, key) {
+    if (type.isSetView)
+      return new InMemoryCollection(type, arc, name, id, key);
+    return new InMemoryVariable(type, arc, name, id, key);
+  }
+}
+
+class InMemoryCollection extends InMemoryStorageProvider {
+  constructor(type, arc, name, id, key) {
+    super(type, arc, name, id, key);
+    this._items = new Map();
+  }
+
+  clone() {
+    var view = new InMemoryCollection(this._type, this._arc, this.name, this.id);
+    view.cloneFrom(this);
+    return view;
+  }
+
+  cloneFrom(view) {
+    this.name = view.name;
+    this.source = view.source;
+    this._items = new Map(view._items);
+    this._version = view._version;
+    this.description = view.description;
+  }
+
+  async get(id) {
+    return this._items.get(id);
+  }
+  traceInfo() {
+    return {items: this._items.size};
+  }
+  // HACK: replace this with some kind of iterator thing?
+  async toList() {
+    return [...this._items.values()];
+  }
+
+  async store(entity) {
+    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: "view", name: "InMemoryCollection::store", args: {name: this.name}});
+    var entityWasPresent = this._items.has(entity.id);
+
+    this._items.set(entity.id, entity);
+    this._version++;
+    if (!entityWasPresent)
+      this._fire('change', {add: [entity], version: this._version});
+    trace.end({args: {entity}});
+  }
+
+  async remove(id) {
+    var trace = __WEBPACK_IMPORTED_MODULE_1__tracelib_trace_js__["a" /* default */].start({cat: "view", name: "InMemoryCollection::remove", args: {name: this.name}});
+    if (!this._items.has(id)) {
+      return;
+    }
+    let entity = this._items.get(id);
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this._items.delete(id));
+    this._version++;
+    this._fire('change', {remove: [entity], version: this._version});
+    trace.end({args: {entity}});
+  }
+
+  // TODO: Something about iterators??
+  // TODO: Something about changing order?
+
+  extractEntities(set) {
+    this._items.forEach(a => set.add(a));
+  }
+
+  serialize(list) {
+    list.push({
+      id: this.id,
+      sort: 'view',
+      type: this.type.toLiteral(),
+      name: this.name,
+      values: this.toList().map(a => a.id),
+      version: this._version
+    });
+  }
+
+  serializeMappingRecord(list) {
+    list.push({
+      id: this.id,
+      sort: 'view',
+      type: this.type.toLiteral(),
+      name: this.name,
+      version: this._version,
+      arc: this._arc.id
+    })
+  }
+}
+
+class InMemoryVariable extends InMemoryStorageProvider {
+  constructor(type, arc, name, id, key) {
+    super(type, arc, name, id, key);
+    this._stored = null;
+  }
+
+  clone() {
+    var variable = new InMemoryVariable(this._type, this._arc, this.name, this.id);
+    variable.cloneFrom(this);
+    return variable;
+  }
+
+  cloneFrom(variable) {
+    this._stored = variable._stored;
+    this._version = variable._version;
+  }
+
+  traceInfo() {
+    return {stored: this._stored !== null};
+  }
+
+  async get() {
+    return this._stored;
+  }
+
+  async set(entity) {
+    this._stored = entity;
+    this._version++;
+    this._fire('change', {data: this._stored, version: this._version});
+  }
+
+  async clear() {
+    this.set(undefined);
+  }
+
+  extractEntities(set) {
+    if (!this._stored) {
+      return;
+    }
+    set.add(this._stored);
+  }
+
+  serialize(list) {
+    if (this._stored == undefined)
+      return;
+    list.push({
+      id: this.id,
+      sort: 'variable',
+      type: this.type.toLiteral(),
+      name: this.name,
+      value: this._stored.id,
+      version: this._version
+    });
+  }
+
+  serializeMappingRecord(list) {
+    list.push({
+      id: this.id,
+      sort: 'variable',
+      type: this.type.toLiteral(),
+      name: this.name,
+      version: this._version,
+      arc: this._arc.id
+    })
+  }
+}
+
+
+/***/ }),
+/* 68 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15053,7 +16072,7 @@ class AddUseViews extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_j
 
 
 /***/ }),
-/* 65 */
+/* 69 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15061,7 +16080,7 @@ class AddUseViews extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_j
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__recipe_walker_js__ = __webpack_require__(3);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__recipe_recipe_js__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__recipe_recipe_util_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js__ = __webpack_require__(18);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__schema_js__ = __webpack_require__(7);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__platform_assert_web_js__ = __webpack_require__(0);
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -15100,7 +16119,7 @@ class AssignRemoteViews extends __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js
 
 
 /***/ }),
-/* 66 */
+/* 70 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15108,7 +16127,7 @@ class AssignRemoteViews extends __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__recipe_walker_js__ = __webpack_require__(3);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__recipe_recipe_js__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__recipe_recipe_util_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js__ = __webpack_require__(18);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__platform_assert_web_js__ = __webpack_require__(0);
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -15145,7 +16164,7 @@ class AssignViewsByTagAndType extends __WEBPACK_IMPORTED_MODULE_4__view_mapper_b
 
 
 /***/ }),
-/* 67 */
+/* 71 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15213,7 +16232,7 @@ class CombinedStrategy extends __WEBPACK_IMPORTED_MODULE_1__strategizer_strategi
 
 
 /***/ }),
-/* 68 */
+/* 72 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15313,7 +16332,7 @@ class ConvertConstraintsToConnections extends __WEBPACK_IMPORTED_MODULE_0__strat
 
 
 /***/ }),
-/* 69 */
+/* 73 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15321,7 +16340,7 @@ class ConvertConstraintsToConnections extends __WEBPACK_IMPORTED_MODULE_0__strat
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__recipe_walker_js__ = __webpack_require__(3);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__recipe_recipe_js__ = __webpack_require__(1);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__recipe_recipe_util_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js__ = __webpack_require__(19);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js__ = __webpack_require__(18);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__schema_js__ = __webpack_require__(7);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__platform_assert_web_js__ = __webpack_require__(0);
 // Copyright (c) 2017 Google Inc. All rights reserved.
@@ -15360,7 +16379,7 @@ class CopyRemoteViews extends __WEBPACK_IMPORTED_MODULE_4__view_mapper_base_js__
 
 
 /***/ }),
-/* 70 */
+/* 74 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15406,7 +16425,7 @@ class CreateDescriptionHandle extends __WEBPACK_IMPORTED_MODULE_1__strategizer_s
 
 
 /***/ }),
-/* 71 */
+/* 75 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15465,7 +16484,7 @@ class FallbackFate extends __WEBPACK_IMPORTED_MODULE_1__strategizer_strategizer_
 
 
 /***/ }),
-/* 72 */
+/* 76 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15592,7 +16611,7 @@ class GroupViewConnections extends __WEBPACK_IMPORTED_MODULE_1__strategizer_stra
 
 
 /***/ }),
-/* 73 */
+/* 77 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15649,7 +16668,7 @@ class InitPopulation extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategize
 
 
 /***/ }),
-/* 74 */
+/* 78 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15702,7 +16721,7 @@ class InitSearch extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_js
 
 
 /***/ }),
-/* 75 */
+/* 79 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15772,7 +16791,7 @@ class MapConsumedSlots extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategi
 
 
 /***/ }),
-/* 76 */
+/* 80 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15863,7 +16882,7 @@ class MapRemoteSlots extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategize
 
 
 /***/ }),
-/* 77 */
+/* 81 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15920,7 +16939,7 @@ class MatchParticleByVerb extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strat
 
 
 /***/ }),
-/* 78 */
+/* 82 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -15972,7 +16991,7 @@ class NameUnnamedConnections extends __WEBPACK_IMPORTED_MODULE_0__strategizer_st
 
 
 /***/ }),
-/* 79 */
+/* 83 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -16076,7 +17095,7 @@ class SearchTokensToParticles extends __WEBPACK_IMPORTED_MODULE_1__strategizer_s
 
 
 /***/ }),
-/* 80 */
+/* 84 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
