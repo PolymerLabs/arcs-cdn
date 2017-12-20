@@ -22,7 +22,7 @@ describe('SeleniumUtils', function() {
         </div>`;
       let outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let shadow = outer[0].attachShadow({mode: 'open'});
+      let shadow = outer[0].attachShadow({ mode: 'open' });
       shadow.innerHTML = `
         <div inner>
           <p goal>goal</p>
@@ -42,11 +42,11 @@ describe('SeleniumUtils', function() {
         </div>`;
       let outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let firstShadow = outer[0].attachShadow({mode: 'open'});
+      let firstShadow = outer[0].attachShadow({ mode: 'open' });
       firstShadow.innerHTML = `
         <div firstInner>
         </div>`;
-      let secondShadow = firstShadow.children[0].attachShadow({mode: 'open'});
+      let secondShadow = firstShadow.children[0].attachShadow({ mode: 'open' });
       secondShadow.innerHTML = `
         <div secondInner>
           <p goal>goal</p>
@@ -54,10 +54,19 @@ describe('SeleniumUtils', function() {
 
       let result;
 
-      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'div[secondInner]', 'p[goal]']);
+      result = pierceShadowsSingle([
+        'div[outer]',
+        'div[firstInner]',
+        'div[secondInner]',
+        'p[goal]'
+      ]);
       assert.equal(result.textContent, 'goal');
 
-      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'p[goal]']);
+      result = pierceShadowsSingle([
+        'div[outer]',
+        'div[firstInner]',
+        'p[goal]'
+      ]);
       assert.equal(result.textContent, 'goal');
     });
     it('should navigate a more complex tree', function() {
@@ -70,11 +79,11 @@ describe('SeleniumUtils', function() {
         </div>`;
       let outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let firstShadow = outer[0].attachShadow({mode: 'open'});
+      let firstShadow = outer[0].attachShadow({ mode: 'open' });
       firstShadow.innerHTML = `
         <div firstInner>
         </div>`;
-      let secondShadow = firstShadow.children[0].attachShadow({mode: 'open'});
+      let secondShadow = firstShadow.children[0].attachShadow({ mode: 'open' });
       secondShadow.innerHTML = `
         <div secondInner>
           <p goal>goal</p>
@@ -84,10 +93,19 @@ describe('SeleniumUtils', function() {
 
       let result;
 
-      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'div[secondInner]', 'p[goal]']);
+      result = pierceShadowsSingle([
+        'div[outer]',
+        'div[firstInner]',
+        'div[secondInner]',
+        'p[goal]'
+      ]);
       assert.equal(result.textContent, 'goal');
 
-      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'p[goal]']);
+      result = pierceShadowsSingle([
+        'div[outer]',
+        'div[firstInner]',
+        'p[goal]'
+      ]);
       assert.equal(result.textContent, 'goal');
     });
   });
@@ -98,7 +116,7 @@ describe('SeleniumUtils', function() {
         </div>`;
       let outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let shadow = outer[0].attachShadow({mode: 'open'});
+      let shadow = outer[0].attachShadow({ mode: 'open' });
       shadow.innerHTML = `
         <div inner>
           <p goal>goal</p>
