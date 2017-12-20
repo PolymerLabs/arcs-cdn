@@ -94,7 +94,7 @@ let utils = {
     // construct id
     let id = Arcs.utils.getContextViewId(type, metadata.tags, idPrefix);
     // find or create a view in the arc context
-    let view = Arcs.utils._requireView(arc, type, metadata.name, id, metadata.tags);
+    let view = await Arcs.utils._requireView(arc, type, metadata.name, id, metadata.tags);
     await Arcs.utils.setViewData(view, values);
     return view;
   },
@@ -115,10 +115,10 @@ let utils = {
         return `${noun} ${name}`;
       }
   },
-  _requireView(arc, type, name, id, tags) {
+  async _requireView(arc, type, name, id, tags) {
     let view = arc.context.findViewById(id);
     if (!view) {
-      view = arc.context.newView(type, name, id, tags);
+      view = await arc.context.newView(type, name, id, tags);
       Arcs.utils.log('synthesized view', id, tags);
     }
     return view;
