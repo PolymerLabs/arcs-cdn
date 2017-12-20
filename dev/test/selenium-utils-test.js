@@ -15,7 +15,7 @@ afterEach(function() {
 });
 
 describe('SeleniumUtils', function() {
-  describe('#pierceShadows', function() {
+  describe('#pierceShadowsSingle', function() {
     it('should cross a simple shadow boundary', function() {
       target.innerHTML = `
         <div outer>
@@ -30,12 +30,10 @@ describe('SeleniumUtils', function() {
 
       let result;
 
-      result = _pierceShadows(target,
-        ['div[outer]', 'div[inner]', 'p[goal]']);
+      result = pierceShadowsSingle(['div[outer]', 'div[inner]', 'p[goal]']);
       assert.equal(result.textContent, 'goal');
 
-      result = _pierceShadows(target,
-        ['div[outer]', 'p[goal]']);
+      result = pierceShadowsSingle(['div[outer]', 'p[goal]']);
       assert.equal(result.textContent, 'goal');
     });
     it('should cross several shadow boundaries', function() {
@@ -56,12 +54,10 @@ describe('SeleniumUtils', function() {
 
       let result;
 
-      result = _pierceShadows(target,
-        ['div[outer]', 'div[firstInner]', 'div[secondInner]', 'p[goal]']);
+      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'div[secondInner]', 'p[goal]']);
       assert.equal(result.textContent, 'goal');
 
-      result = _pierceShadows(target,
-        ['div[outer]', 'div[firstInner]', 'p[goal]']);
+      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'p[goal]']);
       assert.equal(result.textContent, 'goal');
     });
     it('should navigate a more complex tree', function() {
@@ -88,13 +84,37 @@ describe('SeleniumUtils', function() {
 
       let result;
 
-      result = _pierceShadows(target,
-        ['div[outer]', 'div[firstInner]', 'div[secondInner]', 'p[goal]']);
+      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'div[secondInner]', 'p[goal]']);
       assert.equal(result.textContent, 'goal');
 
-      result = _pierceShadows(target,
-        ['div[outer]', 'div[firstInner]', 'p[goal]']);
+      result = pierceShadowsSingle(['div[outer]', 'div[firstInner]', 'p[goal]']);
       assert.equal(result.textContent, 'goal');
+    });
+  });
+  describe('#pierceShadows', function() {
+    it('should return multiple valid matches', function() {
+      target.innerHTML = `
+        <div outer>
+        </div>`;
+      let outer = target.querySelectorAll('div[outer]');
+      assert.equal(outer.length, 1);
+      let shadow = outer[0].attachShadow({mode: 'open'});
+      shadow.innerHTML = `
+        <div inner>
+          <p goal>goal</p>
+        </div>
+        <div inner-two>
+          <p goal>goal two</p>
+        </div>`;
+
+      let result;
+
+      result = pierceShadows(['div[outer]', 'div[inner]', 'p[goal]']);
+      assert.equal(result[0].textContent, 'goal');
+
+      result = pierceShadows(['div[outer]', 'p[goal]']);
+      assert.equal(result[0].textContent, 'goal');
+      assert.equal(result[1].textContent, 'goal two');
     });
   });
 });
