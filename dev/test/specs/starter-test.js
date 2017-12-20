@@ -10,7 +10,6 @@
 
 let assert = require('assert');
 
-
 function pierceShadows(selectors) {
   return browser.execute(function(selectors) {
     return pierceShadows(selectors);
@@ -29,13 +28,13 @@ function pierceShadowsSingle(selectors) {
  *   {id: <element-id>, text: <found text>}
  */
 function searchElementsForText(elements, textQuery) {
-  let textToId = elements
-    .map(value => {
-      return {
-        id: value.ELEMENT, text: browser.elementIdText(value.ELEMENT).value
-      };
-    });
-  assert.ok(textToId.length>0, textToId);
+  let textToId = elements.map(value => {
+    return {
+      id: value.ELEMENT,
+      text: browser.elementIdText(value.ELEMENT).value
+    };
+  });
+  assert.ok(textToId.length > 0, textToId);
   assert.equal(textToId.length, elements.length);
 
   let matches = textToId.reduce((accumulator, currentValue) => {
@@ -54,12 +53,21 @@ function searchElementsForText(elements, textQuery) {
 
 /** wait for the dancing dots to stop. */
 function waitForStillness() {
-  var element = pierceShadowsSingle(['arc-footer', 'x-toast[app-footer]', 'dancing-dots']);
+  var element = pierceShadowsSingle([
+    'arc-footer',
+    'x-toast[app-footer]',
+    'dancing-dots'
+  ]);
 
-  browser.waitUntil(() => {
-    var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
-    return null==result.value;
-  }, 5000, `the dancing dots can't stop won't stop`, 1000);
+  browser.waitUntil(
+    () => {
+      var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
+      return null == result.value;
+    },
+    5000,
+    `the dancing dots can't stop won't stop`,
+    1000
+  );
 }
 
 /** Load the selenium utils into the current page. */
@@ -82,32 +90,47 @@ function allSuggestions(footerPath) {
 function acceptSuggestion(footerPath, textSubstring) {
   waitForStillness();
 
-  let suggestionsRoot = pierceShadowsSingle(footerPath.concat(['suggestions-element']));
-  let suggestionsDiv = pierceShadowsSingle(footerPath.concat(['suggestions-element', 'div']));
-  browser.waitUntil(() => {
-    let allSuggestions = browser.elementIdElements(
-        suggestionsDiv.value.ELEMENT, 'suggest');
-    if (!allSuggestions.value || 0==allSuggestions.value) {
-      return false;
-    }
-
-    try {
-      let desiredSuggestion = searchElementsForText(allSuggestions.value, textSubstring);
-      if (!desiredSuggestion) {
+  let suggestionsRoot = pierceShadowsSingle(
+    footerPath.concat(['suggestions-element'])
+  );
+  let suggestionsDiv = pierceShadowsSingle(
+    footerPath.concat(['suggestions-element', 'div'])
+  );
+  browser.waitUntil(
+    () => {
+      let allSuggestions = browser.elementIdElements(
+        suggestionsDiv.value.ELEMENT,
+        'suggest'
+      );
+      if (!allSuggestions.value || 0 == allSuggestions.value) {
         return false;
       }
 
-      browser.elementIdClick(desiredSuggestion.id);
-      return true;
-    } catch (e) {
-      if (e.message.includes('stale element reference')) {
-        console.log(`got a not-entirely-unexpected error, but we'll try again ${e}`);
-        return false;
-      }
+      try {
+        let desiredSuggestion = searchElementsForText(
+          allSuggestions.value,
+          textSubstring
+        );
+        if (!desiredSuggestion) {
+          return false;
+        }
 
-      throw e;
-    }
-  }, 5000, `couldn't find suggestion ${textSubstring}`);
+        browser.elementIdClick(desiredSuggestion.id);
+        return true;
+      } catch (e) {
+        if (e.message.includes('stale element reference')) {
+          console.log(
+            `got a not-entirely-unexpected error, but we'll try again ${e}`
+          );
+          return false;
+        }
+
+        throw e;
+      }
+    },
+    5000,
+    `couldn't find suggestion ${textSubstring}`
+  );
 }
 
 /**
@@ -118,34 +141,40 @@ function clickInParticles(slotName, selectors, textQuery) {
   waitForStillness();
 
   if (!selectors) selectors = [];
-  let realSelectors = ['arc-host', `div[slotid="${slotName}"]`].concat(selectors);
+  let realSelectors = ['arc-host', `div[slotid="${slotName}"]`].concat(
+    selectors
+  );
 
-  browser.waitUntil(() => {
-    let pierced = pierceShadows(realSelectors);
-    assert.ok(pierced);
-    if (!pierced.value || pierced.value.length==0) {
-      return false;
-    }
-
-    let selected;
-    if (textQuery) {
-      selected = searchElementsForText(pierced.value, textQuery).id;
-    } else {
-      if (1 == pierced.value.length) {
-        selected = pierced.value[0].ELEMENT;
-      } else {
-        throw Error(`found multiple matches for ${realSelectors}: ${pierced.value}`);
+  browser.waitUntil(
+    () => {
+      let pierced = pierceShadows(realSelectors);
+      assert.ok(pierced);
+      if (!pierced.value || pierced.value.length == 0) {
+        return false;
       }
-    }
 
-    if (selected) {
-      browser.elementIdClick(selected);
-      return true;
-    } else {
-      return false;
-    }
-  }, 5000,
-  `couldn't find anything to click with selectors ${realSelectors} textQuery ${textQuery}`
+      let selected;
+      if (textQuery) {
+        selected = searchElementsForText(pierced.value, textQuery).id;
+      } else {
+        if (1 == pierced.value.length) {
+          selected = pierced.value[0].ELEMENT;
+        } else {
+          throw Error(
+            `found multiple matches for ${realSelectors}: ${pierced.value}`
+          );
+        }
+      }
+
+      if (selected) {
+        browser.elementIdClick(selected);
+        return true;
+      } else {
+        return false;
+      }
+    },
+    5000,
+    `couldn't find anything to click with selectors ${realSelectors} textQuery ${textQuery}`
   );
 }
 
@@ -183,7 +212,6 @@ describe('test basic arcs functionality', function() {
 
     acceptSuggestion(footerPath, 'Make a reservation');
     acceptSuggestion(footerPath, 'You are free');
-    
 
     // to drop into debug mode with a REPL; also a handy way to see the state
     // at the end of the test:
