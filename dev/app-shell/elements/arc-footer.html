@@ -108,7 +108,7 @@
       } else {
         let terms = term.trim().toLowerCase().match(/\b(\w+)\b/g);
         return plans.filter(p => {
-          let desc = p.description.toLowerCase();
+          let desc = p.descriptionText.toLowerCase();
           let searchPhrase = p.plan.search ? p.plan.search.phrase : '';
           // TODO: don't match words like "and" etc.
           // TODO: highlight the matching terms in the description in suggestion UI
