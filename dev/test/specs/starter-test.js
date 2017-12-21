@@ -80,12 +80,18 @@ function loadSeleniumUtils(cdnBranch) {
   }, cdnBranch);
   browser.waitUntil(() => {
     try {
-      const result = browser.execute('pierceShadows(["head"])');
+      // To see if our selenium-utils has finished loading, try one of the
+      // methods (pierceShadows()) with an arbitrary argument. If the utils
+      // haven't loaded yet this will throw an exception.
+      browser.execute('pierceShadows(["head"])');
     } catch (e) {
-      console.log(
-        `caught an exception looking for pierceShadows(); we'll try again. Text: ${e}`
-      );
-      return false;
+      if (e.message.includes('pierceShadows is not defined')) {
+        console.log(
+          `got a not-entirely-unexpected error, but waitUntil will try again (up to a point). Error: ${e}`
+        );
+        return false;
+      }
+      throw e;
     }
     return true;
   });
@@ -133,7 +139,7 @@ function acceptSuggestion(footerPath, textSubstring) {
       } catch (e) {
         if (e.message.includes('stale element reference')) {
           console.log(
-            `got a not-entirely-unexpected error, but we'll try again ${e}`
+            `got a not-entirely-unexpected error, but waitUntil will try again (up to a point). Error: ${e}`
           );
           return false;
         }
