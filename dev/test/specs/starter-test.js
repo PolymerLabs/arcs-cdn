@@ -223,7 +223,7 @@ describe('test basic arcs functionality', function() {
     acceptSuggestion(footerPath, 'Find restaurants');
     clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
 
-    acceptSuggestion(footerPath, 'Make a reservation');
+    acceptSuggestion(footerPath, 'make a reservation');
     acceptSuggestion(footerPath, 'You are free');
 
     // to drop into debug mode with a REPL; also a handy way to see the state
