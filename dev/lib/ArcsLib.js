@@ -81,6 +81,7 @@
 
 function assert(test, message) {
   if (!test) {
+    debugger;
     throw new Error(message);
   }
 };
@@ -6467,6 +6468,7 @@ class Arc {
         }
         recipeView.id = view.id;
         recipeView.fate = "use";
+        recipeView.storageKey = view.storageKey;
         // TODO: move the call to OuterPEC's DefineView to here
       }
       let storageKey = recipeView.storageKey;
@@ -6813,6 +6815,7 @@ class Planner {
         plan,
         rank,
         description: relevance.newArc.description,
+        descriptionText: description,  // TODO(mmandlis): exclude the text description from returned results.
         hash
       });
     }
@@ -6927,6 +6930,10 @@ class SlotComposer {
     suggestions.forEach(async suggestion => {
       let suggestionContent =
         await suggestion.description.getRecipeSuggestion(suggestion.description.arc.recipes[0].particles, this._getDescriptionFormatter());
+
+      if (!suggestionContent) {
+        suggestionContent = 'No suggestion content was generated (unnamed recipe and no describable particles)';
+      }
 
       this._getSuggestionContext().createContext(
           this._suggestionsContext.createSuggestionElement({hash: suggestion.hash, plan: suggestion.plan}),
@@ -8602,9 +8609,12 @@ class XenElement extends HTMLElement {
               if (s5 !== peg$FAILED) {
                 s6 = peg$parsewhiteSpace();
                 if (s6 !== peg$FAILED) {
-                  s7 = peg$parseListType();
+                  s7 = peg$parseSchemaInline();
                   if (s7 === peg$FAILED) {
-                    s7 = peg$parseReferenceType();
+                    s7 = peg$parseListType();
+                    if (s7 === peg$FAILED) {
+                      s7 = peg$parseReferenceType();
+                    }
                   }
                   if (s7 !== peg$FAILED) {
                     s8 = peg$currPos;
@@ -13197,7 +13207,7 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
   }
 
   async _combineSelectedDescriptions(selectedDescriptions) {
-    let suggestions = [];
+    let suggestionByParticleDesc = new Map();
     await Promise.all(selectedDescriptions.map(async (particleDesc, index) => {
       if (this.seenParticles.has(particleDesc._particle)) {
         return;
@@ -13222,8 +13232,17 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
           model[newTokenKey] = tokenValue;
         }
       }));
-      suggestions.push({template, model});
+
+      suggestionByParticleDesc.set(particleDesc, {template, model});
     }));
+
+    // Populate suggestions list while maintaining original particles order.
+    let suggestions = [];
+    selectedDescriptions.forEach(desc => {
+      if (suggestionByParticleDesc.has(desc)) {
+        suggestions.push(suggestionByParticleDesc.get(desc));
+      }
+    });
 
     let result = this._joinDescriptions(suggestions);
     result.template += '.';
@@ -13244,7 +13263,17 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
         template = template.concat(`${index == 0 && i == 0 ? token.text[0].toUpperCase() + token.text.slice(1) : token.text}`);
       } else {  // view or slot handle.
         let sanitizedFullName = token.fullName.replace(/[.{}_\$]/g, '');
-        template = template.concat(`<span>{{${sanitizedFullName}}}</span>`);
+        let attribute = '';
+        // TODO(mmandlis): capitalize the data in the model instead.
+        if (i == 0) {
+          // Capitalize the first letter in the token.
+          template = template.concat(`<style>
+            [firstletter]::first-letter { text-transform: capitalize; }
+            [firstletter] {display: inline-block}
+            </style>`);
+          attribute = ' firstletter';
+        }
+        template = template.concat(`<span${attribute}>{{${sanitizedFullName}}}</span>`);
         model[sanitizedFullName] = token.fullName;
       }
     });
@@ -13385,7 +13414,8 @@ let templates = new Map();
 class DomSlot extends __WEBPACK_IMPORTED_MODULE_1__slot_js__["a" /* default */] {
   constructor(consumeConn, arc, containerKind) {
     super(consumeConn, arc);
-    this._templateName = `${this.consumeConn.particle.name}::${this.consumeConn.name}`;
+    this._templateName = [this.consumeConn.particle.name, this.consumeConn.name].concat(
+        Object.values(this.consumeConn.particle.connections).filter(conn => conn.type.isInterface).map(conn => conn.view.id)).join('::');
     this._model = null;
     this._observer = this._initMutationObserver();
     this._containerKind = containerKind;
@@ -15252,6 +15282,7 @@ class View {
   set localName(name) { this._localName = name; }
   get connections() { return this._connections; } // ViewConnection*
   get storageKey() { return this._storageKey; }
+  set storageKey(key) { this._storageKey = key; }
 
   _isValid() {
     var typeSet = [];
@@ -15806,12 +15837,17 @@ class InMemoryKey {
     var parts = key.split("://");
     this.protocol = parts[0];
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.protocol == 'in-memory');
-    parts = parts[1] ? parts[1].split('^^') : [];
+    parts = parts[1] ? parts.slice(1).join('://').split('^^') : [];
     this.arcId = parts[0];
     this.location = parts[1];
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.toString() == key);
   }
   toString() {
-    return `${this.protocol}://${this.arcId}^^${this.location}`;
+    if (this.location !== undefined && this.arcId !== undefined)
+      return `${this.protocol}://${this.arcId}^^${this.location}`;
+    if (this.arcId !== undefined)
+      return `${this.protocol}://${this.arcId}`;
+    return `${this.protocol}`;
   }
 }
 
