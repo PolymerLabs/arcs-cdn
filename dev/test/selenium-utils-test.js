@@ -20,9 +20,9 @@ describe('SeleniumUtils', function() {
       target.innerHTML = `
         <div outer>
         </div>`;
-      let outer = target.querySelectorAll('div[outer]');
+      const outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let shadow = outer[0].attachShadow({ mode: 'open' });
+      const shadow = outer[0].attachShadow({ mode: 'open' });
       shadow.innerHTML = `
         <div inner>
           <p goal>goal</p>
@@ -40,13 +40,13 @@ describe('SeleniumUtils', function() {
       target.innerHTML = `
         <div outer>
         </div>`;
-      let outer = target.querySelectorAll('div[outer]');
+      const outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let firstShadow = outer[0].attachShadow({ mode: 'open' });
+      const firstShadow = outer[0].attachShadow({ mode: 'open' });
       firstShadow.innerHTML = `
         <div firstInner>
         </div>`;
-      let secondShadow = firstShadow.children[0].attachShadow({ mode: 'open' });
+      const secondShadow = firstShadow.children[0].attachShadow({ mode: 'open' });
       secondShadow.innerHTML = `
         <div secondInner>
           <p goal>goal</p>
@@ -77,13 +77,13 @@ describe('SeleniumUtils', function() {
             </div>
           </div>
         </div>`;
-      let outer = target.querySelectorAll('div[outer]');
+      const outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let firstShadow = outer[0].attachShadow({ mode: 'open' });
+      const firstShadow = outer[0].attachShadow({ mode: 'open' });
       firstShadow.innerHTML = `
         <div firstInner>
         </div>`;
-      let secondShadow = firstShadow.children[0].attachShadow({ mode: 'open' });
+      const secondShadow = firstShadow.children[0].attachShadow({ mode: 'open' });
       secondShadow.innerHTML = `
         <div secondInner>
           <p goal>goal</p>
@@ -114,9 +114,9 @@ describe('SeleniumUtils', function() {
       target.innerHTML = `
         <div outer>
         </div>`;
-      let outer = target.querySelectorAll('div[outer]');
+      const outer = target.querySelectorAll('div[outer]');
       assert.equal(outer.length, 1);
-      let shadow = outer[0].attachShadow({ mode: 'open' });
+      const shadow = outer[0].attachShadow({ mode: 'open' });
       shadow.innerHTML = `
         <div inner>
           <p goal>goal</p>

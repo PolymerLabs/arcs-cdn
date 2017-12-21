@@ -32,7 +32,7 @@ function pierceShadows(querySelectors) {
 
 /** As #pierceShadows, but asserts that only a single result is found. */
 function pierceShadowsSingle(querySelectors) {
-  let result = _pierceShadows(document, querySelectors);
+  const result = _pierceShadows(document, querySelectors);
   if (result.length > 1) {
     throw Error(`too many results found ${result}`);
   }
@@ -41,7 +41,7 @@ function pierceShadowsSingle(querySelectors) {
 
 function _nodelistToArray(nl) {
   if (!nl) return [];
-  var l = nl.length,
+  let l = nl.length,
     r = new Array(l);
   while (l--) {
     r[l] = nl[l];
@@ -53,61 +53,62 @@ function _pierceShadows(node, querySelectors, depth) {
   if (undefined === depth) depth = 0;
 
   const remainingSelectors = querySelectors.slice(1);
-  let nextNodes = node.querySelectorAll(querySelectors[0]);
+  const nextNodes = node.querySelectorAll(querySelectors[0]);
 
   if (0 == remainingSelectors.length) {
-    !debug ||
+    if (debug) {
       console.log(
         `${Array(depth + 1).join(' ')}end of recursion at ${nextNodes}`
       );
+    }
     return nextNodes;
   }
 
-  var l = nextNodes.length,
-    nextNodesArr = new Array(l);
-  while (l--) {
-    nextNodesArr[l] = nextNodes[l];
-  }
-
-  let results = nextNodesArr.reduce((accumulator, currentValue) => {
-    !debug ||
-      console.log(
-        `${Array(depth + 1).join(
-          ' '
-        )}descending to light ${currentValue} with selector ${
-          remainingSelectors[0]
-        }`
-      );
-    let lightNodes = _pierceShadows(
-      currentValue,
-      remainingSelectors,
-      depth + 1
-    );
-
-    let shadowNodes;
-    if (currentValue && currentValue.shadowRoot) {
-      !debug ||
+  const results = _nodelistToArray(nextNodes).reduce(
+    (accumulator, currentValue) => {
+      if (debug) {
         console.log(
-          `${Array(depth + 1).join(' ')}descending to shadow ${
-            currentValue.shadowRoot
-          } with selector ${remainingSelectors[0]}`
+          `${Array(depth + 1).join(
+            ' '
+          )}descending to light ${currentValue} with selector ${
+            remainingSelectors[0]
+          }`
         );
-      shadowNodes = _pierceShadows(
-        currentValue.shadowRoot,
+      }
+      const lightNodes = _pierceShadows(
+        currentValue,
         remainingSelectors,
         depth + 1
       );
-    }
-    !debug ||
-      console.log(
-        `${Array(depth + 1).join(
-          ' '
-        )}returning light ${lightNodes} and shadow ${shadowNodes}`
-      );
 
-    return accumulator
-      .concat(_nodelistToArray(lightNodes))
-      .concat(_nodelistToArray(shadowNodes));
-  }, []);
+      let shadowNodes;
+      if (currentValue && currentValue.shadowRoot) {
+        if (debug) {
+          console.log(
+            `${Array(depth + 1).join(' ')}descending to shadow ${
+              currentValue.shadowRoot
+            } with selector ${remainingSelectors[0]}`
+          );
+        }
+        shadowNodes = _pierceShadows(
+          currentValue.shadowRoot,
+          remainingSelectors,
+          depth + 1
+        );
+      }
+      if (debug) {
+        console.log(
+          `${Array(depth + 1).join(
+            ' '
+          )}returning light ${lightNodes} and shadow ${shadowNodes}`
+        );
+      }
+
+      return accumulator
+        .concat(_nodelistToArray(lightNodes))
+        .concat(_nodelistToArray(shadowNodes));
+    },
+    []
+  );
   return results;
 }
