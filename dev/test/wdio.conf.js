@@ -1,4 +1,6 @@
 exports.config = {
+  // This port & path are hardcoded to match chromedriver. See
+  // wdio-chromedriver-service for more information.
   port: '9515',
   path: '/',
   //
