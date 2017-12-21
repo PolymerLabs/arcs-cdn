@@ -8,7 +8,7 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
-let assert = require('assert');
+const assert = require('assert');
 
 function pierceShadows(selectors) {
   return browser.execute(function(selectors) {
@@ -28,7 +28,7 @@ function pierceShadowsSingle(selectors) {
  *   {id: <element-id>, text: <found text>}
  */
 function searchElementsForText(elements, textQuery) {
-  let textToId = elements.map(value => {
+  const textToId = elements.map(value => {
     return {
       id: value.ELEMENT,
       text: browser.elementIdText(value.ELEMENT).value
@@ -37,8 +37,8 @@ function searchElementsForText(elements, textQuery) {
   assert.ok(textToId.length > 0, textToId);
   assert.equal(textToId.length, elements.length);
 
-  let matches = textToId.reduce((accumulator, currentValue) => {
-    let found = currentValue.text.includes(textQuery) ? currentValue : null;
+  const matches = textToId.reduce((accumulator, currentValue) => {
+    const found = currentValue.text.includes(textQuery) ? currentValue : null;
     if (accumulator && found) {
       throw Error(`found two matches ${accumulator}, ${found}`);
     } else if (accumulator) {
@@ -73,7 +73,7 @@ function waitForStillness() {
 /** Load the selenium utils into the current page. */
 function loadSeleniumUtils(cdnBranch) {
   var result = browser.execute(function(cdnBranch) {
-    let script = document.createElement('script');
+    const script = document.createElement('script');
     script.type = 'text/javascript';
     script.src = `${cdnBranch}/test/selenium-utils.js`;
     document.getElementsByTagName('head')[0].appendChild(script);
@@ -83,22 +83,22 @@ function loadSeleniumUtils(cdnBranch) {
 function allSuggestions(footerPath) {
   waitForStillness();
 
-  let magnifier = pierceShadowsSingle(footerPath.concat(['div[search]', 'i']));
+  const magnifier = pierceShadowsSingle(footerPath.concat(['div[search]', 'i']));
   browser.elementIdClick(magnifier.value.ELEMENT);
 }
 
 function acceptSuggestion(footerPath, textSubstring) {
   waitForStillness();
 
-  let suggestionsRoot = pierceShadowsSingle(
+  const suggestionsRoot = pierceShadowsSingle(
     footerPath.concat(['suggestions-element'])
   );
-  let suggestionsDiv = pierceShadowsSingle(
+  const suggestionsDiv = pierceShadowsSingle(
     footerPath.concat(['suggestions-element', 'div'])
   );
   browser.waitUntil(
     () => {
-      let allSuggestions = browser.elementIdElements(
+      const allSuggestions = browser.elementIdElements(
         suggestionsDiv.value.ELEMENT,
         'suggest'
       );
@@ -107,7 +107,7 @@ function acceptSuggestion(footerPath, textSubstring) {
       }
 
       try {
-        let desiredSuggestion = searchElementsForText(
+        const desiredSuggestion = searchElementsForText(
           allSuggestions.value,
           textSubstring
         );
@@ -141,13 +141,13 @@ function clickInParticles(slotName, selectors, textQuery) {
   waitForStillness();
 
   if (!selectors) selectors = [];
-  let realSelectors = ['arc-host', `div[slotid="${slotName}"]`].concat(
+  const realSelectors = ['arc-host', `div[slotid="${slotName}"]`].concat(
     selectors
   );
 
   browser.waitUntil(
     () => {
-      let pierced = pierceShadows(realSelectors);
+      const pierced = pierceShadows(realSelectors);
       assert.ok(pierced);
       if (!pierced.value || pierced.value.length == 0) {
         return false;
@@ -181,7 +181,7 @@ function clickInParticles(slotName, selectors, textQuery) {
 describe('test basic arcs functionality', function() {
   it('can use the restaurant demo flow', function() {
     // TODO(smalls) need to spin up a server for this
-    let cdnBranch = 'http://localhost:8000/arcs-cdn/dev';
+    const cdnBranch = 'http://localhost:8000/arcs-cdn/dev';
 
     // TODO(smalls) should we create a user on the fly?
     browser.url(`${cdnBranch}/apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
@@ -201,7 +201,7 @@ describe('test basic arcs functionality', function() {
     loadSeleniumUtils(cdnBranch);
 
     // check out some basic structure relative to the app footer
-    let footerPath = ['arc-footer', 'x-toast[app-footer]'];
+    const footerPath = ['arc-footer', 'x-toast[app-footer]'];
     assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
     assert.ok(pierceShadowsSingle(footerPath).value);
 
