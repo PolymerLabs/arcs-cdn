@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "tools/mocha-chrome-wrapper */test/index.test.html"
+    "test": "tools/mocha-chrome-wrapper */test/index.test.html && cd dev && ../node_modules/webdriverio/bin/wdio test/wdio.conf.js"
   },
   "devDependencies": {
     "chai": "^4.1.2",

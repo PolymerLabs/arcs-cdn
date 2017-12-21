@@ -78,12 +78,25 @@ function loadSeleniumUtils(cdnBranch) {
     script.src = `${cdnBranch}/test/selenium-utils.js`;
     document.getElementsByTagName('head')[0].appendChild(script);
   }, cdnBranch);
+  browser.waitUntil(() => {
+    try {
+      const result = browser.execute('pierceShadows(["head"])');
+    } catch (e) {
+      console.log(
+        `caught an exception looking for pierceShadows(); we'll try again. Text: ${e}`
+      );
+      return false;
+    }
+    return true;
+  });
 }
 
 function allSuggestions(footerPath) {
   waitForStillness();
 
-  const magnifier = pierceShadowsSingle(footerPath.concat(['div[search]', 'i']));
+  const magnifier = pierceShadowsSingle(
+    footerPath.concat(['div[search]', 'i'])
+  );
   browser.elementIdClick(magnifier.value.ELEMENT);
 }
 
@@ -181,7 +194,7 @@ function clickInParticles(slotName, selectors, textQuery) {
 describe('test basic arcs functionality', function() {
   it('can use the restaurant demo flow', function() {
     // TODO(smalls) need to spin up a server for this
-    const cdnBranch = 'http://localhost:8000/arcs-cdn/dev';
+    const cdnBranch = 'https://polymerlabs.github.io/arcs-cdn/dev';
 
     // TODO(smalls) should we create a user on the fly?
     browser.url(`${cdnBranch}/apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
