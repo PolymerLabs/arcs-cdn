@@ -3,7 +3,7 @@ node_js:
   - "9"
 before_script:
   - npm install
-  - node_modules/http-server/bin/http-server -a localhost -p 8080 &
+  - npm start
   - sleep 3
 script:
   - npm install
