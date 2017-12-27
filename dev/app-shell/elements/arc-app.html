@@ -447,12 +447,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (user) {
         let data = Object.keys(visited).map(key => {
           let {metadata, profile} = visited[key];
+          let href = `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`;
+          if (metadata.additionalRecipe) href += `&manifest=${metadata.additionalRecipe}`;
           return {
             key: key,
             description: metadata.description || key.slice(1),
             icon: metadata.icon || 'broken_image',
             color: metadata.color || 'gray',
-            href: `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`,
+            href: href,
             profile: Boolean(profile)
           };
         });

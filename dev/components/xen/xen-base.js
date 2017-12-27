@@ -1,7 +1,8 @@
 class XenBase extends XenElement(XenState(HTMLElement)) {
   get template() {
     // TODO(sjmiles): null check module?
-    return this.constructor.module.querySelector('template');
+    const module = this.constructor.module;
+    return module ? module.querySelector('template') : '';
   }
   get host() {
     return this.shadowRoot || this.attachShadow({mode: `open`});
