@@ -71,13 +71,13 @@ function waitForStillness() {
 }
 
 /** Load the selenium utils into the current page. */
-function loadSeleniumUtils(cdnBranch) {
-  var result = browser.execute(function(cdnBranch) {
+function loadSeleniumUtils() {
+  var result = browser.execute(function(baseUrl) {
     const script = document.createElement('script');
     script.type = 'text/javascript';
-    script.src = `${cdnBranch}/test/selenium-utils.js`;
+    script.src = `${baseUrl}/test/selenium-utils.js`;
     document.getElementsByTagName('head')[0].appendChild(script);
-  }, cdnBranch);
+  }, browser.options.baseUrl);
   browser.waitUntil(() => {
     try {
       // To see if our selenium-utils has finished loading, try one of the
@@ -199,11 +199,10 @@ function clickInParticles(slotName, selectors, textQuery) {
 
 describe('test basic arcs functionality', function() {
   it('can use the restaurant demo flow', function() {
-    // TODO(smalls) we shouldn't hardcode the path here
-    const cdnBranch = 'http://localhost:8080/dev';
-
     // TODO(smalls) should we create a user on the fly?
-    browser.url(`${cdnBranch}/apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
+    // note - baseUrl (currently specified on the command line) must end in a
+    // trailing '/', and this must not begin with a preceding '/'.
+    browser.url(`apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
 
     assert.equal('Arcs', browser.getTitle());
 
@@ -217,7 +216,7 @@ describe('test basic arcs functionality', function() {
     // wait for the page to load a bit, init the test harness for this page
     browser.waitForVisible('<app-main>');
     browser.waitForVisible('<footer>');
-    loadSeleniumUtils(cdnBranch);
+    loadSeleniumUtils();
 
     // check out some basic structure relative to the app footer
     const footerPath = ['arc-footer', 'x-toast[app-footer]'];
