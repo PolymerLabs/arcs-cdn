@@ -3,7 +3,7 @@ node_js:
   - "9"
 before_script:
   - npm install
-  - npm start
+  - npm start &
   - sleep 3
 script:
   - npm install
