@@ -15,3 +15,4 @@ schema ArcMetadata
     Boolean profile
   optional
     Text blurb
+    URL externalManifest

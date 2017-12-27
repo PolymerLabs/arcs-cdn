@@ -21,6 +21,21 @@ http://polymer.github.io/PATENTS.txt
 <script src="../apps/chrome-extension/data-processing.js"></script>
 <script src="../apps/chrome-extension/test/data-processing-test.js"></script>
 
+<script src="../app-shell/elements/test/fake-database.js"></script>
+<script src="../app-shell/elements/test/fake-database-test.js"></script>
+
+<script src="../components/xen/xen-state.js"></script>
+<script src="../components/xen/xen-element.js"></script>
+<script src="../components/xen/xen-base.js"></script>
+<script>window.Arcs = {};</script>
+<script src="../app-shell/lib/utils.js"></script>
+<!-- TODO(wkorman): Due to HTML imports below these tests must be served through
+an http server in order to run. If we shift them to JS modules then we can go
+back to serving from the file system. -->
+<link rel="import" href="../app-shell/elements/persistent-arc.html">
+<link rel="import" href="../app-shell/elements/watch-group.html">
+<script src="../app-shell/elements/test/persistent-arc-test.js"></script>
+
 <script src="selenium-utils.js"></script>
 <script src="selenium-utils-test.js"></script>
 <script>
