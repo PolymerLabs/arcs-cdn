@@ -199,8 +199,8 @@ function clickInParticles(slotName, selectors, textQuery) {
 
 describe('test basic arcs functionality', function() {
   it('can use the restaurant demo flow', function() {
-    // TODO(smalls) need to spin up a server for this
-    const cdnBranch = 'https://polymerlabs.github.io/arcs-cdn/dev';
+    // TODO(smalls) we shouldn't hardcode the path here
+    const cdnBranch = 'http://localhost:8080/dev';
 
     // TODO(smalls) should we create a user on the fly?
     browser.url(`${cdnBranch}/apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
