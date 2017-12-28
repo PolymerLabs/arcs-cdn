@@ -11,12 +11,14 @@
 const MochaChrome = require('mocha-chrome');
 const fs = require('fs');
 
-const promises = process.argv.slice(2).map(testScript => {
-  // We're not doing a ton of checking since we've relied on shell globs to
-  // populate the parameter list with valid files in the only caller we care
-  // about (npm test).
-  const url = 'file://' + fs.realpathSync(testScript);
+const server = process.argv[2];
 
+const promises = process.argv.slice(3).map(testScript => {
+  if (!fs.existsSync(testScript)) {
+    throw Error(`no test file found at path ${testScript}.`);
+  }
+
+  const url = `http://${server}/${testScript}`;
   const options = Object.assign({
     url: url
   });
