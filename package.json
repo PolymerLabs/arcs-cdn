@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "set && http-server -a ${npm_package_config_host} -p ${npm_package_config_port}",
-    "test": "tools/mocha-chrome-wrapper */test/index.test.html && cd dev && wdio -b http://${npm_package_config_host}:${npm_package_config_port}/dev/ test/wdio.conf.js"
+    "test": "tools/mocha-chrome-wrapper */test/index.test.html && tools/wdio-wrapper */test/wdio.conf.js"
   },
   "devDependencies": {
     "chai": "^4.1.2",
