@@ -1,1 +1,0 @@
-https://diverseui.com/about
