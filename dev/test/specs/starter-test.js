@@ -97,6 +97,42 @@ function loadSeleniumUtils() {
   });
 }
 
+function getFooterPath() {
+  return ['arc-footer', 'x-toast[app-footer]'];
+}
+
+function initTestWithNewArc() {
+  // TODO(smalls) should we create a user on the fly?
+  // note - baseUrl (currently specified on the command line) must end in a
+  // trailing '/', and this must not begin with a preceding '/'.
+  browser.url(`apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
+
+  assert.equal('Arcs', browser.getTitle());
+
+  // create a new arc, switch to that tab (toggling back to the first tab to
+  // reset the webdriver window state).
+  createNewArc();
+
+  // wait for the page to load a bit, init the test harness for this page
+  browser.waitForVisible('<app-main>');
+  browser.waitForVisible('<footer>');
+  loadSeleniumUtils();
+
+  // check out some basic structure relative to the app footer
+  const footerPath = getFooterPath(); //['arc-footer', 'x-toast[app-footer]'];
+  assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
+  assert.ok(pierceShadowsSingle(footerPath).value);
+}
+
+function createNewArc() {
+  // create a new arc, switch to that tab (toggling back to the first tab to
+  // reset the webdriver window state).
+  browser.waitForVisible('div[title="New Arc"]');
+  browser.click('div[title="New Arc"]');
+  browser.switchTab(browser.windowHandles().value[0]);
+  browser.switchTab(browser.windowHandles().value[1]);
+}
+
 function allSuggestions(footerPath) {
   waitForStillness();
 
@@ -150,6 +186,8 @@ function acceptSuggestion(footerPath, textSubstring) {
     5000,
     `couldn't find suggestion ${textSubstring}`
   );
+  // TODO: return the full suggestion text for further verification.
+  console.log(`Accepted suggestion: ${textSubstring}`);
 }
 
 /**
@@ -199,30 +237,9 @@ function clickInParticles(slotName, selectors, textQuery) {
 
 describe('test basic arcs functionality', function() {
   it('can use the restaurant demo flow', function() {
-    // TODO(smalls) should we create a user on the fly?
-    // note - baseUrl (currently specified on the command line) must end in a
-    // trailing '/', and this must not begin with a preceding '/'.
-    browser.url(`apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
+    initTestWithNewArc();
 
-    assert.equal('Arcs', browser.getTitle());
-
-    // create a new arc, switch to that tab (toggling back to the first tab to
-    // reset the webdriver window state).
-    browser.waitForVisible('div[title="New Arc"]');
-    browser.click('div[title="New Arc"]');
-    browser.switchTab(browser.windowHandles().value[0]);
-    browser.switchTab(browser.windowHandles().value[1]);
-
-    // wait for the page to load a bit, init the test harness for this page
-    browser.waitForVisible('<app-main>');
-    browser.waitForVisible('<footer>');
-    loadSeleniumUtils();
-
-    // check out some basic structure relative to the app footer
-    const footerPath = ['arc-footer', 'x-toast[app-footer]'];
-    assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
-    assert.ok(pierceShadowsSingle(footerPath).value);
-
+    const footerPath = getFooterPath();
     allSuggestions(footerPath);
 
     acceptSuggestion(footerPath, 'Find restaurants');
@@ -231,8 +248,28 @@ describe('test basic arcs functionality', function() {
     acceptSuggestion(footerPath, 'make a reservation');
     acceptSuggestion(footerPath, 'You are free');
 
+    browser.close();
     // to drop into debug mode with a REPL; also a handy way to see the state
     // at the end of the test:
     // browser.debug();
+  });
+
+  it('can use the gift shopping demo flow', function() {
+    initTestWithNewArc();
+
+    const footerPath = getFooterPath();
+    allSuggestions(footerPath);
+
+    acceptSuggestion(footerPath, "Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire's wishlist (Book: How to Draw plus 2 other items)");
+
+    // TODO: click the "Add" buttons to move products from recommended to shortlist and
+    // (1) verify product was moved,
+    // (2) verify 'action' slot is not visible after all products were moved.
+
+    acceptSuggestion(footerPath, "Estimate arrival dates, estimate arrival dates");  // TODO: add "and buy gifts for Claire" when descriptions are fixed.
+    acceptSuggestion(footerPath, "check manufacturer information for Products from your browsing context");
+    acceptSuggestion(footerPath, "recommendations based on Products recommended based on Products from your browsing context and Claire's wishlist");
+
+    browser.close();
   });
 });
