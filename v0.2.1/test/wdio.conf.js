@@ -131,9 +131,7 @@ exports.config = {
   framework: 'mocha',
   //
   // Test reporter for stdout.
-  // The only one supported by default is 'dot'
-  // see also: http://webdriver.io/guide/reporters/dot.html
-  reporters: ['dot'],
+  reporters: ['spec'],
 
   //
   // Options to be passed to Mocha.

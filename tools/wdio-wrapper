@@ -18,7 +18,7 @@ const { spawnSync } = require('child_process');
 // inefficiencies seem bearable.
 process.argv.slice(2).forEach(wdioConfig => {
   const version = wdioConfig.split(path.sep)[0];
-  console.log('running tests on version', version);
+  console.log('running web tests on version', version);
 
   spawnSync(
     'wdio',
