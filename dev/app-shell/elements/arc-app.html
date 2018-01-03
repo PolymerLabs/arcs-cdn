@@ -448,7 +448,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         let data = Object.keys(visited).map(key => {
           let {metadata, profile} = visited[key];
           let href = `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`;
-          if (metadata.additionalRecipe) href += `&manifest=${metadata.additionalRecipe}`;
+          if (metadata.externalManifest) href += `&manifest=${metadata.externalManifest}`;
           return {
             key: key,
             description: metadata.description || key.slice(1),
