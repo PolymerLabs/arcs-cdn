@@ -119,12 +119,14 @@ function initTestWithNewArc() {
   loadSeleniumUtils();
 
   // check out some basic structure relative to the app footer
-  const footerPath = getFooterPath(); //['arc-footer', 'x-toast[app-footer]'];
+  const footerPath = getFooterPath();
   assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
   assert.ok(pierceShadowsSingle(footerPath).value);
 }
 
 function createNewArc() {
+  assert.equal(1, browser.windowHandles().value.length);
+
   // create a new arc, switch to that tab (toggling back to the first tab to
   // reset the webdriver window state).
   browser.waitForVisible('div[title="New Arc"]');
@@ -133,17 +135,18 @@ function createNewArc() {
   browser.switchTab(browser.windowHandles().value[1]);
 }
 
-function allSuggestions(footerPath) {
+function allSuggestions() {
   waitForStillness();
 
   const magnifier = pierceShadowsSingle(
-    footerPath.concat(['div[search]', 'i'])
+    getFooterPath().concat(['div[search]', 'i'])
   );
   browser.elementIdClick(magnifier.value.ELEMENT);
 }
 
-function acceptSuggestion(footerPath, textSubstring) {
+function acceptSuggestion(textSubstring) {
   waitForStillness();
+  let footerPath = getFooterPath();
 
   const suggestionsRoot = pierceShadowsSingle(
     footerPath.concat(['suggestions-element'])
@@ -235,18 +238,17 @@ function clickInParticles(slotName, selectors, textQuery) {
   );
 }
 
-describe('test basic arcs functionality', function() {
+describe('test Arcs demo flows', function() {
   it('can use the restaurant demo flow', function() {
     initTestWithNewArc();
 
-    const footerPath = getFooterPath();
-    allSuggestions(footerPath);
+    allSuggestions();
 
-    acceptSuggestion(footerPath, 'Find restaurants');
+    acceptSuggestion('Find restaurants');
     clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
 
-    acceptSuggestion(footerPath, 'make a reservation');
-    acceptSuggestion(footerPath, 'You are free');
+    acceptSuggestion('make a reservation');
+    acceptSuggestion('You are free');
 
     browser.close();
     // to drop into debug mode with a REPL; also a handy way to see the state
@@ -257,18 +259,24 @@ describe('test basic arcs functionality', function() {
   it('can use the gift shopping demo flow', function() {
     initTestWithNewArc();
 
-    const footerPath = getFooterPath();
-    allSuggestions(footerPath);
+    allSuggestions();
 
-    acceptSuggestion(footerPath, "Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire's wishlist (Book: How to Draw plus 2 other items)");
+    acceptSuggestion('Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire\'s wishlist (Book: How to Draw plus 2 other items)');
+    browser.waitForVisible('div[slotid="action"]');
+    browser.waitForVisible('div[slotid="annotation"]');
 
-    // TODO: click the "Add" buttons to move products from recommended to shortlist and
+    // TODO: click the 'Add' buttons to move products from recommended to shortlist and
     // (1) verify product was moved,
     // (2) verify 'action' slot is not visible after all products were moved.
 
-    acceptSuggestion(footerPath, "Estimate arrival dates, estimate arrival dates");  // TODO: add "and buy gifts for Claire" when descriptions are fixed.
-    acceptSuggestion(footerPath, "check manufacturer information for Products from your browsing context");
-    acceptSuggestion(footerPath, "recommendations based on Products recommended based on Products from your browsing context and Claire's wishlist");
+    acceptSuggestion('Estimate arrival dates, estimate arrival dates');  // TODO: add 'and buy gifts for Claire' when descriptions are fixed.
+    acceptSuggestion('check manufacturer information for Products from your browsing context');
+    acceptSuggestion('recommendations based on Products recommended based on Products from your browsing context and Claire\'s wishlist');
+
+    // Verify each product has non empty annotation text.
+    let annotations = browser.getText('div[slotid="annotation"]');
+    assert.equal(6, annotations.length);
+    assert.ok(annotations.length > 0 && annotations.every(a => a.length > 0));
 
     browser.close();
   });
