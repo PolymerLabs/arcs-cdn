@@ -213,7 +213,7 @@ class Type {
       } else if (resolved.shape) {
         return Type.newInterface(resolved.shape);
       } else {
-        throw new Error('Expected {shape} or {schema}')
+        throw new Error('Expected {shape} or {schema}');
       }
     }
 
@@ -298,7 +298,7 @@ class Type {
     if (this.isEntity)
       return this.entitySchema.name;
     if (this.isInterface)
-      return 'Interface'
+      return 'Interface';
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])('Add support to serializing type:', this);
   }
 
@@ -364,7 +364,7 @@ addType('Interface', 'shape');
 
 class Entity {
   constructor(userIDComponent) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!userIDComponent || userIDComponent.indexOf(':') == -1, "user IDs must not contain the ':' character")
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!userIDComponent || userIDComponent.indexOf(':') == -1, "user IDs must not contain the ':' character");
     this[__WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier] = undefined;
     this._userIDComponent = userIDComponent;
   }
@@ -401,10 +401,6 @@ class Entity {
   }
   toLiteral() {
     return this.rawData;
-  }
-
-  get debugString() {
-    return JSON.stringify(this.rawData);
   }
 
   static get type() {
@@ -580,9 +576,9 @@ class ParticleSpec {
     this.slots.forEach(s => {
     results.push(`  ${s.isRequired ? 'must ' : ''}consume ${s.isSet ? 'set of ' : ''}${s.name}`);
       s.providedSlots.forEach(ps => {
-        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`)
+        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`);
         // TODO: support form factors
-        ps.views.forEach(psv => results.push(`      view ${psv}`))
+        ps.views.forEach(psv => results.push(`      view ${psv}`));
       });
     });
     // Description
@@ -729,9 +725,9 @@ class Schema {
         case 'Number':
           return [fieldType, 'number'];
         case 'Boolean':
-          return [fieldType, 'boolean']
+          return [fieldType, 'boolean'];
         case 'Object':
-          return [fieldType, 'object']
+          return [fieldType, 'object'];
         default:
           // Text, URL
           return [fieldType, 'string'];
@@ -782,7 +778,7 @@ class Schema {
           schema: schema.toLiteral(),
         };
       }
-    }
+    };
 
     Object.defineProperty(clazz, 'type', {value: this.type});
     Object.defineProperty(clazz, 'name', {value: this.name});
@@ -815,7 +811,7 @@ class Schema {
           results.push(`    ${schemaType} ${name}`);
         });
       }
-    }
+    };
 
     propertiesToString(this.normative, 'normative');
     propertiesToString(this.optional, 'optional');
@@ -877,8 +873,6 @@ class Schema {
 
 
 
-const DEBUGGING = false;
-
 /** @class Particle
  * A basic particle. For particles that provide UI, you may like to
  * instead use DOMParticle.
@@ -898,6 +892,7 @@ class Particle {
     this._slotByName = new Map();
     this.capabilities = capabilities || {};
     this.hostedSlotBySlotId = new Map();
+    this.handleByHostedHandle = new Map();
   }
 
   /** @method setViews(views)
@@ -1001,14 +996,6 @@ class Particle {
     trace.end();
   }
 
-  logDebug(tag, view) {
-    if (!DEBUGGING)
-      return;
-    let direction = this.spec.connectionMap.get(tag).direction;
-    view.debugString().then(v => console.log(
-       `(${this.spec.name})(${direction})(${tag}): (${view.name})`, v));
-  }
-
   when(changes, f) {
     changes.forEach(change => change.register(this, f));
   }
@@ -1067,7 +1054,7 @@ class ViewChanges {
 
     for (var name of this.names) {
       var view = this.views.get(name);
-      view.synchronize(this.type, afterAllModels, f, particle)
+      view.synchronize(this.type, afterAllModels, f, particle);
     }
   }
 }
@@ -1278,9 +1265,14 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
       if (includeModel) {
         result.model.items.push(Object.assign(content.model || {}, {subId: value.subId}));
       }
+      // TODO: Currently using the first available template. Add support for multiple templates.
       if (includeTemplate && !result.template) {
-        // TODO: Currently using the first available template. Add support for multiple templates.
-        result.template = content.template;
+        let template = content.template;
+        // Replace hosted particle handle names with the corresponding transformation particle handles.
+        this.handleByHostedHandle.forEach((handleName, hostedHandleName) => {
+          template = template.replace(new RegExp(`\{\{(${hostedHandleName})(.*)\}\}`), `{{${handleName}$2}}`);
+        });
+        result.template = template;
       }
     }
     return result;
@@ -1642,7 +1634,7 @@ class StorageProxy {
 
   get() {
     return new Promise((resolve, reject) =>
-      this._port.HandleGet({ callback: r => {resolve(r)}, handle: this }));
+      this._port.HandleGet({ callback: r => resolve(r), handle: this }));
   }
 
   toList() {
@@ -1694,16 +1686,21 @@ class InnerPEC {
       var proxy = new StorageProxy(id, type, this._apiPort, this, name, 0);
       Promise.resolve().then(() => callback(proxy));
       return proxy;
+    };
+
+    this._apiPort.onMapHandleCallback = ({id, callback}) => {
+      Promise.resolve().then(() => callback(id));
+      return id;
     }
 
     this._apiPort.onCreateSlotCallback = ({hostedSlotId, callback}) => {
       Promise.resolve().then(() => callback(hostedSlotId));
       return hostedSlotId;
-    }
+    };
 
     this._apiPort.onInnerArcRender = ({transformationParticle, transformationSlotName, hostedSlotId, content}) => {
       transformationParticle.renderHostedSlot(transformationSlotName, hostedSlotId, content);
-    }
+    };
 
     this._apiPort.onDefineParticle = ({particleDefinition, particleFunction}) => {
       var particle = define(particleDefinition, eval(particleFunction));
@@ -1714,7 +1711,7 @@ class InnerPEC {
       if (global.close) {
         global.close();
       }
-    }
+    };
 
     this._apiPort.onInstantiateParticle =
       ({spec, handles}) => this._instantiateParticle(spec, handles);
@@ -1750,7 +1747,7 @@ class InnerPEC {
         render(content) {
           this._pec._apiPort.Render({particle, slotName, content});
 
-          Object.keys(content).forEach(key => { this._requestedContentTypes.delete(key) });
+          Object.keys(content).forEach(key => { this._requestedContentTypes.delete(key); });
           // Slot is considered rendered, if a non-empty content was sent and all requested content types were fullfilled.
           this._isRendered = this._requestedContentTypes.size == 0 && (Object.keys(content).length > 0);
         }
@@ -1781,7 +1778,7 @@ class InnerPEC {
       __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__["a" /* default */])(particle._slotByName.has(slotName),
         `Stop render called for particle ${particle.name} slot ${slotName} without start render being called.`);
       particle._slotByName.delete(slotName);
-    }
+    };
   }
 
   generateIDComponents() {
@@ -1801,6 +1798,12 @@ class InnerPEC {
             var v = __WEBPACK_IMPORTED_MODULE_1__handle_js__["a" /* default */].handleFor(proxy, proxy.type.isSetView, true, true);
             v.entityClass = (proxy.type.isSetView ? proxy.type.primitiveType().entitySchema : proxy.type.entitySchema).entityClass();
             resolve(v);
+          }}));
+      },
+      mapHandle: function(handle) {
+        return new Promise((resolve, reject) =>
+          pec._apiPort.ArcMapHandle({arc: arcId, handle, callback: id => {
+            resolve(id);
           }}));
       },
       createSlot: function(transformationParticle, transformationSlotName, hostedParticleName, hostedSlotName) {
@@ -1826,9 +1829,9 @@ class InnerPEC {
     return {
       constructInnerArc: particle => {
         return new Promise((resolve, reject) =>
-          this._apiPort.ConstructInnerArc({ callback: arcId => {resolve(this.innerArcHandle(arcId))}, particle }));
+          this._apiPort.ConstructInnerArc({ callback: arcId => {resolve(this.innerArcHandle(arcId));}, particle }));
       }
-    }
+    };
   }
 
   async _instantiateParticle(spec, proxies) {
@@ -2237,11 +2240,11 @@ class JsonldToManifest {
 
     var s = '';
     for (let superName of superNames)
-      s += `import 'https://schema.org/${superName}'\n\n`
+      s += `import 'https://schema.org/${superName}'\n\n`;
 
-    s += `schema ${className}`
+    s += `schema ${className}`;
     if (superNames.length > 0)
-      s += ` extends ${superNames.join(', ')}`
+      s += ` extends ${superNames.join(', ')}`;
 
     if (relevantProperties.length > 0) {
       s += '\n  optional';
@@ -2249,7 +2252,7 @@ class JsonldToManifest {
         if (property.type.length > 1)
           var type = '(' + property.type.join(" or ") + ')';
         else
-          var type = property.type[0]
+          var type = property.type[0];
         s += `\n    ${type} ${property.name}`;
       }
     }
@@ -2372,22 +2375,22 @@ class APIPort {
     this.Direct = {
       convert: a => a,
       unconvert: a => a
-    }
+    };
 
     this.Stringify = {
       convert: a => a.toString(),
       unconvert: a => eval(a)
-    }
+    };
 
     this.LocalMapped = {
       convert: a => this._mapper.maybeCreateMappingForThing(a),
       unconvert: a => this._mapper.thingForIdentifier(a)
-    }
+    };
 
     this.Mapped = {
       convert: a => this._mapper.identifierForThing(a),
       unconvert: a => this._mapper.thingForIdentifier(a)
-    }
+    };
 
     this.Dictionary = function(primitive) {
       return {
@@ -2398,8 +2401,8 @@ class APIPort {
           }
           return r;
         }
-      }
-    }
+      };
+    };
 
     this.Map = function(keyprimitive, valueprimitive) {
       return {
@@ -2414,22 +2417,22 @@ class APIPort {
             r.set(keyprimitive.unconvert(key), valueprimitive.unconvert(a[key]));
           return r;
         }
-      }
-    }
+      };
+    };
 
     this.List = function(primitive) {
       return {
         convert: a => a.map(v => primitive.convert(v)),
         unconvert: a => a.map(v => primitive.unconvert(v))
-      }
-    }
+      };
+    };
 
     this.ByLiteral = function(clazz) {
       return {
         convert: a => a.toLiteral(),
         unconvert: a => clazz.fromLiteral(a)
-      }
-    }
+      };
+    };
   }
 
   close() {
@@ -2523,7 +2526,7 @@ class PECOuterPort extends APIPort {
     this.registerCall("Stop", {});
     this.registerCall("DefineParticle",
       {particleDefinition: this.Direct, particleFunction: this.Stringify});
-    this.registerRedundantInitializer("DefineHandle", {type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct})
+    this.registerRedundantInitializer("DefineHandle", {type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializer("InstantiateParticle",
       {spec: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_1__particle_spec_js__["a" /* default */]), handles: this.Map(this.Direct, this.Mapped)});
 
@@ -2550,6 +2553,9 @@ class PECOuterPort extends APIPort {
 
     this.registerHandler("ArcCreateHandle", {callback: this.Direct, arc: this.LocalMapped, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializer("CreateHandleCallback", {callback: this.Direct, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct, id: this.Direct});
+
+    this.registerHandler("ArcMapHandle", {callback: this.Direct, arc: this.LocalMapped, handle: this.Mapped});
+    this.registerInitializer("MapHandleCallback", {callback: this.Direct, id: this.Direct});
 
     this.registerHandler("ArcCreateSlot",
       { callback: this.Direct, arc: this.LocalMapped, transformationParticle: this.Mapped, transformationSlotName: this.Direct, hostedParticleName: this.Direct, hostedSlotName: this.Direct});
@@ -2595,6 +2601,8 @@ class PECInnerPort extends APIPort {
 
     this.registerCall("ArcCreateHandle", {callback: this.LocalMapped, arc: this.Direct, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializerHandler("CreateHandleCallback", {callback: this.LocalMapped, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct, id: this.Direct});
+    this.registerCall("ArcMapHandle", {callback: this.LocalMapped, arc: this.Direct, handle: this.Mapped});
+    this.registerInitializerHandler("MapHandleCallback", {callback: this.LocalMapped, id: this.Direct});
     this.registerCall("ArcCreateSlot",
       {callback: this.LocalMapped, arc: this.Direct, transformationParticle: this.Mapped, transformationSlotName: this.Direct, hostedParticleName: this.Direct, hostedSlotName: this.Direct});
     this.registerInitializerHandler("CreateSlotCallback", { callback: this.LocalMapped, hostedSlotId: this.Direct });
@@ -2900,11 +2908,6 @@ class Collection extends Handle {
     var serialization = this._serialize(entity);
     return this._view.remove(serialization.id);
   }
-
-  async debugString() {
-    var list = await this.toList();
-    return list ? ('[' + list.map(p => p.debugString).join(", ") + ']') : 'undefined';
-  }
 }
 
 /** @class Variable
@@ -2956,10 +2959,6 @@ class Variable extends Handle {
     if (!this.canWrite)
       throw new Error("View not writeable");
     await this._view.clear();
-  }
-  async debugString() {
-    var value = await this.get();
-    return value ? value.debugString : 'undefined';
   }
 }
 
@@ -3054,7 +3053,7 @@ function schemaLocationFor(name) {
 
 class Loader {
   path(fileName) {
-    let path = fileName.replace(/[\/][^\/]+$/, '/')
+    let path = fileName.replace(/[\/][^\/]+$/, '/');
     return path;
   }
 
@@ -3248,13 +3247,13 @@ if (typeof document == 'object') {
   var now = function() {
     var t = performance.now();
     return t;
-  }
+  };
 } else {
   var pid = process.pid;
   var now = function() {
     var t = process.hrtime();
     return t[0] * 1000000 + t[1] / 1000;
-  }
+  };
 }
 
 var flowId = 0;

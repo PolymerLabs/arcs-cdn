@@ -272,9 +272,9 @@ class Recipe {
       let checkForInvalid = (name, list, f) => {
         var invalids = list.filter(item => !item._isValid());
         if (invalids.length > 0)
-          console.log(`Has Invalid ${name} ${invalids.map(f)}`)
+          console.log(`Has Invalid ${name} ${invalids.map(f)}`);
       }
-      checkForInvalid('Views', this._views, view => view.id);
+      checkForInvalid('Views', this._views, view => `'${view.toString()}'`);
       checkForInvalid('Particles', this._particles, particle => particle.name);
       checkForInvalid('Slots', this._slots, slot => slot.name);
       checkForInvalid('ViewConnections', this.viewConnections, viewConnection => `${viewConnection.particle.name}::${viewConnection.name}`);
@@ -359,7 +359,7 @@ class Recipe {
           slots.push(ps);
           seenSlots.add(ps);
         }
-      })
+      });
     }
 
     // Put particles and views in their final ordering.
@@ -1011,7 +1011,7 @@ class Type {
       } else if (resolved.shape) {
         return Type.newInterface(resolved.shape);
       } else {
-        throw new Error('Expected {shape} or {schema}')
+        throw new Error('Expected {shape} or {schema}');
       }
     }
 
@@ -1096,7 +1096,7 @@ class Type {
     if (this.isEntity)
       return this.entitySchema.name;
     if (this.isInterface)
-      return 'Interface'
+      return 'Interface';
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])('Add support to serializing type:', this);
   }
 
@@ -1230,7 +1230,6 @@ class Shape {
     this.reverse = new Map();
     for (var p in particles)
       this.reverse.set(particles[p], p);
-    this.reverseViews = new Map();
     for (var v in views)
       this.reverse.set(views[v], v);
     for (var vc in vcs)
@@ -1306,6 +1305,14 @@ class RecipeUtil {
             if (reverse.get(recipeVC.view) != shapeVC.view)
               continue;
           } else if (forward.has(shapeVC.view) && forward.get(shapeVC.view) !== null) {
+            continue;
+          }
+          // Check whether shapeVC and recipeVC reference the same view.
+          // Note: the id of a view with 'copy' fate changes during recipe instantiation, hence comparing to original id too.
+          // Skip the check if views have 'create' fate (their ids are arbitrary).
+          if ((shapeVC.view.fate != 'create' || (recipeVC.view.fate != 'create' && recipeVC.view.originalFate != 'create')) &&
+              shapeVC.view.id != recipeVC.view.id && shapeVC.view.id != recipeVC.view.originalId) {
+            // this is a different view.
             continue;
           }
         }
@@ -1447,7 +1454,7 @@ class RecipeUtil {
   }
 
   static directionCounts(view) {
-    var counts = {'in': 0, 'out': 0, 'inout': 0, 'unknown': 0}
+    var counts = {'in': 0, 'out': 0, 'inout': 0, 'unknown': 0};
     for (var connection of view.connections) {
       var direction = connection.direction;
       if (counts[direction] == undefined)
@@ -1587,9 +1594,9 @@ class Schema {
         case 'Number':
           return [fieldType, 'number'];
         case 'Boolean':
-          return [fieldType, 'boolean']
+          return [fieldType, 'boolean'];
         case 'Object':
-          return [fieldType, 'object']
+          return [fieldType, 'object'];
         default:
           // Text, URL
           return [fieldType, 'string'];
@@ -1640,7 +1647,7 @@ class Schema {
           schema: schema.toLiteral(),
         };
       }
-    }
+    };
 
     Object.defineProperty(clazz, 'type', {value: this.type});
     Object.defineProperty(clazz, 'name', {value: this.name});
@@ -1673,7 +1680,7 @@ class Schema {
           results.push(`    ${schemaType} ${name}`);
         });
       }
-    }
+    };
 
     propertiesToString(this.normative, 'normative');
     propertiesToString(this.optional, 'optional');
@@ -1718,13 +1725,13 @@ if (typeof document == 'object') {
   var now = function() {
     var t = performance.now();
     return t;
-  }
+  };
 } else {
   var pid = process.pid;
   var now = function() {
     var t = process.hrtime();
     return t[0] * 1000000 + t[1] / 1000;
-  }
+  };
 }
 
 var flowId = 0;
@@ -2104,9 +2111,9 @@ class ParticleSpec {
     this.slots.forEach(s => {
     results.push(`  ${s.isRequired ? 'must ' : ''}consume ${s.isSet ? 'set of ' : ''}${s.name}`);
       s.providedSlots.forEach(ps => {
-        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`)
+        results.push(`    provide ${ps.isSet ? 'set of ' : ''}${ps.name}`);
         // TODO: support form factors
-        ps.views.forEach(psv => results.push(`      view ${psv}`))
+        ps.views.forEach(psv => results.push(`      view ${psv}`));
       });
     });
     // Description
@@ -2163,8 +2170,15 @@ class Description {
   get relevance() { return this._relevance; }
   set relevance(relevance) { this._relevance = relevance; }
 
-  async getRecipeSuggestion(particles, formatterClass) {
-    let desc = await new (formatterClass || DescriptionFormatter)(this).getRecipeSuggestion(particles);
+  async getArcDescription(formatterClass) {
+    let desc = await new (formatterClass || DescriptionFormatter)(this).getDescription(this._recipe.particles);
+    if (desc) {
+      return desc;
+    }
+  }
+
+  async getRecipeSuggestion(formatterClass) {
+    let desc = await new (formatterClass || DescriptionFormatter)(this).getDescription(this._arc.recipes[0].particles);
     if (desc) {
       return desc;
     }
@@ -2188,21 +2202,24 @@ class DescriptionFormatter {
     this._description = description;
     this._arc = description._arc;
     this._particleDescriptions = [];
-    // this._updateDescriptionHandles(description);
 
     this.seenViews = new Set();
     this.seenParticles = new Set();
     this.excludeValues = false;
   }
 
-  async getRecipeSuggestion(particles) {
+  async getDescription(particles) {
     await this._updateDescriptionHandles(this._description);
 
-    // Choose particles that render UI, sort them by rank and generate suggestions.
-    let particlesSet = new Set(particles || this._particleDescriptions.map(pDesc => pDesc._particle));
+    // Choose particles, sort them by rank and generate suggestions.
+    let particlesSet = new Set(particles);
     let selectedDescriptions = this._particleDescriptions
-      .filter(desc => { return particlesSet.has(desc._particle) && desc._particle.spec.slots.size > 0 && this._isSelectedDescription(desc); })
-      .sort(DescriptionFormatter.sort);
+      .filter(desc => (particlesSet.has(desc._particle) && this._isSelectedDescription(desc)));
+    // Prefer particles that render UI, if any.
+    if (selectedDescriptions.find(desc => (desc._particle.spec.slots.size > 0))) {
+      selectedDescriptions = selectedDescriptions.filter(desc => (desc._particle.spec.slots.size > 0));
+    }
+    selectedDescriptions = selectedDescriptions.sort(DescriptionFormatter.sort);
 
     if (selectedDescriptions.length > 0) {
       return this._combineSelectedDescriptions(selectedDescriptions);
@@ -2294,8 +2311,12 @@ class DescriptionFormatter {
   }
 
   async patternToSuggestion(pattern, particleDescription) {
-    this._tokens = this._initTokens(pattern, particleDescription._particle);
-    return this._joinTokens(await Promise.all(this._tokens.map(async token => await this.tokenToString(token))));
+    var tokens = this._initTokens(pattern, particleDescription._particle);
+    let tokenPromises = tokens.map(async token => await this.tokenToString(token));
+    let tokenResults = await Promise.all(tokenPromises);
+    if (tokenResults.filter(res => res == undefined).length == 0) {
+      return this._joinTokens(tokenResults);
+    }
   }
 
   _initTokens(pattern, particle) {
@@ -2502,7 +2523,7 @@ class DescriptionFormatter {
     // Add description to result array.
     if (viewDescription) {
       // Add the connection spec's description pattern.
-      return await this.patternToSuggestion(viewDescription.pattern, chosenParticleDescription)
+      return await this.patternToSuggestion(viewDescription.pattern, chosenParticleDescription);
     }
   }
   _formatViewDescription(viewConn, view) {
@@ -2878,7 +2899,7 @@ ${e.message}
         slots.push({
           direction: 'provide',
           name: providedSlotItem.name,
-        })
+        });
       }
     }
     // TODO: move shape to recipe/ and add shape builder?
@@ -3074,7 +3095,7 @@ ${e.message}
           if (!targetView) {
             // TODO: tags?
             targetView = recipe.newView();
-            targetConnection.connectToView(targetView)
+            targetConnection.connectToView(targetView);
           }
         }
 
@@ -3118,7 +3139,7 @@ ${e.message}
     let id = item.id;
     let type = Manifest._processType(item.type);
     if (id == null) {
-      id = `${manifest._id}view${manifest._views.length}`
+      id = `${manifest._id}view${manifest._views.length}`;
     }
     let tags = item.tags;
     if (tags == null)
@@ -3147,7 +3168,7 @@ ${e.message}
         view.set({
           id,
           rawData: entity,
-        })
+        });
       }
     }
   }
@@ -3220,7 +3241,7 @@ ${e.message}
 
 class Entity {
   constructor(userIDComponent) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!userIDComponent || userIDComponent.indexOf(':') == -1, "user IDs must not contain the ':' character")
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!userIDComponent || userIDComponent.indexOf(':') == -1, "user IDs must not contain the ':' character");
     this[__WEBPACK_IMPORTED_MODULE_1__symbols_js__["a" /* default */].identifier] = undefined;
     this._userIDComponent = userIDComponent;
   }
@@ -3257,10 +3278,6 @@ class Entity {
   }
   toLiteral() {
     return this.rawData;
-  }
-
-  get debugString() {
-    return JSON.stringify(this.rawData);
   }
 
   static get type() {
@@ -3327,7 +3344,7 @@ function schemaLocationFor(name) {
 
 class Loader {
   path(fileName) {
-    let path = fileName.replace(/[\/][^\/]+$/, '/')
+    let path = fileName.replace(/[\/][^\/]+$/, '/');
     return path;
   }
 
@@ -3424,8 +3441,6 @@ class Loader {
 
 
 
-const DEBUGGING = false;
-
 /** @class Particle
  * A basic particle. For particles that provide UI, you may like to
  * instead use DOMParticle.
@@ -3445,6 +3460,7 @@ class Particle {
     this._slotByName = new Map();
     this.capabilities = capabilities || {};
     this.hostedSlotBySlotId = new Map();
+    this.handleByHostedHandle = new Map();
   }
 
   /** @method setViews(views)
@@ -3548,14 +3564,6 @@ class Particle {
     trace.end();
   }
 
-  logDebug(tag, view) {
-    if (!DEBUGGING)
-      return;
-    let direction = this.spec.connectionMap.get(tag).direction;
-    view.debugString().then(v => console.log(
-       `(${this.spec.name})(${direction})(${tag}): (${view.name})`, v));
-  }
-
   when(changes, f) {
     changes.forEach(change => change.register(this, f));
   }
@@ -3614,7 +3622,7 @@ class ViewChanges {
 
     for (var name of this.names) {
       var view = this.views.get(name);
-      view.synchronize(this.type, afterAllModels, f, particle)
+      view.synchronize(this.type, afterAllModels, f, particle);
     }
   }
 }
@@ -4229,22 +4237,22 @@ class APIPort {
     this.Direct = {
       convert: a => a,
       unconvert: a => a
-    }
+    };
 
     this.Stringify = {
       convert: a => a.toString(),
       unconvert: a => eval(a)
-    }
+    };
 
     this.LocalMapped = {
       convert: a => this._mapper.maybeCreateMappingForThing(a),
       unconvert: a => this._mapper.thingForIdentifier(a)
-    }
+    };
 
     this.Mapped = {
       convert: a => this._mapper.identifierForThing(a),
       unconvert: a => this._mapper.thingForIdentifier(a)
-    }
+    };
 
     this.Dictionary = function(primitive) {
       return {
@@ -4255,8 +4263,8 @@ class APIPort {
           }
           return r;
         }
-      }
-    }
+      };
+    };
 
     this.Map = function(keyprimitive, valueprimitive) {
       return {
@@ -4271,22 +4279,22 @@ class APIPort {
             r.set(keyprimitive.unconvert(key), valueprimitive.unconvert(a[key]));
           return r;
         }
-      }
-    }
+      };
+    };
 
     this.List = function(primitive) {
       return {
         convert: a => a.map(v => primitive.convert(v)),
         unconvert: a => a.map(v => primitive.unconvert(v))
-      }
-    }
+      };
+    };
 
     this.ByLiteral = function(clazz) {
       return {
         convert: a => a.toLiteral(),
         unconvert: a => clazz.fromLiteral(a)
-      }
-    }
+      };
+    };
   }
 
   close() {
@@ -4380,7 +4388,7 @@ class PECOuterPort extends APIPort {
     this.registerCall("Stop", {});
     this.registerCall("DefineParticle",
       {particleDefinition: this.Direct, particleFunction: this.Stringify});
-    this.registerRedundantInitializer("DefineHandle", {type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct})
+    this.registerRedundantInitializer("DefineHandle", {type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializer("InstantiateParticle",
       {spec: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_1__particle_spec_js__["a" /* default */]), handles: this.Map(this.Direct, this.Mapped)});
 
@@ -4407,6 +4415,9 @@ class PECOuterPort extends APIPort {
 
     this.registerHandler("ArcCreateHandle", {callback: this.Direct, arc: this.LocalMapped, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializer("CreateHandleCallback", {callback: this.Direct, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct, id: this.Direct});
+
+    this.registerHandler("ArcMapHandle", {callback: this.Direct, arc: this.LocalMapped, handle: this.Mapped});
+    this.registerInitializer("MapHandleCallback", {callback: this.Direct, id: this.Direct});
 
     this.registerHandler("ArcCreateSlot",
       { callback: this.Direct, arc: this.LocalMapped, transformationParticle: this.Mapped, transformationSlotName: this.Direct, hostedParticleName: this.Direct, hostedSlotName: this.Direct});
@@ -4452,6 +4463,8 @@ class PECInnerPort extends APIPort {
 
     this.registerCall("ArcCreateHandle", {callback: this.LocalMapped, arc: this.Direct, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializerHandler("CreateHandleCallback", {callback: this.LocalMapped, type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct, id: this.Direct});
+    this.registerCall("ArcMapHandle", {callback: this.LocalMapped, arc: this.Direct, handle: this.Mapped});
+    this.registerInitializerHandler("MapHandleCallback", {callback: this.LocalMapped, id: this.Direct});
     this.registerCall("ArcCreateSlot",
       {callback: this.LocalMapped, arc: this.Direct, transformationParticle: this.Mapped, transformationSlotName: this.Direct, hostedParticleName: this.Direct, hostedSlotName: this.Direct});
     this.registerInitializerHandler("CreateSlotCallback", { callback: this.LocalMapped, hostedSlotId: this.Direct });
@@ -5313,9 +5326,14 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
       if (includeModel) {
         result.model.items.push(Object.assign(content.model || {}, {subId: value.subId}));
       }
+      // TODO: Currently using the first available template. Add support for multiple templates.
       if (includeTemplate && !result.template) {
-        // TODO: Currently using the first available template. Add support for multiple templates.
-        result.template = content.template;
+        let template = content.template;
+        // Replace hosted particle handle names with the corresponding transformation particle handles.
+        this.handleByHostedHandle.forEach((handleName, hostedHandleName) => {
+          template = template.replace(new RegExp(`\{\{(${hostedHandleName})(.*)\}\}`), `{{${handleName}$2}}`);
+        });
+        result.template = template;
       }
     }
     return result;
@@ -5517,11 +5535,6 @@ class Collection extends Handle {
     var serialization = this._serialize(entity);
     return this._view.remove(serialization.id);
   }
-
-  async debugString() {
-    var list = await this.toList();
-    return list ? ('[' + list.map(p => p.debugString).join(", ") + ']') : 'undefined';
-  }
 }
 
 /** @class Variable
@@ -5573,10 +5586,6 @@ class Variable extends Handle {
     if (!this.canWrite)
       throw new Error("View not writeable");
     await this._view.clear();
-  }
-  async debugString() {
-    var value = await this.get();
-    return value ? value.debugString : 'undefined';
   }
 }
 
@@ -5634,7 +5643,7 @@ class Search {
     let newTokens = phrase.toLowerCase().split(/[^a-z0-9]/g);
     newTokens.forEach(t => {
       if (!unresolvedTokens || unresolvedTokens.indexOf(t) >= 0) {
-        this._unresolvedTokens.push(t)
+        this._unresolvedTokens.push(t);
       } else {
         this._resolvedTokens.push(t);
       }
@@ -5921,7 +5930,10 @@ class Slot {
       this.startRenderCallback({ particle: this.consumeConn.particle, slotName: this.consumeConn.name, contentTypes });
 
       for (let hostedSlot of this._hostedSlotById.values()) {
-        this.startRenderCallback({ particle: hostedSlot.particle, slotName: hostedSlot.slotName, contentTypes });
+        if (hostedSlot.particle) {
+          // Note: hosted particle may still not be set, if the hosted slot was already created, but the inner recipe wasn't instantiate yet.
+          this.startRenderCallback({ particle: hostedSlot.particle, slotName: hostedSlot.slotName, contentTypes });
+        }
       }
     }
   }
@@ -5966,7 +5978,7 @@ class Slot {
     let hostedSlot = this.getHostedSlot(hostedSlotId);
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(hostedSlot, `Hosted slot ${hostedSlotId} doesn't exist`);
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(hostedSlot.particleName == hostedParticle.name,
-           `Unexpected particle name ${hostedParticle.name} for slot ${hostedSlotId}; expected: ${hostedSlot.particleName}`)
+           `Unexpected particle name ${hostedParticle.name} for slot ${hostedSlotId}; expected: ${hostedSlot.particleName}`);
     hostedSlot.particle = hostedParticle;
     if (this.getContext() && this.startRenderCallback) {
       this.startRenderCallback({ particle: hostedSlot.particle, slotName: hostedSlot.slotName, contentTypes: this.constructRenderRequest() });
@@ -6091,7 +6103,7 @@ class StorageProviderBase {
     }
     results.push(viewStr.join(' '));
     if (this.description)
-      results.push(`  description \`${this.description}\``)
+      results.push(`  description \`${this.description}\``);
     return results.join('\n');
   }
 }
@@ -6500,13 +6512,14 @@ class Arc {
   async createView(type, name, id, tags) {
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(type instanceof __WEBPACK_IMPORTED_MODULE_3__type_js__["a" /* default */], `can't createView with type ${type} that isn't a Type`);
 
-    if (type.isRelation)
+    if (type.isRelation) {
       type = __WEBPACK_IMPORTED_MODULE_3__type_js__["a" /* default */].newSetView(type);
+    }
 
-      let view = await this._storageProviderFactory.construct(id, type, 'in-memory');
-      view.name = name;
+    let view = await this._storageProviderFactory.construct(id, type, 'in-memory');
+    view.name = name;
 
-      this._registerView(view, tags);
+    this._registerView(view, tags);
     return view;
   }
 
@@ -6684,7 +6697,7 @@ class CreateViews extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_j
         }
 
         if (!view.id && view.fate == "?") {
-          return (recipe, view) => {view.fate = "create"; return score}
+          return (recipe, view) => {view.fate = "create"; return score;};
         }
       }
     }(__WEBPACK_IMPORTED_MODULE_4__recipe_walker_js__["a" /* default */].Permuted), this);
@@ -6731,7 +6744,7 @@ class Planner {
   }
 
   async plan(timeout, generations) {
-    let trace = __WEBPACK_IMPORTED_MODULE_24__tracelib_trace_js__["a" /* default */].async({cat: 'planning', name: 'Planner::plan', args: {timeout}})
+    let trace = __WEBPACK_IMPORTED_MODULE_24__tracelib_trace_js__["a" /* default */].async({cat: 'planning', name: 'Planner::plan', args: {timeout}});
     timeout = timeout || NaN;
     let allResolved = [];
     let now = () => (typeof performance == 'object') ? performance.now() : process.hrtime();
@@ -6761,11 +6774,11 @@ class Planner {
   _matchesActiveRecipe(plan) {
     var planShape = __WEBPACK_IMPORTED_MODULE_3__recipe_recipe_util_js__["a" /* default */].recipeToShape(plan);
     var result = __WEBPACK_IMPORTED_MODULE_3__recipe_recipe_util_js__["a" /* default */].find(this._arc._activeRecipe, planShape);
-    return result[0].score == 0;
+    return result.some(r => r.score == 0);
   }
 
   async suggest(timeout, generations) {
-    let trace = __WEBPACK_IMPORTED_MODULE_24__tracelib_trace_js__["a" /* default */].async({cat: 'planning', name: 'Planner::suggest', args: {timeout}})
+    let trace = __WEBPACK_IMPORTED_MODULE_24__tracelib_trace_js__["a" /* default */].async({cat: 'planning', name: 'Planner::suggest', args: {timeout}});
     let plans = await trace.wait(() => this.plan(timeout, generations));
     trace.resume();
     let suggestions = [];
@@ -6773,7 +6786,7 @@ class Planner {
     // TODO: Run some reasonable number of speculations in parallel.
     let results = [];
     for (let plan of plans) {
-      let hash = ((hash) => { return hash.substring(hash.length - 4)}) (await plan.digest());
+      let hash = ((hash) => { return hash.substring(hash.length - 4);}) (await plan.digest());
 
       if (this._matchesActiveRecipe(plan)) {
         this._updateGeneration(generations, hash, (g) => g.active = true);
@@ -6788,7 +6801,7 @@ class Planner {
       let rank = relevance.calcRelevanceScore();
 
       relevance.newArc.description.relevance = relevance;
-      let description = await relevance.newArc.description.getRecipeSuggestion(relevance.newArc.recipes[0].particles);
+      let description = await relevance.newArc.description.getRecipeSuggestion();
 
       this._updateGeneration(generations, hash, (g) => g.description = description);
 
@@ -6929,7 +6942,7 @@ class SlotComposer {
     this._suggestionsContext.clear();
     suggestions.forEach(async suggestion => {
       let suggestionContent =
-        await suggestion.description.getRecipeSuggestion(suggestion.description.arc.recipes[0].particles, this._getDescriptionFormatter());
+        await suggestion.description.getRecipeSuggestion(this._getDescriptionFormatter());
 
       if (!suggestionContent) {
         suggestionContent = 'No suggestion content was generated (unnamed recipe and no describable particles)';
@@ -7028,7 +7041,7 @@ class SlotComposer {
     if (slot) {
       // Set the slot's new content.
       await slot.setContent(content, eventlet => {
-        this.arc.pec.sendEvent(particle, slotName, eventlet)
+        this.arc.pec.sendEvent(particle, slotName, eventlet);
         this.arc.makeSuggestions && this.arc.makeSuggestions();
       });
       return;
@@ -7261,11 +7274,11 @@ class JsonldToManifest {
 
     var s = '';
     for (let superName of superNames)
-      s += `import 'https://schema.org/${superName}'\n\n`
+      s += `import 'https://schema.org/${superName}'\n\n`;
 
-    s += `schema ${className}`
+    s += `schema ${className}`;
     if (superNames.length > 0)
-      s += ` extends ${superNames.join(', ')}`
+      s += ` extends ${superNames.join(', ')}`;
 
     if (relevantProperties.length > 0) {
       s += '\n  optional';
@@ -7273,7 +7286,7 @@ class JsonldToManifest {
         if (property.type.length > 1)
           var type = '(' + property.type.join(" or ") + ')';
         else
-          var type = property.type[0]
+          var type = property.type[0];
         s += `\n    ${type} ${property.name}`;
       }
     }
@@ -7336,7 +7349,7 @@ class JsonldToManifest {
 // TODO: Move HTMLElement to platform abstraction.
 let HTMLElement;
 if (typeof window == 'undefined') {
-  HTMLElement = class HTMLElement {}
+  HTMLElement = class HTMLElement {};
 } else {
   HTMLElement = window.HTMLElement;
 }
@@ -7492,7 +7505,7 @@ if (typeof customElements != 'undefined') {
 
 let HTMLElement;
 if (typeof window == 'undefined') {
-  HTMLElement = class HTMLElement {}
+  HTMLElement = class HTMLElement {};
 } else {
   HTMLElement = window.HTMLElement;
 }
@@ -13215,11 +13228,13 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
 
       let {template, model} = this._retrieveTemplateAndModel(particleDesc, index);
 
-      await Promise.all(Object.keys(model).map(async tokenKey => {
+      let success = await Promise.all(Object.keys(model).map(async tokenKey => {
         let token = this._initHandleToken(model[tokenKey], particleDesc._particle);
         let tokenValue = await this.tokenToString(token);
 
-        if (tokenValue.template && tokenValue.model) {
+        if (tokenValue == undefined) {
+          return false;
+        } else if (tokenValue && tokenValue.template && tokenValue.model) {
           // Dom token.
           template = template.replace(`{{${tokenKey}}}`, tokenValue.template);
           delete model[tokenKey];
@@ -13231,9 +13246,12 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
           delete model[tokenKey];
           model[newTokenKey] = tokenValue;
         }
+        return true;
       }));
 
-      suggestionByParticleDesc.set(particleDesc, {template, model});
+      if (success.every(s => !!s)) {
+        suggestionByParticleDesc.set(particleDesc, {template, model});
+      }
     }));
 
     // Populate suggestions list while maintaining original particles order.
@@ -13337,13 +13355,13 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
       return {
         template: `${description.template} (${viewValue.template})`,
         model: Object.assign(description.model, viewValue.model)
-      }
+      };
     }
     let descKey = `${token.viewName}Description${++this._nextID}`;
     return {
       template: `<span>{{${descKey}}}</span> (${viewValue.template})`,
       model: Object.assign({[descKey]: description}, viewValue.model)
-    }
+    };
   }
 
   _formatEntityProperty(viewName, properties, value) {
@@ -13366,7 +13384,7 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
       return {
         template: viewList.map((v, i) => `<b>{{${viewKey}${i}}}</b>`).join(", "),
         model: Object.assign(...viewList.map((v, i) => ({[`${viewKey}${i}`]: v.rawData.name} )))
-      }
+      };
     }
     return {
       template: `<b>{{${viewKey}Length}}</b> items`,
@@ -13378,7 +13396,7 @@ class DescriptionDomFormatter extends __WEBPACK_IMPORTED_MODULE_1__description_j
       return {
         template: `<b>{{${viewName}Var}}</b>`,
         model: {[`${viewName}Var`]: viewVar.rawData.name}
-      }
+      };
     }
   }
 }
@@ -13683,7 +13701,7 @@ class StorageProxy {
 
   get() {
     return new Promise((resolve, reject) =>
-      this._port.HandleGet({ callback: r => {resolve(r)}, handle: this }));
+      this._port.HandleGet({ callback: r => resolve(r), handle: this }));
   }
 
   toList() {
@@ -13735,16 +13753,21 @@ class InnerPEC {
       var proxy = new StorageProxy(id, type, this._apiPort, this, name, 0);
       Promise.resolve().then(() => callback(proxy));
       return proxy;
+    };
+
+    this._apiPort.onMapHandleCallback = ({id, callback}) => {
+      Promise.resolve().then(() => callback(id));
+      return id;
     }
 
     this._apiPort.onCreateSlotCallback = ({hostedSlotId, callback}) => {
       Promise.resolve().then(() => callback(hostedSlotId));
       return hostedSlotId;
-    }
+    };
 
     this._apiPort.onInnerArcRender = ({transformationParticle, transformationSlotName, hostedSlotId, content}) => {
       transformationParticle.renderHostedSlot(transformationSlotName, hostedSlotId, content);
-    }
+    };
 
     this._apiPort.onDefineParticle = ({particleDefinition, particleFunction}) => {
       var particle = define(particleDefinition, eval(particleFunction));
@@ -13755,7 +13778,7 @@ class InnerPEC {
       if (global.close) {
         global.close();
       }
-    }
+    };
 
     this._apiPort.onInstantiateParticle =
       ({spec, handles}) => this._instantiateParticle(spec, handles);
@@ -13791,7 +13814,7 @@ class InnerPEC {
         render(content) {
           this._pec._apiPort.Render({particle, slotName, content});
 
-          Object.keys(content).forEach(key => { this._requestedContentTypes.delete(key) });
+          Object.keys(content).forEach(key => { this._requestedContentTypes.delete(key); });
           // Slot is considered rendered, if a non-empty content was sent and all requested content types were fullfilled.
           this._isRendered = this._requestedContentTypes.size == 0 && (Object.keys(content).length > 0);
         }
@@ -13822,7 +13845,7 @@ class InnerPEC {
       __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__["a" /* default */])(particle._slotByName.has(slotName),
         `Stop render called for particle ${particle.name} slot ${slotName} without start render being called.`);
       particle._slotByName.delete(slotName);
-    }
+    };
   }
 
   generateIDComponents() {
@@ -13842,6 +13865,12 @@ class InnerPEC {
             var v = __WEBPACK_IMPORTED_MODULE_1__handle_js__["a" /* default */].handleFor(proxy, proxy.type.isSetView, true, true);
             v.entityClass = (proxy.type.isSetView ? proxy.type.primitiveType().entitySchema : proxy.type.entitySchema).entityClass();
             resolve(v);
+          }}));
+      },
+      mapHandle: function(handle) {
+        return new Promise((resolve, reject) =>
+          pec._apiPort.ArcMapHandle({arc: arcId, handle, callback: id => {
+            resolve(id);
           }}));
       },
       createSlot: function(transformationParticle, transformationSlotName, hostedParticleName, hostedSlotName) {
@@ -13867,9 +13896,9 @@ class InnerPEC {
     return {
       constructInnerArc: particle => {
         return new Promise((resolve, reject) =>
-          this._apiPort.ConstructInnerArc({ callback: arcId => {resolve(this.innerArcHandle(arcId))}, particle }));
+          this._apiPort.ConstructInnerArc({ callback: arcId => {resolve(this.innerArcHandle(arcId));}, particle }));
       }
-    }
+    };
   }
 
   async _instantiateParticle(spec, proxies) {
@@ -14052,7 +14081,7 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
       if (this.slotComposer) {
         this.slotComposer.renderSlot(particle, slotName, content);
       }
-    }
+    };
 
     this._apiPort.onSynchronize = async ({handle, target, callback, modelCallback, type}) => {
       if (handle.constructor.name == 'InMemoryVariable') {
@@ -14066,13 +14095,13 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
 
     this._apiPort.onHandleGet = async ({handle, callback}) => {
       this._apiPort.SimpleCallback({callback, data: await handle.get()});
-    }
+    };
 
     this._apiPort.onHandleToList = async ({handle, callback}) => {
       this._apiPort.SimpleCallback({callback, data: await handle.toList()});
-    }
+    };
 
-    this._apiPort.onHandleSet = ({handle, data}) => {handle.set(data)};
+    this._apiPort.onHandleSet = ({handle, data}) => {handle.set(data);};
     this._apiPort.onHandleStore = ({handle, data}) => handle.store(data);
     this._apiPort.onHandleClear = ({handle}) => handle.clear();
     this._apiPort.onHandleRemove = ({handle, data}) => handle.remove(data);
@@ -14082,16 +14111,22 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
         this._idlePromise = undefined;
         this._idleResolve(relevance);
       }
-    }
+    };
 
     this._apiPort.onConstructInnerArc = ({callback, particle}) => {
       var arc = {};
       this._apiPort.ConstructArcCallback({callback, arc});
-    }
+    };
 
     this._apiPort.onArcCreateHandle = async ({callback, arc, type, name}) => {
       var view = await this._arc.createView(type, name);
       this._apiPort.CreateHandleCallback(view, {type, name, callback, id: view.id});
+    };
+
+    this._apiPort.onArcMapHandle = async ({callback, arc, handle}) => {
+      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(this._arc.findViewById(handle.id), `Cannot map nonexistent handle ${handle.id}`);
+      // TODO: create hosted handles map with specially generated ids instead of returning the real ones?
+      this._apiPort.MapHandleCallback({}, {callback, id: handle.id});
     }
 
     this._apiPort.onArcCreateSlot = ({callback, arc, transformationParticle, transformationSlotName, hostedParticleName,  hostedSlotName}) => {
@@ -14099,7 +14134,7 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
         var hostedSlotId = this.slotComposer.createHostedSlot(transformationParticle, transformationSlotName, hostedParticleName, hostedSlotName);
       }
       this._apiPort.CreateSlotCallback({}, {callback, hostedSlotId});
-    }
+    };
 
     this._apiPort.onArcLoadRecipe = async ({arc, recipe, callback}) => {
       let manifest = await __WEBPACK_IMPORTED_MODULE_3__manifest_js__["a" /* default */].parse(recipe, {loader: this._arc._loader, fileName: ''});
@@ -14121,8 +14156,8 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
       } else {
         error = "No recipe defined";
       }
-      this._apiPort.SimpleCallback({callback, data: error})
-    }
+      this._apiPort.SimpleCallback({callback, data: error});
+    };
   }
 
   stop() {
@@ -14145,7 +14180,7 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
   }
 
   sendEvent(particle, slotName, event) {
-    this._apiPort.UIEvent({particle, slotName, event})
+    this._apiPort.UIEvent({particle, slotName, event});
   }
 
   instantiate(particleSpec, spec, views, lastSeenVersion) {
@@ -14175,7 +14210,7 @@ class OuterPEC extends __WEBPACK_IMPORTED_MODULE_0__particle_execution_context_j
     this._apiPort.StopRender({particle, slotName});
   }
   innerArcRender(transformationParticle, transformationSlotName, hostedSlotId, content) {
-    this._apiPort.InnerArcRender({transformationParticle, transformationSlotName, hostedSlotId, content})
+    this._apiPort.InnerArcRender({transformationParticle, transformationSlotName, hostedSlotId, content});
   }
 }
 
@@ -14289,7 +14324,7 @@ class ConnectionConstraint {
 
 /* harmony default export */ __webpack_exports__["a"] = (async function(str) {
   let buffer = new TextEncoder('utf-8').encode(str);
-  let digest = await crypto.subtle.digest('SHA-1', buffer)
+  let digest = await crypto.subtle.digest('SHA-1', buffer);
   return Array.from(new Uint8Array(digest)).map(x => ('00' + x.toString(16)).slice(-2)).join('');
 });;
 
@@ -14543,7 +14578,7 @@ class Particle {
     for (let slotConnection of Object.values(this._consumedSlotConnections)) {
       result.push(slotConnection.toString(nameMap, options).replace(/^|(\n)/g, '$1  '));
     }
-    return result.join('\n')
+    return result.join('\n');
   }
 }
 
@@ -14969,7 +15004,7 @@ class TypeChecker {
       return {valid: false};
     }
     // TODO: direction?
-    return {type: result.type, valid: true}
+    return {type: result, valid: true};
   }
 
   static substitute(type, variable, value) {
@@ -15203,9 +15238,10 @@ class View {
     this._tags = [];
     this._type = undefined;
     this._fate = null;
-    // TODO: replace originalFate with more generic mechanism for tracking
+    // TODO: replace originalFate and originalId with more generic mechanism for tracking
     // how and from what the recipe was generated.
     this._originalFate = null;
+    this._originalId = null;
     this._connections = [];
     this._mappedType = undefined;
     this._storageKey = undefined;
@@ -15223,6 +15259,7 @@ class View {
       view._type = this._type;
       view._fate = this._fate;
       view._originalFate = this._originalFate;
+      view._originalId = this._originalId;
       view._mappedType = this._mappedType;
       view._storageKey = this._storageKey;
 
@@ -15266,12 +15303,18 @@ class View {
     this._fate = fate;
   }
   get originalFate() { return this._originalFate || "?"; }
+  get originalId() { return this._originalId; }
   get recipe() { return this._recipe; }
   get tags() { return this._tags; } // only tags owned by the view
   set tags(tags) { this._tags = tags; }
   get type() { return this._type; } // nullable
   get id() { return this._id; }
-  set id(id) { this._id = id; }
+  set id(id) {
+    if (!this._originalId) {
+      this._originalId = this._id;
+    }
+    this._id = id;
+  }
   mapToView(view) {
     this._id = view.id;
     this._type = undefined;
@@ -15422,7 +15465,7 @@ class WalkerBase extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_js
             if (permutation.length == 0)
               continue;
             permutation.forEach(({f, context}) => {
-              score += f(newRecipe, cloneMap.get(context))
+              score += f(newRecipe, cloneMap.get(context));
             });
 
             newRecipes.push({recipe: newRecipe, score});
@@ -15457,7 +15500,7 @@ class WalkerBase extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_js
   createDescendant(recipe, score) {
     let valid = recipe.normalize();
     //if (!valid) debugger;
-    let hash = valid ? recipe.digest() : null
+    let hash = valid ? recipe.digest() : null;
     super.createDescendant(recipe, score, hash, valid);
   }
 
@@ -15981,7 +16024,7 @@ class InMemoryCollection extends InMemoryStorageProvider {
       name: this.name,
       version: this._version,
       arc: this._arc.id
-    })
+    });
   }
 }
 
@@ -16048,7 +16091,7 @@ class InMemoryVariable extends InMemoryStorageProvider {
       name: this.name,
       version: this._version,
       arc: this._arc.id
-    })
+    });
   }
 }
 
@@ -16086,7 +16129,9 @@ class AddUseViews extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_j
         if (freeViews.length > 0)
           return;
 
-        var disconnectedConnections = recipe.viewConnections.filter(vc => vc.view == null && !vc.isOptional);
+        // TODO: "description" handles are always created, and in the future they need to be "optional" (blocked by optional handles
+        // not being properly supported in arc instantiation). For now just hardcode skiping them.
+        var disconnectedConnections = recipe.viewConnections.filter(vc => vc.view == null && !vc.isOptional && vc.name != "descriptions");
 
         return recipe => {
           disconnectedConnections.forEach(vc => {
@@ -16355,7 +16400,7 @@ class ConvertConstraintsToConnections extends __WEBPACK_IMPORTED_MODULE_0__strat
             }
             recipe.clearConnectionConstraints();
             return score;
-          }
+          };
         });
       }
     }(__WEBPACK_IMPORTED_MODULE_2__recipe_walker_js__["a" /* default */].Independent), this);
@@ -16623,7 +16668,7 @@ class GroupViewConnections extends __WEBPACK_IMPORTED_MODULE_1__strategizer_stra
               let recipeView = recipe.newView();
               group.forEach(conn => {
                 let cloneConn = recipe.updateToClone({conn}).conn;
-                cloneConn.connectToView(recipeView)
+                cloneConn.connectToView(recipeView);
               });
             });
           });
@@ -16739,7 +16784,7 @@ class InitSearch extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategizer_js
     let recipe = new __WEBPACK_IMPORTED_MODULE_1__recipe_recipe_js__["a" /* default */]();
     recipe.setSearchPhrase(this._search);
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__["a" /* default */])(recipe.normalize());
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__["a" /* default */])(!recipe.isResolved())
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__platform_assert_web_js__["a" /* default */])(!recipe.isResolved());
 
     return {
       results: [{
@@ -16811,7 +16856,7 @@ class MapConsumedSlots extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategi
         });
         return potentialSlots.map(slot => {
           return (recipe, slotConnection) => {
-            let clonedSlot = recipe.updateToClone({slot})
+            let clonedSlot = recipe.updateToClone({slot});
             slotConnection.connectToSlot(clonedSlot.slot);
             return 1;
           };
@@ -16906,7 +16951,7 @@ class MapRemoteSlots extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strategize
           }
           slotConnection.targetSlot.id = remoteSlotId;
           return score;
-        }
+        };
       }
     }(__WEBPACK_IMPORTED_MODULE_2__recipe_walker_js__["a" /* default */].Permuted), this);
 
@@ -16952,7 +16997,7 @@ class MatchParticleByVerb extends __WEBPACK_IMPORTED_MODULE_0__strategizer_strat
         }
 
         let particleSpecs = arc.context.findParticlesByVerb(particle.primaryVerb)
-            .filter(spec => !arc.pec.slotComposer || spec.matchAffordance(arc.pec.slotComposer.affordance))
+            .filter(spec => !arc.pec.slotComposer || spec.matchAffordance(arc.pec.slotComposer.affordance));
 
         return particleSpecs.map(spec => {
           return (recipe, particle) => {
@@ -17074,7 +17119,7 @@ class SearchTokensToParticles extends __WEBPACK_IMPORTED_MODULE_1__strategizer_s
           for (let spec of findParticles(token)) {
             // TODO: Skip particles that are already in the active recipe?
             specsByToken[token] = specsByToken[token] || [];
-            specsByToken[token].push(spec)
+            specsByToken[token].push(spec);
           }
         }
         let resolvedTokens = Object.keys(specsByToken);

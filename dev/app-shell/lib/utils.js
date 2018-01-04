@@ -76,7 +76,7 @@ let utils = {
     return `${rl(adjectives)}-${rl(nouns)}`.replace(/ /g, '-');
   },
   async describeArc(arc) {
-    let combinedSuggestion = await new Arcs.Description(arc).getRecipeSuggestion(arc._activeRecipe.particles);
+    let combinedSuggestion = await new Arcs.Description(arc).getArcDescription();
     //let combinedSuggestion = Arcs.Description.getSuggestion(arc._activeRecipe, arc, null);
     //if (combinedSuggestion) {
     //  let tags = Object.keys(arc._tags).filter(t => ['#nosync','#arcmetadata','#identity','#identities'].indexOf(t) < 0);
