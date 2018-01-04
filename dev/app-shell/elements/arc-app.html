@@ -221,6 +221,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _didMount() {
       this.setAttribute('arc-app', '');
       this._initHotKeys();
+      this._initGeolocation();
     }
     _update(props, state, lastProps, lastState) {
       // for debugging
@@ -230,8 +231,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       window.users = state.users;
       state.appState = state;
       //
-      if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData)) {
-        state.identityViewData = this._synthesizeIdentityViewData(state.arc, state.user);
+      if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData
+          || state.geoCoords !== lastState.geoCoords)) {
+        state.identityViewData = this._synthesizeIdentityViewData(
+            state.arc, state.user, state.geoCoords);
       }
       if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
         state.plan = state.plans[0].plan;
@@ -320,10 +323,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return models;
     }
-    _synthesizeIdentityViewData(arc, user) {
+    _synthesizeIdentityViewData(arc, user, geoCoords) {
       return {
         id: user.id,
-        name: user.name
+        name: user.name,
+        location: geoCoords ? {
+          latitude: geoCoords.latitude,
+          longitude: geoCoords.longitude
+        } : null
       };
     }
     /*
@@ -596,6 +603,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         metadata = Object.assign(Object.assign(Object.create(null), metadata), data);
         // set new object to state
         this._setState({metadata});
+      }
+    }
+    _initGeolocation() {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition(position => {
+          this._setState({geoCoords: position.coords});
+        });
       }
     }
   }
