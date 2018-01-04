@@ -17,3 +17,4 @@ schema Person extends Thing
     Text active
     Object arcs
     Object profiles
+    Object shares
