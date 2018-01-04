@@ -97,17 +97,56 @@ function loadSeleniumUtils() {
   });
 }
 
-function allSuggestions(footerPath) {
+function getFooterPath() {
+  return ['arc-footer', 'x-toast[app-footer]'];
+}
+
+function initTestWithNewArc() {
+  // TODO(smalls) should we create a user on the fly?
+  // note - baseUrl (currently specified on the command line) must end in a
+  // trailing '/', and this must not begin with a preceding '/'.
+  browser.url(`apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
+
+  assert.equal('Arcs', browser.getTitle());
+
+  // create a new arc, switch to that tab (toggling back to the first tab to
+  // reset the webdriver window state).
+  createNewArc();
+
+  // wait for the page to load a bit, init the test harness for this page
+  browser.waitForVisible('<app-main>');
+  browser.waitForVisible('<footer>');
+  loadSeleniumUtils();
+
+  // check out some basic structure relative to the app footer
+  const footerPath = getFooterPath();
+  assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
+  assert.ok(pierceShadowsSingle(footerPath).value);
+}
+
+function createNewArc() {
+  assert.equal(1, browser.windowHandles().value.length);
+
+  // create a new arc, switch to that tab (toggling back to the first tab to
+  // reset the webdriver window state).
+  browser.waitForVisible('div[title="New Arc"]');
+  browser.click('div[title="New Arc"]');
+  browser.switchTab(browser.windowHandles().value[0]);
+  browser.switchTab(browser.windowHandles().value[1]);
+}
+
+function allSuggestions() {
   waitForStillness();
 
   const magnifier = pierceShadowsSingle(
-    footerPath.concat(['div[search]', 'i'])
+    getFooterPath().concat(['div[search]', 'i'])
   );
   browser.elementIdClick(magnifier.value.ELEMENT);
 }
 
-function acceptSuggestion(footerPath, textSubstring) {
+function acceptSuggestion(textSubstring) {
   waitForStillness();
+  let footerPath = getFooterPath();
 
   const suggestionsRoot = pierceShadowsSingle(
     footerPath.concat(['suggestions-element'])
@@ -150,6 +189,8 @@ function acceptSuggestion(footerPath, textSubstring) {
     5000,
     `couldn't find suggestion ${textSubstring}`
   );
+  // TODO: return the full suggestion text for further verification.
+  console.log(`Accepted suggestion: ${textSubstring}`);
 }
 
 /**
@@ -197,42 +238,46 @@ function clickInParticles(slotName, selectors, textQuery) {
   );
 }
 
-describe('test basic arcs functionality', function() {
+describe('test Arcs demo flows', function() {
   it('can use the restaurant demo flow', function() {
-    // TODO(smalls) should we create a user on the fly?
-    // note - baseUrl (currently specified on the command line) must end in a
-    // trailing '/', and this must not begin with a preceding '/'.
-    browser.url(`apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
+    initTestWithNewArc();
 
-    assert.equal('Arcs', browser.getTitle());
+    allSuggestions();
 
-    // create a new arc, switch to that tab (toggling back to the first tab to
-    // reset the webdriver window state).
-    browser.waitForVisible('div[title="New Arc"]');
-    browser.click('div[title="New Arc"]');
-    browser.switchTab(browser.windowHandles().value[0]);
-    browser.switchTab(browser.windowHandles().value[1]);
-
-    // wait for the page to load a bit, init the test harness for this page
-    browser.waitForVisible('<app-main>');
-    browser.waitForVisible('<footer>');
-    loadSeleniumUtils();
-
-    // check out some basic structure relative to the app footer
-    const footerPath = ['arc-footer', 'x-toast[app-footer]'];
-    assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
-    assert.ok(pierceShadowsSingle(footerPath).value);
-
-    allSuggestions(footerPath);
-
-    acceptSuggestion(footerPath, 'Find restaurants');
+    acceptSuggestion('Find restaurants');
     clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
 
-    acceptSuggestion(footerPath, 'make a reservation');
-    acceptSuggestion(footerPath, 'You are free');
+    acceptSuggestion('make a reservation');
+    acceptSuggestion('You are free');
 
+    browser.close();
     // to drop into debug mode with a REPL; also a handy way to see the state
     // at the end of the test:
     // browser.debug();
+  });
+
+  it('can use the gift shopping demo flow', function() {
+    initTestWithNewArc();
+
+    allSuggestions();
+
+    acceptSuggestion('Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire\'s wishlist (Book: How to Draw plus 2 other items)');
+    browser.waitForVisible('div[slotid="action"]');
+    browser.waitForVisible('div[slotid="annotation"]');
+
+    // TODO: click the 'Add' buttons to move products from recommended to shortlist and
+    // (1) verify product was moved,
+    // (2) verify 'action' slot is not visible after all products were moved.
+
+    acceptSuggestion('Estimate arrival dates, estimate arrival dates');  // TODO: add 'and buy gifts for Claire' when descriptions are fixed.
+    acceptSuggestion('check manufacturer information for Products from your browsing context');
+    acceptSuggestion('recommendations based on Products recommended based on Products from your browsing context and Claire\'s wishlist');
+
+    // Verify each product has non empty annotation text.
+    let annotations = browser.getText('div[slotid="annotation"]');
+    assert.equal(6, annotations.length);
+    assert.ok(annotations.length > 0 && annotations.every(a => a.length > 0));
+
+    browser.close();
   });
 });
