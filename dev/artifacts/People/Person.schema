@@ -18,3 +18,4 @@ schema Person extends Thing
     Object location
     Object arcs
     Object profiles
+    Object shares

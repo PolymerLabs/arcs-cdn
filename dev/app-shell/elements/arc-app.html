@@ -148,7 +148,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         </template>
         <div buttons style%="{{toolbarButtonsStyle}}">
           <toggle-button title="Arc Contains Profile Data" state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
-          <toggle-button title="Share this Arc" state="{{sharingState}}" on-state="_onSharingState" icons="link supervisor_account"></toggle-button>
+          <toggle-button title="Share this Arc" state="{{sharedState}}" on-state="_onSharedState" icons="link supervisor_account"></toggle-button>
           <toggle-button title="Cast" on-state="_onCastState" icons="cast cast_connected"></toggle-button>
           <i on-click="_onNewArcClick">note_add</i>
         </div>
