@@ -9,6 +9,6 @@
 import 'Product.schema'
 
 particle Arrivinator in 'source/Arrivinator.js'
-  Arrivinator(in [Product] list)
-  consume set of annotation
-  description `estimate arrival dates`
+  Arrivinator(in Product product)
+  consume annotation
+  description `estimate arrival date`
