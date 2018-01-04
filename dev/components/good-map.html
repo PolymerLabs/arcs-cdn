@@ -31,12 +31,11 @@
           this[name] = parseFloat(val);
           break;
         case 'map-options':
-          this.mapOptions = Object.assign(this.mapOptions, JSON.parse(val));
+          this.extraOptions = JSON.parse(val);
           break;
       }
       if (this.map) {
-        this._updateMapOptions();
-        this.map.setOptions(this.mapOptions);
+        this.map.setOptions(this._constructMapOptions());
       }
     }
     constructor() {
@@ -46,25 +45,26 @@
       this.zoom = null;
       this.latitude = null;
       this.longitude = null;
-      this.mapOptions = {};
+      this.extraOptions = {};
     }
     connectedCallback() {
       loadGoogleMaps(this.apiKey).then(() => {
-        this._updateMapOptions();
-        this.map = new google.maps.Map(this, this.mapOptions);
+        this.map = new google.maps.Map(this, this._constructMapOptions());
         this.dispatchEvent(new CustomEvent('google-map-ready', { detail: this.map }));
       });
     }
-    _updateMapOptions() {
+    _constructMapOptions() {
+      let mapOptions = Object.assign({}, this.extraOptions);
       if (this.zoom) {
-        this.mapOptions.zoom = this.zoom || 0;
+        mapOptions.zoom = this.zoom || 0;
       }
       if (this.latitude || this.longitude) {
-        this.mapOptions.center = {
+        mapOptions.center = {
           lat: this.latitude || 0,
           lng: this.longitude || 0
         };
       }
+      return mapOptions;
     }
   });
 }
