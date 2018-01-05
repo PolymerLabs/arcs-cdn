@@ -1,6 +1,6 @@
 <script>
   'use strict';
-{
+const GoodMap = (() => {
   // resolves when window.__initGoodMap is called via JSONP protocol in dynamic script tag
   const callbackPromise = new Promise(resolve => window.__initGoodMap = resolve);
   // semaphore
@@ -16,7 +16,7 @@
     return callbackPromise;
   }
   // define custom element
-  customElements.define('good-map', class extends HTMLElement {
+  return class extends HTMLElement {
     static get observedAttributes() {
       return ['api-key', 'zoom', 'latitude', 'longitude', 'map-options'];
     }
@@ -31,8 +31,11 @@
           this[name] = parseFloat(val);
           break;
         case 'map-options':
-          this.mapOptions = JSON.parse(val);
-          break
+          this.extraOptions = JSON.parse(val);
+          break;
+      }
+      if (this.map) {
+        this.map.setOptions(this._constructMapOptions());
       }
     }
     constructor() {
@@ -42,23 +45,30 @@
       this.zoom = null;
       this.latitude = null;
       this.longitude = null;
-      this.mapOptions = {};
+      this.extraOptions = {};
     }
     connectedCallback() {
       loadGoogleMaps(this.apiKey).then(() => {
-        if (!this.mapOptions.zoom) {
-          this.mapOptions.zoom = this.zoom || 0;
-        }
-        if (!this.mapOptions.center) {
-          this.mapOptions.center = {
-            lat: this.latitude || 0,
-            lng: this.longitude || 0
-          };
-        }
-        this.map = new google.maps.Map(this, this.mapOptions);
+        this.map = new google.maps.Map(this, this._constructMapOptions());
         this.dispatchEvent(new CustomEvent('google-map-ready', { detail: this.map }));
       });
     }
-  });
-}
+    _constructMapOptions() {
+      let mapOptions = Object.assign({}, this.extraOptions);
+      if (this.zoom) {
+        mapOptions.zoom = this.zoom || 0;
+      }
+      if (this.latitude || this.longitude) {
+        mapOptions.center = {
+          lat: this.latitude || 0,
+          lng: this.longitude || 0
+        };
+      }
+      return mapOptions;
+    }
+  }
+})();
+
+  // define custom element
+  customElements.define('good-map', GoodMap);
 </script>
