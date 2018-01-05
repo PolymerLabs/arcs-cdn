@@ -35,16 +35,16 @@ describe('GoodMap', function() {
       map.setAttribute('zoom', 15);
 
       assert.equal(
-        JSON.stringify({mapTypeId: 'satellite', zoom: 15}),
-        JSON.stringify(map._mapOptionsForTest));
+        JSON.stringify(map._mapOptionsForTest),
+        JSON.stringify({mapTypeId: 'satellite', zoom: 15}));
 
       map.removeAttribute('map-options');
       map.setAttribute('latitude', -33.865);
       map.setAttribute('longitude', 151.209);
 
       assert.equal(
-        JSON.stringify({zoom: 15, center: {lat: -33.865, lng: 151.209}}),
-        JSON.stringify(map._mapOptionsForTest));
+        JSON.stringify(map._mapOptionsForTest),
+        JSON.stringify({zoom: 15, center: {lat: -33.865, lng: 151.209}}));
     });
   });
 });

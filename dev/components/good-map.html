@@ -1,6 +1,6 @@
 <script>
   'use strict';
-var GoodMap = (() => {
+const GoodMap = (() => {
   // resolves when window.__initGoodMap is called via JSONP protocol in dynamic script tag
   const callbackPromise = new Promise(resolve => window.__initGoodMap = resolve);
   // semaphore
