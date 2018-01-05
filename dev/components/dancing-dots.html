@@ -42,6 +42,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <script>
   class DancingDots extends HTMLElement {
+    constructor() {
+      super();
+      this._active = false;
+    }
     connectedCallback() {
       if (!this.childElementCount) {
         this.appendChild(this.constructor.module.querySelector('template').content.cloneNode(true));
@@ -63,8 +67,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return this._active;
     }
     set active(active) {
-      this._active = active;
-      this._active ? this._start() : this._stop();
+      if (this._active !== active) {
+        this._active = active;
+        this._active ? this._start() : this._stop();
+      }
     }
     get _bullets() {
       return this.querySelectorAll('bullet');
