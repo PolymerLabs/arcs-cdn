@@ -36,3 +36,46 @@ That server will block, so you'll need to use a new shell to run tests:
 ```
 arcs-cdn> npm test
 ```
+
+### Debugging Selenium Failures
+
+It may be easiest to see the problem in a browser window to diagnose it. Edit
+`wdio.conf.js` in the branch with failures, comment out the `'--headless'`
+option and increase the mocha timeout. In combination, these two changes will
+allow you to see what's happening on the screen, and will give you enough time
+to debug the situation.
+
+```
+arcs-cdn> vi dev/test/wdio.conf.js
+arcs-cdn> git diff dev/test/wdio.conf.js
+diff --git a/dev/test/wdio.conf.js b/dev/test/wdio.conf.js
+index 0e36452..8ecf3d6 100644
+--- a/dev/test/wdio.conf.js
++++ b/dev/test/wdio.conf.js
+@@ -50,7 +50,7 @@ exports.config = {
+       chromeOptions: {
+         args: [
+           // arcs note: comment this out to see the system running
+-          '--headless'
++          // '--headless'
+         ]
+       }
+     }
+@@ -139,7 +139,7 @@ exports.config = {
+   mochaOpts: {
+     ui: 'bdd',
+     // arcs note: increase this timeout for debugging
+-    timeout: 20003
++    timeout: 2000003
+   }
+   //
+   // =====
+```
+
+Then, in your test, you can add a breakpoint (via `browser.debug();`) to pause
+execution so you can debug in the browser. It may be worthwhile to add several
+`browser.debug()` invocations through your flow to trace execution (`.exit`
+will exit the debugger and continue execution of the test).
+
+The debugger at the prompt is fairly minimal, it may be there just to pause
+execution until you can open up DevTools in your browser.
