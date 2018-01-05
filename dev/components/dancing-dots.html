@@ -66,10 +66,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._active = active;
       this._active ? this._start() : this._stop();
     }
+    get _bullets() {
+      return this.querySelectorAll('bullet');
+    }
     _start() {
-      this.querySelectorAll('bullet').forEach((bullet, i) => {
-        let keyframes = {transform: ['translateY(8px)', 'translateY(-8px)']};
-        let timing = {
+      this._bullets.forEach((bullet, i) => {
+        const keyframes = {transform: ['translateY(8px)', 'translateY(-8px)']};
+        const timing = {
           iterations: Infinity,
           duration: 200,
           direction: 'alternate',
@@ -81,14 +84,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       });
     }
     _stop() {
-      for (let bullet of this.querySelectorAll('bullet')) {
+      for (const bullet of this._bullets) {
         // Ideally we would cause the animation to reach the half way point
         // between iterations, but that's complicated without the setTiming
         // API.
-        let transform = getComputedStyle(bullet).transform;
-        let animation = bullet._animation;
-        let stopAnimation = bullet.animate(
+        const transform = getComputedStyle(bullet).transform;
+        const animation = bullet._animation;
+        const stopAnimation = bullet.animate(
             {transform: [transform, 'translateY(0px)']},
+            // About 10 frames at 60hz.
             {duration: 166.66, easing: 'ease'});
         stopAnimation.startTime = animation.startTime + animation.currentTime;
         animation.cancel();
