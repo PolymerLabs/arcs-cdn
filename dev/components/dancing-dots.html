@@ -11,17 +11,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <style>
     dancing-dots bullet {
       display: inline-block;
-      transition: all 200ms cubic-bezier(0.445, 0.05, 0.55, 0.95);
       font-size: 2em;
     }
     dancing-dots bullet::after {
       content: '•'
-    }
-    dancing-dots[animate] bullet {
-      transform: translate3d(0, 8px, 0);
-    }
-    dancing-dots[up] bullet {
-      transform: translate3d(0, -8px, 0);
     }
     body dancing-dots[off] bullet {
       color: silver;
@@ -31,15 +24,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     dancing-dots bullet:nth-of-type(2) {
       color: red;
-      transition-delay: calc(1*40ms);
     }
     dancing-dots bullet:nth-of-type(3) {
       color: orange;
-      transition-delay: calc(2*40ms);
     }
     dancing-dots bullet:nth-of-type(4) {
       color: green;
-      transition-delay: calc(3*40ms);
     }
   </style>
   <div bullets>
@@ -76,22 +66,36 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       this._active = active;
       this._active ? this._start() : this._stop();
     }
+    get _bullets() {
+      return this.querySelectorAll('bullet');
+    }
     _start() {
-      if (!this._interval) {
-        this.disabled = false;
-        this.setAttribute('animate', '');
-        let animate = () => {
-          this.setAttribute('up', '');
-          setTimeout(() => this.removeAttribute('up'), 280);
+      this._bullets.forEach((bullet, i) => {
+        const keyframes = {transform: ['translateY(8px)', 'translateY(-8px)']};
+        const timing = {
+          iterations: Infinity,
+          duration: 200,
+          direction: 'alternate',
+          iterationStart: 0.5,
+          easing: 'ease-in-out',
+          delay: i * 40,
         };
-        this._interval = setInterval(animate, 560);
-      }
+        bullet._animation = bullet.animate(keyframes, timing);
+      });
     }
     _stop() {
-      this.removeAttribute('animate');
-      if (this._interval) {
-        clearInterval(this._interval);
-        this._interval = null;
+      for (const bullet of this._bullets) {
+        // Ideally we would cause the animation to reach the half way point
+        // between iterations, but that's complicated without the setTiming
+        // API.
+        const transform = getComputedStyle(bullet).transform;
+        const animation = bullet._animation;
+        const stopAnimation = bullet.animate(
+            {transform: [transform, 'translateY(0px)']},
+            // About 10 frames at 60hz.
+            {duration: 166.66, easing: 'ease'});
+        stopAnimation.startTime = animation.startTime + animation.currentTime;
+        animation.cancel();
       }
     }
     startStop() {
