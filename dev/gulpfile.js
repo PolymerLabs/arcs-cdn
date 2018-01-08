@@ -8,7 +8,9 @@
 
 const gulp = require('gulp');
 const execSync = require('child_process').execSync;
-const resolve = require('path').resolve;
+const path = require('path');
+const resolve = path.resolve;
+const sep = path.sep;
 
 const target = `./lib`;
 
@@ -21,14 +23,14 @@ const sources = {
     'worker-entry-cdn.js',
     'ArcsLib.js',
     'Tracelib.js'
-  ],
+  ]
 };
 
 let arcsBuild = async (path) => {
   const options = {cwd: resolve(path), stdio: 'inherit'};
   await execSync('echo `pwd`', options);
   await execSync('npm install', options);
-  await execSync('tools/sigh', options);
+  await execSync(`node tools${sep}sigh.js`, options);
 };
 
 gulp.task('arcs-build', async function() {
