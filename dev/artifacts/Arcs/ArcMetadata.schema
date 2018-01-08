@@ -7,13 +7,12 @@
 
 schema ArcMetadata
   normative
-    Text blurb
     Text description
     Text icon
     Text key
     Text href
     Text color
-    Boolean profile
+    Text profile
   optional
     Text blurb
     URL externalManifest
