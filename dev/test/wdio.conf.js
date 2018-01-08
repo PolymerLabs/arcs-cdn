@@ -55,6 +55,8 @@ exports.config = {
       }
     }
   ],
+  // arcs node: uncomment to attach a debugger
+  // execArgv: ['--inspect'],
   //
   // ===================
   // Test Configurations

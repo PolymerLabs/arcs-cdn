@@ -39,6 +39,15 @@ arcs-cdn> npm test
 
 ### Debugging Selenium Failures
 
+Selenium failures are often easy to cause due to seemingly unrelated changes,
+and difficult to diagnose.
+
+There are 2 main avenues to debug them in this system. The first is to have
+the browser run in a graphical manner (as opposed to the default headless
+configuration). The second is to actually debug the running selenium instance.
+
+#### Graphical (non-headless)
+
 It may be easiest to see the problem in a browser window to diagnose it. Edit
 `wdio.conf.js` in the branch with failures, comment out the `'--headless'`
 option and increase the mocha timeout. In combination, these two changes will
@@ -77,5 +86,58 @@ execution so you can debug in the browser. It may be worthwhile to add several
 `browser.debug()` invocations through your flow to trace execution (`.exit`
 will exit the debugger and continue execution of the test).
 
-The debugger at the prompt is fairly minimal, it may be there just to pause
-execution until you can open up DevTools in your browser.
+At that point you can open up DevTools in the browser to debug the current
+state, or inspect it visually. Some utilities (those in `selenium-utils.js`,
+including pierceShadows) have already been loaded.
+
+There are also some commands available natively at that point, including
+`.help` and the `browser` variable (including methods such as
+`browser.execute()`).
+
+#### Attaching a Debugger
+
+To attach a debugger, uncomment the execArgv `--inspect` configuration option.
+It's likely that you'll still want to have increased the mochaTimeout and to
+be running graphically, so those are in the example as well:
+
+```
+arcs-cdn> git diff dev/test/wdio.conf.js
+diff --git a/dev/test/wdio.conf.js b/dev/test/wdio.conf.js
+index 0e36452..4240c0a 100644
+--- a/dev/test/wdio.conf.js
++++ b/dev/test/wdio.conf.js
+@@ -50,11 +50,12 @@ exports.config = {
+       chromeOptions: {
+         args: [
+           // arcs note: comment this out to see the system running
+-          '--headless'
++          // '--headless'
+         ]
+       }
+     }
+   ],
++  execArgv: ['--inspect'],
+   //
+   // ===================
+   // Test Configurations
+@@ -139,7 +140,7 @@ exports.config = {
+   mochaOpts: {
+     ui: 'bdd',
+     // arcs note: increase this timeout for debugging
+-    timeout: 20003
++    timeout: 2000003
+   }
+   //
+   // =====
+```
+
+When starting, you should see log item like `debugger listening on
+ws://127.0.0.1:9229/..` as normally appears for [node
+debugging](https://nodejs.org/api/debugger.html). Passing the --inspect
+argument will also enable the [V8 Inspector
+Integration](https://nodejs.org/api/debugger.html) which may be easier to use
+(to activate this, look for a node icon in a Chrome DevTools process).
+
+Adding `debugger;` statements may be the easiest way to activate the debugger.
+Using `browser.debug();` statements to pause execution to give you time to
+attach a debugger may be helpful as well.

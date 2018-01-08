@@ -97,6 +97,23 @@ function loadSeleniumUtils() {
   });
 }
 
+/** Wait until the element specified by selectors is visible. Unlike the
+ * normal #waitForVisible()
+ * (http://webdriver.io/api/utility/waitForVisible.html) this will traverse
+ * the shadow DOM. */
+function waitForVisible(selectors) {
+  browser.waitUntil(
+    () => {
+      const selected = pierceShadows(selectors);
+      console.log(`selected ${selected} values ${selected.value}`);
+      return selected.value && selected.value.length > 0;
+    },
+    5000000,
+    `selectors ${selectors} never selected anything`,
+    1000
+  );
+}
+
 function getFooterPath() {
   return ['arc-footer', 'x-toast[app-footer]'];
 }
@@ -134,6 +151,8 @@ function createNewArc() {
   browser.switchTab(browser.windowHandles().value[0]);
   browser.switchTab(browser.windowHandles().value[1]);
 }
+
+function expandSuggestionsDrawer() {}
 
 function allSuggestions() {
   waitForStillness();
@@ -193,6 +212,10 @@ function acceptSuggestion(textSubstring) {
   console.log(`Accepted suggestion: ${textSubstring}`);
 }
 
+function particleSelectors(slotName, selectors) {
+  return ['arc-host', `div[slotid="${slotName}"]`].concat(selectors);
+}
+
 /**
  * Click in the main arcs app, in the slot with the name 'slotName', using the
  * specified selectors, filtering by the optional textQuery.
@@ -201,9 +224,7 @@ function clickInParticles(slotName, selectors, textQuery) {
   waitForStillness();
 
   if (!selectors) selectors = [];
-  const realSelectors = ['arc-host', `div[slotid="${slotName}"]`].concat(
-    selectors
-  );
+  const realSelectors = particleSelectors(slotName, selectors);
 
   browser.waitUntil(
     () => {
@@ -245,7 +266,17 @@ describe('test Arcs demo flows', function() {
     allSuggestions();
 
     acceptSuggestion('Find restaurants');
-    clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
+
+    // Our location is relative to where you are now, so this list is dynamic.
+    // Rather than trying to mock this out let's just grab the first
+    // restaurant.
+    const restaurantSelectors = particleSelectors('root', [
+      'div.item',
+      'div.title'
+    ]);
+    waitForVisible(restaurantSelectors);
+    let restaurantNodes = pierceShadows(restaurantSelectors);
+    browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
 
     acceptSuggestion('make a reservation');
     acceptSuggestion('You are free');
@@ -261,7 +292,9 @@ describe('test Arcs demo flows', function() {
 
     allSuggestions();
 
-    acceptSuggestion('Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire\'s wishlist (Book: How to Draw plus 2 other items)');
+    acceptSuggestion(
+      "Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire's wishlist (Book: How to Draw plus 2 other items)"
+    );
     browser.waitForVisible('div[slotid="action"]');
     browser.waitForVisible('div[slotid="annotation"]');
 
@@ -269,9 +302,13 @@ describe('test Arcs demo flows', function() {
     // (1) verify product was moved,
     // (2) verify 'action' slot is not visible after all products were moved.
 
-    acceptSuggestion('Estimate arrival dates, estimate arrival dates');  // TODO: add 'and buy gifts for Claire' when descriptions are fixed.
-    acceptSuggestion('check manufacturer information for Products from your browsing context');
-    acceptSuggestion('recommendations based on Products recommended based on Products from your browsing context and Claire\'s wishlist');
+    acceptSuggestion('Estimate arrival dates, estimate arrival dates'); // TODO: add 'and buy gifts for Claire' when descriptions are fixed.
+    acceptSuggestion(
+      'check manufacturer information for Products from your browsing context'
+    );
+    acceptSuggestion(
+      "recommendations based on Products recommended based on Products from your browsing context and Claire's wishlist"
+    );
 
     // Verify each product has non empty annotation text.
     let annotations = browser.getText('div[slotid="annotation"]');
