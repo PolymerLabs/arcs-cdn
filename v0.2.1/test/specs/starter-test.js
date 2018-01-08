@@ -97,6 +97,22 @@ function loadSeleniumUtils() {
   });
 }
 
+/** Wait until the element specified by selectors is visible. Unlike the
+ * normal #waitForVisible()
+ * (http://webdriver.io/api/utility/waitForVisible.html) this will traverse
+ * the shadow DOM. */
+function waitForVisible(selectors) {
+  browser.waitUntil(
+    () => {
+      const selected = pierceShadows(selectors);
+      return selected.value && selected.value.length > 0;
+    },
+    5000000,
+    `selectors ${selectors} never selected anything`,
+    1000
+  );
+}
+
 function allSuggestions(footerPath) {
   waitForStillness();
 
@@ -150,6 +166,10 @@ function acceptSuggestion(footerPath, textSubstring) {
     5000,
     `couldn't find suggestion ${textSubstring}`
   );
+}
+
+function particleSelectors(slotName, selectors) {
+  return ['arc-host', `div[slotid="${slotName}"]`].concat(selectors);
 }
 
 /**
@@ -226,7 +246,17 @@ describe('test basic arcs functionality', function() {
     allSuggestions(footerPath);
 
     acceptSuggestion(footerPath, 'Find restaurants');
-    clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
+
+    // Our location is relative to where you are now, so this list is dynamic.
+    // Rather than trying to mock this out let's just grab the first
+    // restaurant.
+    const restaurantSelectors = particleSelectors('root', [
+      'div.item',
+      'div.title'
+    ]);
+    waitForVisible(restaurantSelectors);
+    let restaurantNodes = pierceShadows(restaurantSelectors);
+    browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
 
     acceptSuggestion(footerPath, 'make a reservation');
     acceptSuggestion(footerPath, 'You are free');

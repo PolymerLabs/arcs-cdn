@@ -105,7 +105,6 @@ function waitForVisible(selectors) {
   browser.waitUntil(
     () => {
       const selected = pierceShadows(selectors);
-      console.log(`selected ${selected} values ${selected.value}`);
       return selected.value && selected.value.length > 0;
     },
     5000000,
