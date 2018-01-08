@@ -51,7 +51,7 @@
         dotsActive: props.dots == 'active',
         searchText: state.search || '',
         toastOpen: state.open == undefined ? true : state.open,
-        suggestions
+        suggestions: this._filterPlans(props.suggestions, state.search)
       };
     }
     _onPlanSelected(e, suggestion) {
