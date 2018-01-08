@@ -7,6 +7,8 @@
 // http://polymer.github.io/PATENTS.txt
 
 const gulp = require('gulp');
+const execSync = require('child_process').execSync;
+const resolve = require('path').resolve;
 
 const target = `./lib`;
 
@@ -21,6 +23,17 @@ const sources = {
     'Tracelib.js'
   ],
 };
+
+let arcsBuild = async (path) => {
+  const options = {cwd: resolve(path), stdio: 'inherit'};
+  await execSync('echo `pwd`', options);
+  await execSync('npm install', options);
+  await execSync('tools/sigh', options);
+};
+
+gulp.task('arcs-build', async function() {
+  await arcsBuild(arcs);
+});
 
 let pack = async (files) => {
   try {
@@ -55,12 +68,12 @@ let pack = async (files) => {
   }
 };
 
-gulp.task('build', async function() {
+gulp.task('build', ['arcs-build'], async function() {
   await pack(sources.cdn);
 });
 
 const components = `${target}components/`;
-const arcs = `../arcs/`;
+const arcs = `../../arcs/`;
 const browserlib = `runtime/browser/lib/`;
 
 const strategyExplorer = `strategy-explorer`;

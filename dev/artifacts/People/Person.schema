@@ -15,3 +15,7 @@ schema Person extends Thing
     Text foods
     Text avatar
     Text active
+    Object location
+    Object arcs
+    Object profiles
+    Object shares

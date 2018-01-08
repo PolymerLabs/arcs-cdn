@@ -149,7 +149,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         </template>
         <div buttons style%="{{toolbarButtonsStyle}}">
           <toggle-button title="Arc Contains Profile Data" state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
-          <toggle-button title="Share this Arc" state="{{sharingState}}" on-state="_onSharingState" icons="link supervisor_account"></toggle-button>
+          <toggle-button title="Share this Arc" state="{{sharedState}}" on-state="_onSharedState" icons="link supervisor_account"></toggle-button>
           <toggle-button title="Cast" on-state="_onCastState" icons="cast cast_connected"></toggle-button>
           <i on-click="_onNewArcClick">note_add</i>
         </div>
@@ -226,6 +226,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _didMount() {
       this.setAttribute('arc-app', '');
       this._initHotKeys();
+      this._initGeolocation();
     }
     _update(props, state, lastProps, lastState) {
       // for debugging
@@ -236,8 +237,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       window.users = state.users;
       state.appState = state;
       //
-      if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData)) {
-        state.identityViewData = this._synthesizeIdentityViewData(state.arc, state.user);
+      if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData
+          || state.geoCoords !== lastState.geoCoords)) {
+        state.identityViewData = this._synthesizeIdentityViewData(
+            state.arc, state.user, state.geoCoords);
       }
       if (state.users && (state.users !== lastState.users || !state.identitiesViewData)) {
         state.identitiesViewData = this._sythesizeIdentitiesViewData(state.users);
@@ -329,10 +332,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return models;
     }
-    _synthesizeIdentityViewData(arc, user) {
+    _synthesizeIdentityViewData(arc, user, geoCoords) {
       return {
         id: user.id,
-        name: user.name
+        name: user.name,
+        location: geoCoords ? {
+          latitude: geoCoords.latitude,
+          longitude: geoCoords.longitude
+        } : null
       };
     }
     _sythesizeIdentitiesViewData(users) {
@@ -464,6 +471,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (user) {
         let data = Object.keys(visited).map(key => {
           let {metadata, profile} = visited[key];
+          let href = `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`;
+          if (metadata.externalManifest) href += `&manifest=${metadata.externalManifest}`;
           return {
             key: key,
             description: metadata.description || key.slice(1),
@@ -631,6 +640,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _onExclusions(e, exclusions) {
       this._setIfDirty({exclusions});
+    }
+    _initGeolocation() {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition(position => {
+          this._setState({geoCoords: position.coords});
+        });
+      }
     }
   }
   ArcApp.module = document.currentImport;

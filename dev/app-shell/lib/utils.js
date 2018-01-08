@@ -10,11 +10,11 @@
 
 // ad-hoc (for now) utilities
 let utils = {
-  createArc: ({id, urlMap, slotComposer, context}) => {
+  createArc: ({id, urlMap, slotComposer, context, loader}) => {
     // worker paths are relative to worker location, remap urls from there to here
     let remap = Arcs.utils._expandUrls(urlMap);
     let pecFactory = Arcs.utils._createPecWorker.bind(null, urlMap[`worker-entry-cdn.js`], remap);
-    return new Arcs.Arc({id, pecFactory, slotComposer, context});
+    return new Arcs.Arc({id, pecFactory, slotComposer, context, loader});
   },
   _expandUrls: urlMap => {
     let remap = {};
@@ -76,12 +76,7 @@ let utils = {
     return `${rl(adjectives)}-${rl(nouns)}`.replace(/ /g, '-');
   },
   async describeArc(arc) {
-    let combinedSuggestion = await new Arcs.Description(arc).getRecipeSuggestion(arc._activeRecipe.particles);
-    //let combinedSuggestion = Arcs.Description.getSuggestion(arc._activeRecipe, arc, null);
-    //if (combinedSuggestion) {
-    //  let tags = Object.keys(arc._tags).filter(t => ['#nosync','#arcmetadata','#identity','#identities'].indexOf(t) < 0);
-    //  combinedSuggestion += `${tags.length ? ` (${tags.join(", ")})` : ''}`;
-    //}
+    const combinedSuggestion = await new Arcs.Description(arc).getArcDescription();
     return combinedSuggestion || '';
   },
   removeUndefined(object) {
@@ -94,7 +89,7 @@ let utils = {
     // construct id
     let id = Arcs.utils.getContextViewId(type, metadata.tags, idPrefix);
     // find or create a view in the arc context
-    let view = Arcs.utils._requireView(arc, type, metadata.name, id, metadata.tags);
+    let view = await Arcs.utils._requireView(arc, type, metadata.name, id, metadata.tags);
     await Arcs.utils.setViewData(view, values);
     return view;
   },
@@ -115,10 +110,10 @@ let utils = {
         return `${noun} ${name}`;
       }
   },
-  _requireView(arc, type, name, id, tags) {
+  async _requireView(arc, type, name, id, tags) {
     let view = arc.context.findViewById(id);
     if (!view) {
-      view = arc.context.newView(type, name, id, tags);
+      view = await arc.context.newView(type, name, id, tags);
       Arcs.utils.log('synthesized view', id, tags);
     }
     return view;

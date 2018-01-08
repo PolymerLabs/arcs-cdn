@@ -16,16 +16,36 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         db: db.child('arcs')
       };
     }
+    // Allow overriding search params for unit tests.
+    _getSearchParams() {
+      return (new URL(document.location)).searchParams;
+    }
+    _getExternalManifest() {
+      const params = this._getSearchParams();
+      // Prioritize manifest over solo, semi-arbitrarily, since usually we'll
+      // only see one or the other.
+      return params.get('solo') || params.get('manifest');
+    }
     _update(props, state, lastProps) {
       if (props.key === '*' && lastProps.key != props.key) {
         this._createKey(state.db);
       }
       if (props.key && props.key !== '*') {
-        if (props.metadata && props.metadata !== state.metadata) {
-          state.metadata = props.metadata;
-          let arcMetadata = state.db.child(props.key).child('metadata');
-          PersistentArc.log('WRITING (update) metadata for', String(arcMetadata), props.metadata);
-          arcMetadata.update(props.metadata);
+        if (props.metadata) {
+          // Typical developer workflow involves creating a new arc and
+          // subsequently modifying the url to include a specific recipe via a
+          // solo or manifest query param, thus we have to look for such a param
+          // at arc update time. Alternatively we could have the developer
+          // include the param in the main launcher page and have the app shell
+          // pass it along to the 'New Arc' url, but that is not the current
+          // state of the world.
+          props.metadata['externalManifest'] = this._getExternalManifest();
+          if (props.metadata !== state.metadata) {
+            state.metadata = props.metadata;
+            let arcMetadata = state.db.child(props.key).child('metadata');
+            PersistentArc.log('WRITING (update) metadata for', String(arcMetadata), props.metadata);
+            arcMetadata.update(props.metadata);
+          }
         }
         if (props.key !== lastProps.key) {
           state.watch.watches = [this._watchKey(state.db, props.key)];
@@ -38,7 +58,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let data = {
         description: Arcs.utils.randomName(),
         icon: icons[Math.floor(Math.random()*icons.length)],
-        color: colors[Math.floor(Math.random()*colors.length)]
+        color: colors[Math.floor(Math.random()*colors.length)],
+        externalManifest: this._getExternalManifest()
       };
       let key = db.push({'metadata': data}).key;
       this._setState({key});

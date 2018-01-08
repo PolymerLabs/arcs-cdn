@@ -50,10 +50,10 @@ class SuggestionsElement extends HTMLElement {
     }
   }
 
-  addSuggestion({plan, description, rank, hash}, index) {
+  async addSuggestion({plan, description, rank, hash}, index) {
     let model = {
       index,
-      innerHTML: description,
+      innerHTML: await description.getRecipeSuggestion(),
       onclick: () => {
         //this.toast.open = false;
         // TODO(sjmiles): wait for toast animation to avoid jank

@@ -55,6 +55,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     async _applyConfig(config) {
       let arc = await this._createArc(config);
+      arc.makeSuggestions = async () => { this._schedulePlanning(state); }
       ArcHost.log('instantiated', arc);
       this._setState({arc});
       this._fire('arc', arc)
@@ -75,11 +76,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // send urlMap to the Arc so worker-entry*.js can create mapping loaders
       let urlMap = loader._urlMap;
       // Arc!
-      let arc = Arcs.utils.createArc({id, urlMap, slotComposer, context});
-      // TODO(sjmiles): loader instance has to follow the arc, why is it not already this way?
-      // TODO(sjmiles): ArcsLib made a similar change (arc._loader?), unify
-      arc.loader = loader;
-      return arc;
+      return Arcs.utils.createArc({id, urlMap, slotComposer, context, loader});
     }
     _marshalLoader(config) {
       // create default URL map

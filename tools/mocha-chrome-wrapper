@@ -11,19 +11,21 @@
 const MochaChrome = require('mocha-chrome');
 const fs = require('fs');
 
-let promises = process.argv.slice(2).map(testScript => {
-  // We're not doing a ton of checking for now, since we've relied on
-  // shell globs to populate the parameter list with valid files in the only
-  // caller we care about for now (npm test).
-  let url = 'file://' + fs.realpathSync(testScript);
+const server = process.argv[2];
 
+const promises = process.argv.slice(3).map(testScript => {
+  if (!fs.existsSync(testScript)) {
+    throw Error(`no test file found at path ${testScript}.`);
+  }
+
+  const url = `http://${server}/${testScript}`;
   const options = Object.assign({
     url: url
   });
 
   const mochaChrome = new MochaChrome(options);
 
-  let promise = new Promise(async resolve => {
+  const promise = new Promise(async resolve => {
     // 'ended' seems like the preferred event, but let's catch everything
     // that the mocha-chrome cli does.
     mochaChrome.on('ended', stats => {
@@ -47,13 +49,13 @@ Promise.all(promises).then(results => {
       }`
     );
   });
-  let exitCode = results
+  const exitCode = results
     .map(result => result.failures)
     .reduce((accumulator, currentValue) => accumulator || currentValue);
   console.log(
-    `overall run ${exitCode ? 'failed some tests' : 'passed all tests'} (code ${
-      exitCode
-    })`
+    `overall run ${
+      exitCode ? 'failed some tests' : 'passed all tests'
+    } (code ${exitCode})`
   );
   process.exit(exitCode);
 });

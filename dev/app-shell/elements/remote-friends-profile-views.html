@@ -64,14 +64,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _processFriendProfileViews(arc, friend, views) {
       //RemoteFriendsProfileViews.log(`friend's profile views`, friend, views);
-      Object.keys(views).forEach(key => {
+      Object.keys(views).forEach(async key => {
         let {values, metadata: {name, type, tags}} = views[key];
         let tagString = (tags && tags.length ? `${tags.sort().join('_').replace(/#/g, '')}` : '');
         let id = `FRIENDS_PROFILE_${tagString}`;
         // TODO(sjmiles): not always a SetView is it?
         let arcsType = Arcs.utils.typeFromMetaType(type).setViewOf();
         if (values) {
-          let view = this._requireView(arc, id, arcsType, id, [`#friends_${tagString}`]);
+          let view = await this._requireView(arc, id, arcsType, id, [`#friends_${tagString}`]);
           // TODO(sjmiles): how to know if `values` represents a SetView or Entity?
           //if (!Array.isArray(values)) {
           if ('id' in values) {
@@ -91,8 +91,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         }
       });
     }
-    _requireView(arc, id, type, name, tags) {
-      return arc.context.findViewById(id) || arc.context.newView(type, name, id, tags);
+    async _requireView(arc, id, type, name, tags) {
+      return arc.context.findViewById(id) || await arc.context.newView(type, name, id, tags);
     }
   }
   RemoteFriendsProfileViews.module = document.currentImport;

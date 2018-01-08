@@ -10,7 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script>
   class ArcView extends XenBase {
     static get observedAttributes() { return ['arc', 'options', 'data']; }
-    _update(props, state, lastProps) {
+    async _update(props, state, lastProps) {
       let lastData = lastProps.data;
       let {arc, options, data} = props;
       if (arc && !state.view) {
@@ -18,7 +18,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           Arcs.Manifest.load(options.schemas, arc.loader).then(manifest => this._setState({manifest}));
         }
         if (state.manifest && options) {
-          state.view = this._createView(arc, state.manifest, options);
+          state.view = await this._createView(arc, state.manifest, options);
         }
         lastData = null;
       }
@@ -28,7 +28,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         //this._fire('view', state.view);
       }
     }
-    _createView(arc, manifest, {name, tags, type, id, asContext}) {
+    async _createView(arc, manifest, {name, tags, type, id, asContext}) {
       let viewOf = false;
       if (type[0] == '[') {
         viewOf = true;
@@ -41,10 +41,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let view;
       if (asContext) {
         // manifest-view, for `map`, `copy`, `?`
-        view = arc.context.newView(typeOf, name, id, tags);
+        view = await arc.context.newView(typeOf, name, id, tags);
       } else {
         // arc-view, suitable for `use`, `?`
-        view = arc.createView(typeOf, name, id, tags);
+        view = await arc.createView(typeOf, name, id, tags);
       }
       // observe view
       view.on('change', change => this._fire('view', view), this);
