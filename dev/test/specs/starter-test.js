@@ -152,8 +152,6 @@ function createNewArc() {
   browser.switchTab(browser.windowHandles().value[1]);
 }
 
-function expandSuggestionsDrawer() {}
-
 function allSuggestions() {
   waitForStillness();
 
