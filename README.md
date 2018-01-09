@@ -133,7 +133,7 @@ index 0e36452..4240c0a 100644
 
 When starting, you should see log item like `debugger listening on
 ws://127.0.0.1:9229/..` as normally appears for [node
-debugging](https://nodejs.org/api/debugger.html). Passing the --inspect
+debugging](https://nodejs.org/api/debugger.html). Passing the `--inspect`
 argument will also enable the [V8 Inspector
 Integration](https://nodejs.org/api/debugger.html) which may be easier to use
 (to activate this, look for a node icon in a Chrome DevTools process).

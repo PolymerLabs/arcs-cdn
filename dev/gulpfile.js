@@ -28,7 +28,6 @@ const sources = {
 
 let arcsBuild = async (path) => {
   const options = {cwd: resolve(path), stdio: 'inherit'};
-  await execSync('echo `pwd`', options);
   await execSync('npm install', options);
   await execSync(`node tools${sep}sigh.js`, options);
 };

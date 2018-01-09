@@ -55,6 +55,7 @@ exports.config = {
       }
     }
   ],
+  // execArgv: ['--inspect'],
   //
   // ===================
   // Test Configurations
