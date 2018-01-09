@@ -293,6 +293,7 @@ describe('test basic arcs functionality', function() {
 
     allSuggestions(footerPath);
 
+    wait(2);
     acceptSuggestion(footerPath, 'Find restaurants');
 
     // Our location is relative to where you are now, so this list is dynamic.
