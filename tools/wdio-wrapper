@@ -12,6 +12,8 @@
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+var result = 0;
+
 // Rather than spawning a new wdio for every version, it might be possible to
 // have a single wdio/wdio.conf.js that includes references to all paths.
 // However, the current arrangement makes the baseUrl much simpler, and the
@@ -30,7 +32,9 @@ process.argv.slice(2).forEach(wdioConfig => {
     { cwd: path.resolve(version), stdio: 'inherit' }
   );
   if (ret.status>0) {
-    console.log(`exiting (status code ${ret.status}) due to errors in ${version}`);
-    process.exit(ret.status);
+    console.log(`ERROR: failure (status code ${ret.status}) due to errors in ${version}`);
+    result = ret.status;
   }
 });
+
+process.exit(result);

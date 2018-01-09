@@ -21,6 +21,20 @@ function pierceShadowsSingle(selectors) {
   }, selectors);
 }
 
+/** Wait a short, approximate time (up to 10 seconds). */
+function wait(seconds) {
+  let count = 0;
+  browser.waitUntil(
+    () => {
+      count += 1;
+      return count >= seconds;
+    },
+    10000,
+    `we should have exited after a few iterations`,
+    1000
+  );
+}
+
 /**
  * Search the list of elements, return the one that matches the textQuery.
  * (return an error if there are multiple matches, null if there are none).
@@ -51,25 +65,6 @@ function searchElementsForText(elements, textQuery) {
   return matches;
 }
 
-/** wait for the dancing dots to stop. */
-function waitForStillness() {
-  var element = pierceShadowsSingle([
-    'arc-footer',
-    'x-toast[app-footer]',
-    'dancing-dots'
-  ]);
-
-  browser.waitUntil(
-    () => {
-      var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
-      return null == result.value;
-    },
-    5000,
-    `the dancing dots can't stop won't stop`,
-    1000
-  );
-}
-
 /** Load the selenium utils into the current page. */
 function loadSeleniumUtils() {
   var result = browser.execute(function(baseUrl) {
@@ -87,7 +82,7 @@ function loadSeleniumUtils() {
     } catch (e) {
       if (e.message.includes('pierceShadows is not defined')) {
         console.log(
-          `got a not-entirely-unexpected error, but waitUntil will try again (up to a point). Error: ${e}`
+          `spin-waiting for pierceShadows to load; the error indicates it's not yet loaded so we'll try again (up to a point). Error: ${e}`
         );
         return false;
       }
@@ -95,6 +90,81 @@ function loadSeleniumUtils() {
     }
     return true;
   });
+}
+
+/** Wait until the element specified by selectors is visible. Unlike the
+ * normal #waitForVisible()
+ * (http://webdriver.io/api/utility/waitForVisible.html) this will traverse
+ * the shadow DOM. */
+function waitForVisible(selectors) {
+  browser.waitUntil(
+    () => {
+      const selected = pierceShadows(selectors);
+      const isVisible = selected.value && selected.value.length > 0;
+      return isVisible;
+    },
+    5000,
+    `selectors ${selectors} never selected anything`,
+    500
+  );
+}
+
+function dancingDotsElement() {
+  return pierceShadowsSingle([
+    'arc-footer',
+    'x-toast[app-footer]',
+    'dancing-dots'
+  ]);
+}
+
+/** wait for the dancing dots to stop. */
+function waitForStillness() {
+  var element = dancingDotsElement();
+
+  browser.waitUntil(
+    () => {
+      var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
+      return null == result.value;
+    },
+    5000,
+    `the dancing dots can't stop won't stop`,
+    1000
+  );
+}
+
+function _waitForSuggestionsDrawerToBeOpen(footerPath) {
+  try {
+    browser.waitUntil(
+      () => {
+        const footer = pierceShadowsSingle(footerPath);
+        const open = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
+        return open.value;
+      },
+      500,
+      `the suggestions drawer was never open`,
+      100
+    );
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function openSuggestionDrawer(footerPath) {
+  // pause before we start; sometimes the drawer is in animation
+  wait(2);
+  const suggestionsOpen = _waitForSuggestionsDrawerToBeOpen(footerPath);
+  if (!suggestionsOpen) {
+    const dancingDots = dancingDotsElement();
+    browser.elementIdClick(dancingDots.value.ELEMENT);
+
+    // after the click, wait a beat for the animation to finish
+    wait(2);
+
+    if (!_waitForSuggestionsDrawerToBeOpen(footerPath)) {
+      throw Error(`suggestions drawer never opened even after a click`);
+    }
+  }
 }
 
 function allSuggestions(footerPath) {
@@ -108,6 +178,7 @@ function allSuggestions(footerPath) {
 
 function acceptSuggestion(footerPath, textSubstring) {
   waitForStillness();
+  openSuggestionDrawer(footerPath);
 
   const suggestionsRoot = pierceShadowsSingle(
     footerPath.concat(['suggestions-element'])
@@ -139,7 +210,7 @@ function acceptSuggestion(footerPath, textSubstring) {
       } catch (e) {
         if (e.message.includes('stale element reference')) {
           console.log(
-            `got a not-entirely-unexpected error, but waitUntil will try again (up to a point). Error: ${e}`
+            `spin-wait on accepting a suggestion - got an error indicating we're not ready, so waitUntil will try again (up to a point). Error: ${e}`
           );
           return false;
         }
@@ -150,6 +221,10 @@ function acceptSuggestion(footerPath, textSubstring) {
     5000,
     `couldn't find suggestion ${textSubstring}`
   );
+}
+
+function particleSelectors(slotName, selectors) {
+  return ['arc-host', `div[slotid="${slotName}"]`].concat(selectors);
 }
 
 /**
@@ -226,9 +301,19 @@ describe('test basic arcs functionality', function() {
     allSuggestions(footerPath);
 
     acceptSuggestion(footerPath, 'Find restaurants');
-    clickInParticles('root', ['div.item', 'div.title'], 'Tacolicious');
 
-    acceptSuggestion(footerPath, 'make a reservation');
+    // Our location is relative to where you are now, so this list is dynamic.
+    // Rather than trying to mock this out let's just grab the first
+    // restaurant.
+    const restaurantSelectors = particleSelectors('root', [
+      'div.item',
+      'div.title'
+    ]);
+    waitForVisible(restaurantSelectors);
+    let restaurantNodes = pierceShadows(restaurantSelectors);
+    browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
+
+    acceptSuggestion(footerPath, 'Make a reservation');
     acceptSuggestion(footerPath, 'You are free');
 
     // to drop into debug mode with a REPL; also a handy way to see the state
