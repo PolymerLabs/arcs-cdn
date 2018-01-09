@@ -330,7 +330,7 @@ describe('test Arcs demo flows', function() {
     let restaurantNodes = pierceShadows(restaurantSelectors);
     browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
 
-    acceptSuggestion('make a reservation');
+    acceptSuggestion('Make a reservation');
     acceptSuggestion('You are free');
 
     browser.close();
