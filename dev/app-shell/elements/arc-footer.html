@@ -46,16 +46,12 @@
   class ArcFooter extends XenBase {
     static get observedAttributes() { return ['suggestions', 'dots', 'open', 'search']; }
     _render(props, state) {
-      let {dots, suggestions} = props;
-
-      suggestions = this._filterPlans(suggestions, state.search);
-
       return {
-        dotsDisabled: dots == 'disabled',
-        dotsActive: dots == 'active',
+        dotsDisabled: props.dots == 'disabled',
+        dotsActive: props.dots == 'active',
         searchText: state.search || '',
         toastOpen: state.open == undefined ? true : state.open,
-        suggestions
+        suggestions: this._filterPlans(props.suggestions, state.search)
       };
     }
     _onPlanSelected(e, suggestion) {
@@ -79,11 +75,10 @@
     }
     _prepareSearchTermForBackendSearch(search) {
       if (search) {
-        search = search.trim().toLowerCase();
-        if (!search || search == '*') {
-          return null;
+        search = search.trim();
+        if (search && search !== '*') {
+          return search.toLowerCase();
         }
-        return search;
       }
       return null;
     }
@@ -98,7 +93,6 @@
       if (!plans) {
         return [];
       }
-
       if (!term) {
         // empty string = show suggestions matching current slots, i.e.
         // suggestions furthering current flow, but not those just appending

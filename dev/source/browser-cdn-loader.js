@@ -41,11 +41,7 @@ export default class BrowserLoader extends Loader {
     let path = this._resolve(fileName);
     // inject path to this particle into the UrlMap,
     // allows "foo.js" particle to invoke `importScripts(resolver('foo/othermodule.js'))`
-    let parts = path.split('/');
-    let suffix = parts.pop();
-    let folder = parts.join('/');
-    let name = suffix.split('.').shift();
-    this._urlMap[name] = folder;
+    this.mapParticleUrl(path);
     let result = [];
     self.defineParticle = function(particleWrapper) {
       result.push(particleWrapper);
@@ -53,6 +49,13 @@ export default class BrowserLoader extends Loader {
     importScripts(path);
     delete self.defineParticle;
     return this.unwrapParticle(result[0]);
+  }
+  mapParticleUrl(path) {
+    let parts = path.split('/');
+    let suffix = parts.pop();
+    let folder = parts.join('/');
+    let name = suffix.split('.').shift();
+    this._urlMap[name] = folder;
   }
   unwrapParticle(particleWrapper) {
     // TODO(sjmiles): regarding `resolver`:

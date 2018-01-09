@@ -126,13 +126,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
     <persistent-users on-users="_onUsers"></persistent-users>
     <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
+    <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
     <persistent-views arc="{{arc}}" key="{{key}}"></persistent-views>
     <remote-profile-views arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-views>
     <remote-shared-views arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-views>
     <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-views>
     <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
     <arc-view arc="{{arc}}" data="{{identityViewData}}" options="{{identityViewOptions}}" on-view="_onIdentityView"></arc-view>
-    <arc-view arc="{{arc}}" data="{{users}}" options="{{identitiesViewOptions}}" on-view="_onIdentitiesView"></arc-view>
+    <arc-view arc="{{arc}}" data="{{identitiesViewData}}" options="{{identitiesViewOptions}}" on-view="_onIdentitiesView"></arc-view>
     <arc-view arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarViewOptions}}"></arc-view>
     <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
     <!-- only for launcher -->
@@ -154,7 +155,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         </div>
       </app-toolbar>
     </toolbar>
-    <arc-host config="{{hostConfig}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+    <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
       <div slotid="toproot"></div>
       <div slotid="root"></div>
     </arc-host>
@@ -164,6 +165,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   </app-main>
   <app-tools>
     <simple-tabs>
+      <div tab="Manifests">
+        <local-data manifest="{{manifest}}" on-update-manifest="_onUpdateManifest" on-promote-manifest="_onPromoteManifest"></local-data>
+        <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></manifest-data>
+      </div>
       <div tab="Arc Explorer">
         <arc-explorer user="{{user}}"></arc-explorer>
       </div>
@@ -225,6 +230,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     _update(props, state, lastProps, lastState) {
       // for debugging
+      window.app = this;
       window.state = state;
       window.arc = state.arc;
       window.user = state.user;
@@ -235,6 +241,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           || state.geoCoords !== lastState.geoCoords)) {
         state.identityViewData = this._synthesizeIdentityViewData(
             state.arc, state.user, state.geoCoords);
+      }
+      if (state.users && (state.users !== lastState.users || !state.identitiesViewData)) {
+        state.identitiesViewData = this._sythesizeIdentitiesViewData(state.users);
       }
       if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
         state.plan = state.plans[0].plan;
@@ -332,6 +341,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           longitude: geoCoords.longitude
         } : null
       };
+    }
+    _sythesizeIdentitiesViewData(users) {
+      return Object.keys(users).map(id => {
+        return {
+          id: id,
+          name: users[id].name
+        };
+      });
     }
     /*
     _hasViews(state) {
@@ -461,8 +478,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             description: metadata.description || key.slice(1),
             icon: metadata.icon || 'broken_image',
             color: metadata.color || 'gray',
-            href: href,
-            profile: Boolean(profile)
+            href: `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`,
+            profile: profile
           };
         });
         /*
@@ -604,6 +621,25 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         // set new object to state
         this._setState({metadata});
       }
+    }
+    _onUpdateManifest(e, manifestPath) {
+      ArcApp.log(`onUpdateManifest: [${manifestPath}]`);
+      this._setState({manifestPath});
+    }
+    _onPromoteManifest(e) {
+      let state = this._state;
+      //ArcApp.log(`onPromoteManifest: [${state.manifestPath}]`);
+      if (state.manifestPath) {
+        let manifests = (state.manifests || []).concat([state.manifestPath]);
+        ArcApp.log(`onPromoteManifest: [${manifests}]`);
+       this._setState({manifestPath: '', manifests: manifests.slice()})
+      }
+    }
+    _onManifests(e, manifests) {
+      this._setIfDirty({manifests});
+    }
+    _onExclusions(e, exclusions) {
+      this._setIfDirty({exclusions});
     }
     _initGeolocation() {
       if ("geolocation" in navigator) {
