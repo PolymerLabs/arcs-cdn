@@ -9,43 +9,46 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 -->
 <style>
   data-item {
-    display: flex;
+    display: block;
+    min-height: 28px;
   }
   data-item > * {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    border: 1px dotted silver;
-    border-left: none;
-    border-top: none;
+    display: inline-block;
+    vertical-align: middle;
   }
   data-item > left {
-    display: flex;
-    align-items: center;
+    vertical-align: top;
     padding: 4px;
-    justify-content: flex-end;
-    /*
-    flex: 1;
-    min-width: 40px;
-    border-right: 1px solid gray;
-    */
-    width: 128px;
-    background-color: whitesmoke;
+    color: gray;
   }
-  data-item > right {
-    flex: 3;
+  data-item > left::before {
+    content: '⋅ '
   }
-  data-item > right > div {
+  data-item > right > span {
+    display: inline-block;
     padding: 4px;
+  }
+  data-item > right > data-explorer {
+    margin: 4px 16px;
+  }
+  data-item > right > [expander] {
+    font-size: 0.6em;
+    background: whitesmoke;
+    border: 1px solid silver;
+    padding: 0 2px;
+    cursor: pointer;
   }
 </style>
 
 <template>
-  <left title="{{name}}" on-click="_onExpandClick">{{name}}</left>
+  <left title="{{name}}" on-click="_onExpandClick"><span>{{name}}</span>: </left>
   <right>
-    <div hidden="{{hideexpand}}" on-click="_onExpandClick">+</div>
-    <div hidden="{{notbool}}" title="{{name}}"><input type="checkbox" checked="{{value}}" on-click="_onCheckInput"></div>
-    <div hidden="{{notstring}}" title="{{title}}">{{value}}</div>
+    <span expander hidden="{{hideexpand}}" on-click="_onExpandClick">+</span>
+    <span hidden="{{notbool}}" title="{{name}}"><input type="checkbox" checked="{{value}}" on-click="_onCheckInput"></span>
+    <span hidden="{{notstring}}" title="{{title}}">{{value}}</span>
     <data-explorer hidden="{{notobject}}" object="{{object}}"></data-explorer>
   </right>
 </template>
