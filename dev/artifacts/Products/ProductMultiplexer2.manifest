@@ -8,6 +8,11 @@
 
 import 'Product.schema'
 
-particle AlsoOn in 'source/AlsoOn.js'
-  AlsoOn(in Product product, in [Product] choices)
+shape HostedParticleShape
+  HostedParticleShape(in Product product, in [~a] others)
   consume annotation
+
+particle ProductMultiplexer2 in 'source/ProductMultiplexer2.js'
+  ProductMultiplexer2(host HostedParticleShape hostedParticle, in [Product] products, in [~a] others)
+  consume set of annotation
+  description `${hostedParticle} for each product in ${products}`
