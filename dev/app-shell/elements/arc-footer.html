@@ -1,6 +1,5 @@
 <link rel="import" href="../../components/dancing-dots.html">
 <script src="../../components/x-toast.js"></script>
-<script src="../../components/suggestions-element.js"></script>
 
 <template>
   <style>
@@ -38,13 +37,18 @@
       <input value="{{searchText}}" on-input="_onSearchChange" on-blur="_onSearchDone">
       <i class="material-icons" on-click="_onSearchClick">search</i>
     </div>
-    <suggestions-element suggestions="{{suggestions}}" on-plan-selected="_onPlanSelected"></suggestions-element>
+    <slot></slot>
   </x-toast>
 </template>
 
 <script>
   class ArcFooter extends XenBase {
     static get observedAttributes() { return ['suggestions', 'dots', 'open', 'search']; }
+    _didMount() {
+      // TODO(sjmiles): this is a hack, repair asap. App should receive this event and
+      // communicate the new state to footer.
+      document.addEventListener('plan-choose', e => this._onPlanSelected(e, e.detail));
+    }
     _render(props, state) {
       return {
         dotsDisabled: props.dots == 'disabled',
