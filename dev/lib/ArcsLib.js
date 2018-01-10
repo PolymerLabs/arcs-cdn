@@ -6898,7 +6898,7 @@ class SlotComposer {
       this._contextById["root"] = options.rootContext;
     }
 
-    this._suggestionsContext = options.suggestionsContext;
+    this._suggestionsContext = options.suggestionsContext || this._contextById["suggestions"];
 
     this._slots = [];
   }
@@ -6942,7 +6942,8 @@ class SlotComposer {
       return;
     }
 
-    this._suggestionsContext.clear();
+    this._suggestionsContext.textContent = '';
+
     suggestions.forEach(async suggestion => {
       let suggestionContent =
         await suggestion.description.getRecipeSuggestion(this._getDescriptionFormatter());
@@ -6952,9 +6953,17 @@ class SlotComposer {
       }
 
       this._getSuggestionContext().createContext(
-          this._suggestionsContext.createSuggestionElement({hash: suggestion.hash, plan: suggestion.plan}),
-          suggestionContent);
+          this.createSuggestionElement(this._suggestionsContext, suggestion),
+          suggestionContent
+      );
     });
+  }
+
+  createSuggestionElement(container, plan) {
+    let suggest = Object.assign(document.createElement("suggestion-element"), {plan});
+    // TODO(sjmiles): LIFO is weird, iterate top-down elsewhere?
+    container.insertBefore(suggest, container.firstElementChild);
+    return suggest;
   }
 
   getSlot(particle, slotName) {
