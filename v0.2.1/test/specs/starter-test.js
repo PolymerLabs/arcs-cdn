@@ -111,7 +111,6 @@ function waitForVisible(selectors) {
 
 function dancingDotsElement() {
   return pierceShadowsSingle([
-    'arc-footer',
     'x-toast[app-footer]',
     'dancing-dots'
   ]);
@@ -235,7 +234,7 @@ function clickInParticles(slotName, selectors, textQuery) {
   waitForStillness();
 
   if (!selectors) selectors = [];
-  const realSelectors = ['arc-host', `div[slotid="${slotName}"]`].concat(
+  const realSelectors = ['div[arc-panel]', `div[slotid="${slotName}"]`].concat(
     selectors
   );
 
@@ -277,24 +276,18 @@ describe('test basic arcs functionality', function() {
     // TODO(smalls) should we create a user on the fly?
     // note - baseUrl (currently specified on the command line) must end in a
     // trailing '/', and this must not begin with a preceding '/'.
-    browser.url(`apps/web/?user=-L-YGQo_7f3izwPg6RBn`);
+    browser.url(
+      `apps/web/?solo=${browser.options.baseUrl}artifacts/canonical.manifest`
+    );
 
     assert.equal('Arcs', browser.getTitle());
 
-    // create a new arc, switch to that tab (toggling back to the first tab to
-    // reset the webdriver window state).
-    browser.waitForVisible('div[title="New Arc"]');
-    browser.click('div[title="New Arc"]');
-    browser.switchTab(browser.windowHandles().value[0]);
-    browser.switchTab(browser.windowHandles().value[1]);
-
     // wait for the page to load a bit, init the test harness for this page
-    browser.waitForVisible('<app-main>');
-    browser.waitForVisible('<footer>');
+    browser.waitForVisible('<app-shell>');
     loadSeleniumUtils();
 
     // check out some basic structure relative to the app footer
-    const footerPath = ['arc-footer', 'x-toast[app-footer]'];
+    const footerPath = ['x-toast[app-footer]'];
     assert.ok(pierceShadowsSingle(footerPath.slice(0, 1)).value);
     assert.ok(pierceShadowsSingle(footerPath).value);
 
@@ -305,13 +298,7 @@ describe('test basic arcs functionality', function() {
     // Our location is relative to where you are now, so this list is dynamic.
     // Rather than trying to mock this out let's just grab the first
     // restaurant.
-    const restaurantSelectors = particleSelectors('root', [
-      'div.item',
-      'div.title'
-    ]);
-    waitForVisible(restaurantSelectors);
-    let restaurantNodes = pierceShadows(restaurantSelectors);
-    browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
+    clickInParticles('root', ['div.item', 'div.title', 'span'], 'Tacolicious');
 
     acceptSuggestion(footerPath, 'Make a reservation');
     acceptSuggestion(footerPath, 'You are free');
