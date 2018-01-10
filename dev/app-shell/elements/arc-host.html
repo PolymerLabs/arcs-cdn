@@ -44,6 +44,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (props.plan && lastProps.plan !== props.plan) {
         this._applySuggestion(state.arc, props.plan);
       }
+      if (props.plans && lastProps.plans !== props.plans) {
+        state.slotComposer.setSuggestions(props.plans);
+      }
     }
     _intersectManifests(manifests, exclusions) {
       return manifests.filter(m => !exclusions.includes(m));
@@ -69,10 +72,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let context = await this._loadManifest(config, loader);
       // composer
       let slotComposer = new Arcs.SlotComposer({
-        rootContext: this,
+        rootContext: this.parentElement,
         affordance: config.affordance,
-        containerKind: config.containerKind
+        containerKind: config.containerKind,
+        suggestionsContext: config.suggestionsNode
       });
+      // capture composer so we can push suggestions there
+      this._state.slotComposer = slotComposer;
       // send urlMap to the Arc so worker-entry*.js can create mapping loaders
       let urlMap = loader._urlMap;
       // Arc!
