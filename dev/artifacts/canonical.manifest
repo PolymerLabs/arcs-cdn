@@ -10,3 +10,5 @@
 import 'Profile/Profile.recipes'
 import 'Events/Events.recipes'
 import 'Restaurants/Restaurants.recipes'
+
+import 'Products/Products.recipes'
