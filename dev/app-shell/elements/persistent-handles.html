@@ -34,7 +34,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           return;
         }
         state.watching.add(handleId);
-        let remoteHandleMeta = this._db.child(`handles/${handleId}`);
+        // TODO(wkorman): Rename `views` to `handles` below on the next database rebuild.
+        let remoteHandleMeta = this._db.child(`views/${handleId}`);
         // TODO(sjmiles): maybe not do this unless we have to (reducing FB thrash)
         remoteHandleMeta.child('metadata').update({
           type: Arcs.utils.metaTypeFromType(localHandle.type),
