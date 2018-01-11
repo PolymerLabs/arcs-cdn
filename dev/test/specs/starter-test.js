@@ -183,6 +183,9 @@ function initTestWithNewArc() {
   // reset the webdriver window state).
   createNewArc();
 
+  // use a solo URL pointing to our local recipes
+  browser.url(`${browser.getUrl()}&solo=${browser.options.baseUrl}artifacts/canonical.manifest`);
+
   // wait for the page to load a bit, init the test harness for this page
   browser.waitForVisible('<app-main>');
   browser.waitForVisible('<footer>');
@@ -334,11 +337,19 @@ describe('test Arcs demo flows', function() {
     acceptSuggestion('You are free');
 
     browser.close();
+
     // to drop into debug mode with a REPL; also a handy way to see the state
     // at the end of the test:
-    // browser.debug();
+    //browser.debug();
+
+    // if you'd like to see the browser logs (you suspect an error, for
+    // instance):
+    //browser.log('browser').value.forEach(log => {
+    //  console.log(`${log.level}:${log.source}:${log.message}`);
+    //});
   });
 
+  /*
   it('can use the gift shopping demo flow', function() {
     initTestWithNewArc();
 
@@ -369,4 +380,5 @@ describe('test Arcs demo flows', function() {
 
     browser.close();
   });
+  */
 });
