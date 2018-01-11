@@ -127,14 +127,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <persistent-users on-users="_onUsers"></persistent-users>
     <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
     <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
-    <persistent-views arc="{{arc}}" key="{{key}}"></persistent-views>
-    <remote-profile-views arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-views>
-    <remote-shared-views arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-views>
-    <remote-friends-profiles-views arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-views>
-    <arc-view arc="{{arc}}" data="{{arcsViewData}}" options="{{arcsViewOptions}}" on-view="_onArcsView"></arc-view>
-    <arc-view arc="{{arc}}" data="{{identityViewData}}" options="{{identityViewOptions}}" on-view="_onIdentityView"></arc-view>
-    <arc-view arc="{{arc}}" data="{{identitiesViewData}}" options="{{identitiesViewOptions}}" on-view="_onIdentitiesView"></arc-view>
-    <arc-view arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarViewOptions}}"></arc-view>
+    <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles>
+    <remote-profile-handles arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-handles>
+    <remote-shared-handles arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-handles>
+    <remote-friends-profiles-handles arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-handles>
+    <arc-handle arc="{{arc}}" data="{{arcsHandleData}}" options="{{arcsHandleOptions}}" on-handle="_onArcsHandle"></arc-handle>
+    <arc-handle arc="{{arc}}" data="{{identityHandleData}}" options="{{identityHandleOptions}}" on-handle="_onIdentityHandle"></arc-handle>
+    <arc-handle arc="{{arc}}" data="{{identitiesHandleData}}" options="{{identitiesHandleOptions}}" on-handle="_onIdentitiesHandle"></arc-handle>
+    <arc-handle arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarHandleOptions}}"></arc-handle>
     <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
     <!-- only for launcher -->
     <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
@@ -195,25 +195,25 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let typesPath = `${cdnPath}/app-shell/artifacts`;
       return {
         cdnPath,
-        arcsViewOptions: {
+        arcsHandleOptions: {
           schemas: `${typesPath}/arc-types.manifest`,
           type: '[ArcMetadata]',
           name: 'ArcMetadata',
           tags: ['#arcmetadata']
         },
-        identityViewOptions: {
+        identityHandleOptions: {
           schemas: `${typesPath}/identity-types.manifest`,
           type: 'Person',
           name: 'User',
           tags: ['#user']
         },
-        identitiesViewOptions: {
+        identitiesHandleOptions: {
           schemas: `${typesPath}/identity-types.manifest`,
           type: '[Person]',
           name: 'Identities',
           tags: ['#identities']
         },
-        friendsAvatarViewOptions: {
+        friendsAvatarHandleOptions: {
           schemas: `${typesPath}/identity-types.manifest`,
           type: '[Avatar]',
           name: 'FRIENDS_PROFILE_avatar',
@@ -239,13 +239,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       window.users = state.users;
       state.appState = state;
       //
-      if (state.arc && state.user && (state.user !== lastState.user || !state.identityViewData
+      if (state.arc && state.user && (state.user !== lastState.user || !state.identityHandleData
           || state.geoCoords !== lastState.geoCoords)) {
-        state.identityViewData = this._synthesizeIdentityViewData(
+        state.identityHandleData = this._synthesizeIdentityHandleData(
             state.arc, state.user, state.geoCoords);
       }
-      if (state.users && (state.users !== lastState.users || !state.identitiesViewData)) {
-        state.identitiesViewData = this._sythesizeIdentitiesViewData(state.users);
+      if (state.users && (state.users !== lastState.users || !state.identitiesHandleData)) {
+        state.identitiesHandleData = this._sythesizeIdentitiesHandleData(state.users);
       }
       if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
         state.plan = state.plans[0].plan;
@@ -334,7 +334,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       return models;
     }
-    _synthesizeIdentityViewData(arc, user, geoCoords) {
+    _synthesizeIdentityHandleData(arc, user, geoCoords) {
       return {
         id: user.id,
         name: user.name,
@@ -344,7 +344,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         } : null
       };
     }
-    _sythesizeIdentitiesViewData(users) {
+    _sythesizeIdentitiesHandleData(users) {
       return Object.keys(users).map(id => {
         return {
           id: id,
@@ -353,8 +353,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       });
     }
     /*
-    _hasViews(state) {
-      return Boolean(state.arcsView && state.identityView && state.identitiesView);
+    _hasHandles(state) {
+      return Boolean(state.arcsHandle && state.identityHandle && state.identitiesHandle);
     }
     */
     _setIfDirty(object) {
@@ -505,7 +505,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           color: 'black',
           href: `?arc=*&user=${user.id}`
         });
-        this._setState({arcsViewData: data});
+        this._setState({arcsHandleData: data});
       }
     }
     _onFriends(e, friends) {
@@ -523,24 +523,24 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         this._modifyProfileState(true);
       }
     }
-    async _onArcsView(e, arcsView) {
-      this._installSyntheticView('arcsView', arcsView);
-      let visitedArcs = await Arcs.utils.getViewData(arcsView);
+    async _onArcsHandle(e, arcsHandle) {
+      this._installSyntheticHandle('arcsHandle', arcsHandle);
+      let visitedArcs = await Arcs.utils.getHandleData(arcsHandle);
       this._setState({visitedArcs});
       ArcApp.log('visitedArcs: ', visitedArcs);
     }
-    _onIdentityView(e, identityView) {
-      this._installSyntheticView('identityView', identityView);
+    _onIdentityHandle(e, identityHandle) {
+      this._installSyntheticHandle('identityHandle', identityHandle);
     }
-    _onIdentitiesView(e, identitiesView) {
-      this._installSyntheticView('identitiesView', identitiesView);
+    _onIdentitiesHandle(e, identitiesHandle) {
+      this._installSyntheticHandle('identitiesHandle', identitiesHandle);
     }
-    _installSyntheticView(name, view) {
-      ArcApp.log(name, view);
+    _installSyntheticHandle(name, handle) {
+      ArcApp.log(name, handle);
       let state = {
         plans: null
       };
-      state[name] = view;
+      state[name] = handle;
       this._setState(state);
     }
     _onMetadata(e, metadata) {

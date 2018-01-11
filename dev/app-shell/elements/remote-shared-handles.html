@@ -8,7 +8,7 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 <script>
-  class RemoteSharedViews extends XenBase {
+  class RemoteSharedHandles extends XenBase {
     static get observedAttributes() { return ['arc','friends','user']; }
     _getInitialState() {
       return {
@@ -25,48 +25,48 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           // TODO(sjmiles): is adding 'user' to 'friends' copacetic?
           friends.push({id: user.id});
           watches = this._watchFriends(props.arc, friends, props.user, state.groups)
-          RemoteSharedViews.log(`watching (raw) FRIENDS`, friends);
+          RemoteSharedHandles.log(`watching (raw) FRIENDS`, friends);
         }
         state.group.watches = watches;
       }
     }
     _watchFriends(arc, friends, user, groups) {
       return friends.map(friend => {
-        //RemoteSharedViews.log(`watching friend's [${friend.id}] shared views`);
+        //RemoteSharedHandles.log(`watching friend's [${friend.id}] shared handles`);
         let group = Object.assign(new WatchGroup(), {db});
         return {
           path: `users/${friend.id}`,
           handler: snap => {
-            group.watches = this._watchSharedViews(arc, user, snap.val());
+            group.watches = this._watchSharedHandles(arc, user, snap.val());
           },
           group
         }
       });
     }
-    _watchSharedViews(arc, user, sharer) {
+    _watchSharedHandles(arc, user, sharer) {
       //let remotes = Arcs.utils.getUserProfileKeys(sharer);
       let remotes = Arcs.utils.getUserShareKeys(sharer);
-      RemoteSharedViews.log(`watching [${sharer.name}]'s shared arcs`, remotes);
+      RemoteSharedHandles.log(`watching [${sharer.name}]'s shared arcs`, remotes);
       return remotes.map(key => {
         return {
           // TODO(sjmiles): path is technically not firebase specific
-          path: `arcs/${key}/views`,
+          path: `arcs/${key}/handles`,
           // TODO(sjmiles): firebase knowledge here, maybe push down into watchGroup
-          handler: snapshot => this._remoteViewsChanged(arc, key, snapshot.val())
+          handler: snapshot => this._remoteHandlesChanged(arc, key, snapshot.val())
         }
       });
     }
-    _remoteViewsChanged(arc, arcKey, views) {
-      if (views) {
-        Object.keys(views).forEach(key => {
-          let view = views[key];
-          RemoteSharedViews.log(`remoteViewsChanged`, view.metadata.tags);
-          Arcs.utils.createOrUpdateView(arc, view, `SHARED[${arcKey}]`);
+    _remoteHandlesChanged(arc, arcKey, handles) {
+      if (handles) {
+        Object.keys(handles).forEach(key => {
+          let handle = handles[key];
+          RemoteSharedHandles.log(`remoteHandlesChanged`, handle.metadata.tags);
+          Arcs.utils.createOrUpdateHandle(arc, handle, `SHARED[${arcKey}]`);
         });
       }
     }
   }
-  RemoteSharedViews.module = document.currentImport;
-  RemoteSharedViews.log = XenBase.logFactory('RemoteSVs', '#c79400');
-  customElements.define('remote-shared-views', RemoteSharedViews);
+  RemoteSharedHandles.module = document.currentImport;
+  RemoteSharedHandles.log = XenBase.logFactory('RemoteSHs', '#c79400');
+  customElements.define('remote-shared-handles', RemoteSharedHandles);
 </script>

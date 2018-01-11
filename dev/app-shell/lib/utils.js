@@ -82,26 +82,26 @@ let utils = {
   removeUndefined(object) {
     return JSON.parse(JSON.stringify(object));
   },
-  async createOrUpdateView(arc, remoteView, idPrefix) {
-    let {metadata, values} = remoteView;
+  async createOrUpdateHandle(arc, remoteHandle, idPrefix) {
+    let {metadata, values} = remoteHandle;
     // construct type object
     let type = Arcs.utils.typeFromMetaType(metadata.type);
     // construct id
-    let id = Arcs.utils.getContextViewId(type, metadata.tags, idPrefix);
-    // find or create a view in the arc context
-    let view = await Arcs.utils._requireView(arc, type, metadata.name, id, metadata.tags);
-    await Arcs.utils.setViewData(view, values);
-    return view;
+    let id = Arcs.utils.getContextHandleId(type, metadata.tags, idPrefix);
+    // find or create a handle in the arc context
+    let handle = await Arcs.utils._requireHandle(arc, type, metadata.name, id, metadata.tags);
+    await Arcs.utils.setHandleData(handle, values);
+    return handle;
   },
-  // Returns the context view id for the given params.
-  getContextViewId(type, tags, prefix) {
+  // Returns the context handle id for the given params.
+  getContextHandleId(type, tags, prefix) {
     return ''
       + (prefix ? `${prefix}_` : '')
       + (`${type.toString().replace(' ', '-')}_`).replace(/[\[\]]/g, '!')
       + ((tags && [...tags].length) ? `${[...tags].sort().join('-').replace(/#/g, '')}` : '')
       ;
   },
-  _getViewDescription(name, tags, user, owner) {
+  _getHandleDescription(name, tags, user, owner) {
       let noun = (user === owner) ? 'my' : `<b>${owner}'s</b>`;
       if (tags && tags.length) {
         return `${noun} ${tags[0].substring(1)}`;
@@ -110,13 +110,13 @@ let utils = {
         return `${noun} ${name}`;
       }
   },
-  async _requireView(arc, type, name, id, tags) {
-    let view = arc.context.findViewById(id);
-    if (!view) {
-      view = await arc.context.newView(type, name, id, tags);
-      Arcs.utils.log('synthesized view', id, tags);
+  async _requireHandle(arc, type, name, id, tags) {
+    let handle = arc.context.findViewById(id);
+    if (!handle) {
+      handle = await arc.context.newView(type, name, id, tags);
+      Arcs.utils.log('synthesized handle', id, tags);
     }
-    return view;
+    return handle;
   },
   metaTypeFromType(type) {
     return JSON.stringify(type ? type.toLiteral() : null);
@@ -124,39 +124,27 @@ let utils = {
   typeFromMetaType(metaType) {
     return Arcs.Type.fromLiteral(JSON.parse(metaType));
   },
-  isViewDirty(view, data) {
-    if (view.toList) {
-      // list is dirty if the length has changed
-      return (view._items.size !== data.length) ||
-        // ... or there is a record that doesn't exist in the original list (by id)
-        // TOOD(sjmiles): if an entity can mutate without changing id, we may have to do additional
-        // dirty checking here (entity version check would be a nice alternative to full equality testing).
-        data.some(datum => !view._items.has(datum.id));
-    } else {
-      return view.id !== data.id;
-    }
+  async getHandleData(handle) {
+    return handle.toList ? await handle.toList() : {id: handle.id, rawData: handle._stored && handle._stored.rawData || {}};
   },
-  async getViewData(view) {
-    return view.toList ? await view.toList() : {id: view.id, rawData: view._stored && view._stored.rawData || {}};
+  async setHandleData(handle, data) {
+    await this.clearHandle(handle);
+    this.addHandleData(handle, data);
   },
-  async setViewData(view, data) {
-    await this.clearView(view);
-    this.addViewData(view, data);
-  },
-  async clearView(view) {
-    if (view.toList) {
-      let entities = await view.toList();
-      entities.forEach(e => view.remove(e.id));
+  async clearHandle(handle) {
+    if (handle.toList) {
+      let entities = await handle.toList();
+      entities.forEach(e => handle.remove(e.id));
     } else {
       // TODO(sjmiles): necessary? correct semantics?
-      view.clear();
+      handle.clear();
     }
   },
-  addViewData(view, data) {
-    if (view.toList) {
-      data && Object.values(data).forEach(e => view.store(e));
+  addHandleData(handle, data) {
+    if (handle.toList) {
+      data && Object.values(data).forEach(e => handle.store(e));
     } else {
-      view.set(data);
+      handle.set(data);
     }
   },
   getUserProfileKeys(user) {
