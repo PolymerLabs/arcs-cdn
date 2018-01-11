@@ -137,8 +137,8 @@ function _waitForSuggestionsDrawerToBeOpen() {
     browser.waitUntil(
       () => {
         const footer = pierceShadowsSingle(footerPath);
-        const open = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
-        return open.value;
+        const isOpen = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
+        return isOpen.value;
       },
       500,
       `the suggestions drawer was never open`,
@@ -222,18 +222,12 @@ function acceptSuggestion(textSubstring) {
   waitForStillness();
   let footerPath = getFooterPath();
 
-  const suggestionsRoot = pierceShadowsSingle(
-    footerPath.concat(['suggestions-element'])
-  );
-  const suggestionsDiv = pierceShadowsSingle(
-    footerPath.concat(['suggestions-element', 'div'])
-  );
   browser.waitUntil(
     () => {
-      const allSuggestions = browser.elementIdElements(
-        suggestionsDiv.value.ELEMENT,
-        'suggest'
-      );
+      const allSuggestions = pierceShadows([
+        'div[slotid="suggestions"]',
+        'suggestion-element'
+      ]);
       if (!allSuggestions.value || 0 == allSuggestions.value) {
         return false;
       }
