@@ -29,7 +29,7 @@ defineParticle(({DomParticle, resolver}) => {
       return template;
     }
     _willReceiveProps(props, state) {
-      if (props.restaurants && props.location && !state.count) {
+      if (props.restaurants && !state.count) {
         this._fetchPlaces(props.location);
       }
     }
@@ -44,7 +44,6 @@ defineParticle(({DomParticle, resolver}) => {
         .then(places => this._receivePlaces(places));
     }
     _receivePlaces(places) {
-      //console.log("_receivePlaces = ", places.results);
       let restaurants = this._views.get('restaurants');
       let Restaurant = restaurants.entityClass;
       places.results.forEach(p => {
