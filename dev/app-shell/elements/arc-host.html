@@ -21,7 +21,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 <script>
   class ArcHost extends XenBase {
     static get observedAttributes() {
-      return ['config','plans','plan','manifests','exclusions'];
+      return ['config','plans','plan','manifests','exclusions','arckey'];
     }
     _getInitialState() {
       return {
@@ -32,10 +32,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       if (props.manifests && props.exclusions) {
         state.effectiveManifests = this._intersectManifests(props.manifests, props.exclusions);
       }
-      if (props.config && props.config !== state.config && state.effectiveManifests) {
+      if (props.config && props.config !== state.config && state.effectiveManifests && props.arckey) {
         state.config = props.config;
         state.config.manifests = state.effectiveManifests;
-        this._applyConfig(state.config)
+        state.config.arcKey = props.arckey;
+        this._applyConfig(state.config);
       }
       else if (state.arc && (props.manifests !== lastProps.manifests || props.exclusions != lastProps.exclusions)) {
         ArcHost.log('reloading')
@@ -61,7 +62,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       arc.makeSuggestions = async () => { this._schedulePlanning(state); }
       ArcHost.log('instantiated', arc);
       this._setState({arc});
-      this._fire('arc', arc)
+      this._fire('arc', arc);
     }
     async _createArc(config) {
       // make an id
@@ -83,7 +84,11 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       // send urlMap to the Arc so worker-entry*.js can create mapping loaders
       let urlMap = loader._urlMap;
       // Arc!
-      return Arcs.utils.createArc({id, urlMap, slotComposer, context, loader});
+      const database = 'arcs-storage.firebaseio.com';
+      const apiKey = 'AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8';
+      const dbVersion = '0_3_4';
+      const storageKey = `firebase://${database}/${apiKey}/${dbVersion}/arcs/${config.arcKey}/handles`;
+      return Arcs.utils.createArc({id, urlMap, slotComposer, context, loader, storageKey});
     }
     _marshalLoader(config) {
       // create default URL map

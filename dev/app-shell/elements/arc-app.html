@@ -127,7 +127,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <persistent-users on-users="_onUsers"></persistent-users>
     <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
     <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
-    <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles>
+    <!-- <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles> -->
     <remote-profile-handles arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-handles>
     <remote-shared-handles arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-handles>
     <remote-friends-profiles-handles arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-handles>
@@ -155,7 +155,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         </div>
       </app-toolbar>
     </toolbar>
-    <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+    <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" arckey="{{key}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
       <div slotid="toproot"></div>
       <div slotid="root"></div>
     </arc-host>
