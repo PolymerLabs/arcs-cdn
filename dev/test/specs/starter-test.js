@@ -354,8 +354,9 @@ describe('test Arcs demo flows', function() {
     allSuggestions();
 
     acceptSuggestion(
-      'Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire\'s wishlist (Book: How to Draw plus 2 other items)'
+      'Show products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on products from your browsing context and Claire\'s wishlist (Book: How to Draw plus 2 other items)'
     );
+
     browser.waitForVisible('div[slotid="action"]');
     browser.waitForVisible('div[slotid="annotation"]');
 
@@ -363,12 +364,12 @@ describe('test Arcs demo flows', function() {
     // (1) verify product was moved,
     // (2) verify 'action' slot is not visible after all products were moved.
 
-    acceptSuggestion('Estimate arrival dates, estimate arrival dates'); // TODO: add 'and buy gifts for Claire' when descriptions are fixed.
+    acceptSuggestion('Buy gifts for Claire, estimate arrival date for each product');
     acceptSuggestion(
-      'Check manufacturer information for Products from your browsing context'
+      'check manufacturer information for each product in products from your browsing context'
     );
     acceptSuggestion(
-      'Recommendations based on Products recommended based on Products from your browsing context'
+      'Recommendations based on products from your browsing context'
       // TODO: add 'and Claire\'s wishlist' when regex is supported.
     );
 

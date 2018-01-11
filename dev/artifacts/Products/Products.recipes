@@ -7,8 +7,82 @@
 
 import 'Product.schema'
 import 'ShowProducts.manifest'
+import 'Recommend.manifest'
+import 'Chooser.manifest'
+import 'GiftList.manifest'
+import 'Interests.manifest'
+import 'ProductMultiplexer.manifest'
+import 'ProductMultiplexer2.manifest'
+import 'AlsoOn.manifest'
+import 'Arrivinator.manifest'
+import 'ManufacturerInfo.manifest'
 
+# Create shortlist with [product, ...]
 recipe
-  copy as shortlist
+   ShowProducts
+
+# See [person]'s wishlist
+recipe
+  map #wishlist as wishlist
+  ShowProducts
+    list <- wishlist
+
+# Create shortlist with [product, ...] and suggest similar products from [person]'s wish list
+recipe
+  Chooser.choices -> Recommend.recommendations
+  #Chooser.resultList -> ManageProducts.list
+  Chooser.resultList -> ShowProducts.list
+  Chooser.resultList -> Recommend.known
+  Chooser.resultList -> ProductMultiplexer2.products
+  Chooser.choices -> ProductMultiplexer2.others
+  map #wishlist as wishlist
+  copy #shortlist as shortlist
+  slot as slot0
+  Recommend
+    population <- wishlist
   ShowProducts
     list <- shortlist
+  #ManageProducts
+    #list = shortlist
+    consume root as slot0
+      provide annotation as slot1
+  ProductMultiplexer2
+    hostedParticle = AlsoOn
+    consume annotation as slot1
+
+# Buying for [person]'s [occasion] in [timeframe]? Product [X] arrives too late.
+recipe
+  map as view1
+  use as view2
+  use as view3
+  GiftList
+    person <- view1
+  ProductMultiplexer
+    products <- view2
+    hostedParticle = Arrivinator
+  ProductMultiplexer
+    products <- view3
+    hostedParticle = Arrivinator
+
+# Check manufacturer information for products.
+recipe
+  use #shortlist as shortlist
+  ProductMultiplexer
+    products <- shortlist
+    hostedParticle <- ManufacturerInfo
+
+# TODO: Check for newer versions, e.g. there is a new version of [product].
+# TODO: [Manufacturer] recommends [product] instead of [product] for 13 year olds.
+# TODO: See awards, e.g. [product] winning the [award].
+
+# Recommendations based on Claire's interest in field hockey.
+recipe
+  Interests
+
+# TODO: move these to separate manifests for claire's wishlist / page
+view PageProducts of [Product] #shortlist in 'https://mmandlis.github.io/arcs-stories/0.3.1/Products/data/products.json'
+  description `products from your browsing context`
+view ClairesWishlist of [Product] #wishlist in 'https://mmandlis.github.io/arcs-stories/0.3.1/Products/data/wishlist.json'
+  description `Claire's wishlist`
+view APerson of Person in 'https://mmandlis.github.io/arcs-stories/0.3.1/Products/data/people.json'
+#view ThePeople of Person in 'https://mmandlis.github.io/arcs-stories/0.2/Products/data/people.json'
