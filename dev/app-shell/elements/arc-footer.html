@@ -96,7 +96,7 @@
       if (!term) {
         // empty string = show suggestions matching current slots, i.e.
         // suggestions furthering current flow, but not those just appending
-        // TODO(seefeld): Also add suggestions based on in-arc views?
+        // TODO(seefeld): Also add suggestions based on in-arc handles?
         return plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
       } else if (term === '*' || term.length <= 2) {
         return plans;
