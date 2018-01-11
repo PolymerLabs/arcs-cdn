@@ -31,7 +31,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       return profiles.map(key => {
         return {
           // TODO(sjmiles): path is technically not firebase specific
-          path: `arcs/${key}/handles`,
+          // TODO(wkorman): Rename `views` to `handles` below on the next database rebuild.
+          path: `arcs/${key}/views`,
           // TODO(sjmiles): firebase knowledge here
           handler: snapshot => this._remoteHandlesChanged(arc, friends, snapshot.key, snapshot.val())
         }
