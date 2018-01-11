@@ -160,7 +160,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       <div slotid="root"></div>
     </arc-host>
     <footer hidden="{{hideFooter}}">
-      <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" suggestions="{{plans}}" on-suggest="_onSuggest" on-search="_onMakeSuggestions"></arc-footer>
+      <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" on-suggest="_onSuggest" on-search="_onMakeSuggestions">
+        <div slotid="suggestions"></div>
+      </arc-footer>
     </footer>
   </app-main>
   <app-tools>
@@ -410,6 +412,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         user = this._newUserPrompt();
         ArcApp.log('new user', user);
       }
+      //config.suggestionsNode = this.querySelector('suggestions-element');
       this._setState({config, key, userId, user, arcsToolsVisible: config.arcsToolsVisible});
     }
     _onToggleIlluminate() {
