@@ -29,7 +29,7 @@ class PersistentHandles extends XenBase {
       if (tags && tags.has('#nosync')) {
         return;
       }
-      let handleId = Arcs.utils.getContextHandleId(localHandle.type, tags);
+      let handleId = ArcsUtils.getContextHandleId(localHandle.type, tags);
       if (state.watching.has(handleId)) {
         return;
       }
@@ -38,7 +38,7 @@ class PersistentHandles extends XenBase {
       let remoteHandleMeta = this._db.child(`views/${handleId}`);
       // TODO(sjmiles): maybe not do this unless we have to (reducing FB thrash)
       remoteHandleMeta.child('metadata').update({
-        type: Arcs.utils.metaTypeFromType(localHandle.type),
+        type: ArcsUtils.metaTypeFromType(localHandle.type),
         name: localHandle.name || null,
         tags: [...tags]
       });
@@ -68,7 +68,7 @@ class PersistentHandles extends XenBase {
         initialLoad = false;
         localVariable.on('change', change => {
           if (change.data && change.data.id.startsWith(arc.id)) {
-            remoteVariable.set(Arcs.utils.removeUndefined(change.data));
+            remoteVariable.set(ArcsUtils.removeUndefined(change.data));
           } else if (change.data === undefined) {
             remoteVariable.remove();
           }
@@ -102,7 +102,7 @@ class PersistentHandles extends XenBase {
           change.add.forEach(a => {
             // Only store changes that were made locally.
             if (a.id.startsWith(arc.id)) {
-              remoteSet.push(Arcs.utils.removeUndefined(a));
+              remoteSet.push(ArcsUtils.removeUndefined(a));
             }
           });
         } else if (change.remove) {

@@ -50,7 +50,7 @@ class RemoteFriendsProfileHandles extends XenBase {
     let user = snap.val();
     RemoteFriendsProfileHandles.log(`READING friend's user [${user.name}]`); // from`, String(snap.ref));
     // find keys for user's profile arcs
-    return Arcs.utils.getUserProfileKeys(user).map(key => {
+    return ArcsUtils.getUserProfileKeys(user).map(key => {
       //RemoteFriendsProfileHandles.log(`watching friend's [${user.name}] profile handles`); // from`, String(snap.ref));
       return {
         node: db.child(`arcs/${key}/handles`),
@@ -71,7 +71,7 @@ class RemoteFriendsProfileHandles extends XenBase {
       let tagString = (tags && tags.length ? `${tags.sort().join('_').replace(/#/g, '')}` : '');
       let id = `FRIENDS_PROFILE_${tagString}`;
       // TODO(sjmiles): not always a SetView is it?
-      let arcsType = Arcs.utils.typeFromMetaType(type).setViewOf();
+      let arcsType = ArcsUtils.typeFromMetaType(type).setViewOf();
       if (values) {
         let handle = await this._requireHandle(arc, id, arcsType, id, [`#friends_${tagString}`]);
         // TODO(sjmiles): how to know if `values` represents a SetView or Entity?
@@ -88,7 +88,7 @@ class RemoteFriendsProfileHandles extends XenBase {
             rawData: v.rawData
           };
         });
-        Arcs.utils.addHandleData(handle, data);
+        ArcsUtils.addHandleData(handle, data);
         RemoteFriendsProfileHandles.log(`merged friend's profile handle [${id}]`); //, id, handle, data);
       }
     });

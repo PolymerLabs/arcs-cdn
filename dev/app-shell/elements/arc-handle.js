@@ -59,7 +59,7 @@ class ArcHandle extends XenBase {
     } else {
       data = {id: arc.generateID(), rawData: data};
     }
-    Arcs.utils.setHandleData(handle, data);
+    ArcsUtils.setHandleData(handle, data);
   }
 }
 ArcHandle.log = XenBase.logFactory('ArcHandle', '#c6a700');

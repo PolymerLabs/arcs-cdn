@@ -18,6 +18,9 @@ import "../components/arc-tools/shell-particles.js";
 import "../components/simple-tabs.js";
 import "../components/suggestion-element.js";
 
+// Arcs helpers.
+import "./lib/arcs-utils.js";
+
 // Elements.
 import "./elements/arc-config.js";
 import "./elements/arc-footer.js";

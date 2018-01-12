@@ -58,7 +58,7 @@ class PersistentArc extends XenBase {
     let icons = ['settings','movie','new_releases','high_quality','room_service','casino','child_care','spa','kitchen'];
     let colors = ['darkred','darkblue','darkgreen','darkorange','black'];
     let data = {
-      description: Arcs.utils.randomName(),
+      description: ArcsUtils.randomName(),
       icon: icons[Math.floor(Math.random()*icons.length)],
       color: colors[Math.floor(Math.random()*colors.length)],
       externalManifest: this._getExternalManifest()

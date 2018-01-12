@@ -46,8 +46,8 @@ class RemoteSharedHandles extends XenBase {
     });
   }
   _watchSharedHandles(arc, user, sharer) {
-    //let remotes = Arcs.utils.getUserProfileKeys(sharer);
-    let remotes = Arcs.utils.getUserShareKeys(sharer);
+    //let remotes = ArcsUtils.getUserProfileKeys(sharer);
+    let remotes = ArcsUtils.getUserShareKeys(sharer);
     RemoteSharedHandles.log(`watching [${sharer.name}]'s shared arcs`, remotes);
     return remotes.map(key => {
       return {
@@ -64,7 +64,7 @@ class RemoteSharedHandles extends XenBase {
       Object.keys(handles).forEach(key => {
         let handle = handles[key];
         RemoteSharedHandles.log(`remoteHandlesChanged`, handle.metadata.tags);
-        Arcs.utils.createOrUpdateHandle(arc, handle, `SHARED[${arcKey}]`);
+        ArcsUtils.createOrUpdateHandle(arc, handle, `SHARED[${arcKey}]`);
       });
     }
   }

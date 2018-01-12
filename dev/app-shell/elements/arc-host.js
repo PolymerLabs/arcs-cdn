@@ -65,7 +65,7 @@ class ArcHost extends XenBase {
   }
   async _createArc(config) {
     // make an id
-    let id = 'demo-' + Arcs.utils.randomId();
+    let id = 'demo-' + ArcsUtils.randomId();
     // create a system loader
     let loader = this._marshalLoader(config);
     // load manifest
@@ -83,11 +83,11 @@ class ArcHost extends XenBase {
     // send urlMap to the Arc so worker-entry*.js can create mapping loaders
     let urlMap = loader._urlMap;
     // Arc!
-    return Arcs.utils.createArc({id, urlMap, slotComposer, context, loader});
+    return ArcsUtils.createArc({id, urlMap, slotComposer, context, loader});
   }
   _marshalLoader(config) {
     // create default URL map
-    let urlMap = Arcs.utils.createUrlMap(config.root);
+    let urlMap = ArcsUtils.createUrlMap(config.root);
     // create a system loader
     // TODO(sjmiles): `pecFactory` creates loader objects (via worker-entry*.js) for the innerPEC,
     // but we have to create one by hand for manifest loading
@@ -101,10 +101,10 @@ class ArcHost extends XenBase {
   async _loadManifest(config, loader) {
     let manifest, {folder, content} = this._fetchManifestContent(config);
     try {
-      manifest = await Arcs.utils.parseManifest(`${folder}/`, content, loader);
+      manifest = await ArcsUtils.parseManifest(`${folder}/`, content, loader);
     } catch(x) {
       console.warn(x);
-      manifest = Arcs.utils.parseManifest(`${folder}/`, '', loader);
+      manifest = ArcsUtils.parseManifest(`${folder}/`, '', loader);
     }
     return manifest;
   }
@@ -150,7 +150,7 @@ class ArcHost extends XenBase {
     this._fire('plans', plans);
   }
   async _plan(arc) {
-    return await Arcs.utils.makePlans(arc, 5000) || [];
+    return await ArcsUtils.makePlans(arc, 5000) || [];
   }
   async _applySuggestion(arc, plan) {
     // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,

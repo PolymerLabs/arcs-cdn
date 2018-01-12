@@ -29,7 +29,7 @@ class RemoteProfileHandles extends XenBase {
     }
   }
   _watchProfileHandles(user, arc, friends) {
-    let profiles = Arcs.utils.getUserProfileKeys(user);
+    let profiles = ArcsUtils.getUserProfileKeys(user);
     return profiles.map(key => {
       return {
         // TODO(sjmiles): path is technically not firebase specific
@@ -47,7 +47,7 @@ class RemoteProfileHandles extends XenBase {
       Object.keys(remotes).forEach(async key => {
         // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _handle_ keys
         // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
-        let handle = await Arcs.utils.createOrUpdateHandle(arc, remotes[key], 'PROFILE');
+        let handle = await ArcsUtils.createOrUpdateHandle(arc, remotes[key], 'PROFILE');
         RemoteProfileHandles.log('created/updated handle', handle.id);
         this._synthesizeFriendsHandle(friends, handle);
         //this._fire('handle', {handle});
@@ -64,7 +64,7 @@ class RemoteProfileHandles extends XenBase {
     }
   }
   async _friendsHandleChanged(handle) {
-    let data = await Arcs.utils.getHandleData(handle);
+    let data = await ArcsUtils.getHandleData(handle);
     RemoteProfileHandles.log('FRIENDS handle changed:', data);
     this._fire('friends', data);
   }
