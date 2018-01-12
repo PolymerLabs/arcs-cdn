@@ -1,4 +1,4 @@
-<!--
+/*
 @license
 Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
@@ -6,13 +6,16 @@ The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
 The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
--->
+*/
 
-<link rel="import" href="../strategy-explorer/strategy-explorer.html"></link>
-<!--<link rel="import" href="arc-explorer.html"></link>-->
+document.body.appendChild(Object.assign(document.createElement('link'), {
+  rel: 'import',
+  href: `${shellPath}/../components/strategy-explorer/strategy-explorer.html`
+}));
+// <link rel="import" href="arc-explorer.html"></link>
 
-<style>
-  .explorer {
+document.head.appendChild(Object.assign(document.createElement('style'), {innerText:
+  `.explorer {
     display: none;
     background-color: white;
     top: 0;
@@ -20,10 +23,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     height: 100%;
     position: fixed;
     z-index: 2000;
-  }
-</style>
+  }`
+}));
 
-<script>
 (function() {
 
   let explorer = document.body.appendChild(document.createElement('strategy-explorer'));
@@ -59,4 +61,3 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 })();
-</script>
