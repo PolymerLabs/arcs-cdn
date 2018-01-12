@@ -1,7 +1,8 @@
-import Xen from "../components/xen/xen.js";
-import TB from "../components/toggle-button.js";
-import ST from "../components/simple-tabs.js";
+import "../components/xen/xen.js";
+import "../components/toggle-button.js";
+import "../components/simple-tabs.js";
 import "../components/suggestion-element.js";
+import "./elements/arc-store.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',
