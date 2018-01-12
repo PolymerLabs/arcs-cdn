@@ -25,6 +25,7 @@ import "./elements/arc-steps.js";
 import "./elements/arc-store.js";
 import "./elements/persistent-arc.js";
 import "./elements/persistent-handles.js";
+import "./elements/persistent-manifests.js";
 import "./elements/persistent-user.js";
 import "./elements/persistent-users.js";
 
