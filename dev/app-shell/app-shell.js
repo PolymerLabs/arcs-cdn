@@ -30,6 +30,8 @@ import "./elements/persistent-user.js";
 import "./elements/persistent-users.js";
 import "./elements/remote-friends-profile-handles.js";
 import "./elements/remote-profile-handles.js";
+import "./elements/remote-shared-handles.js";
+import "./elements/remote-visited-arcs.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',
