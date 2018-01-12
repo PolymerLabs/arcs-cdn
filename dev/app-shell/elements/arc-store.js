@@ -8,9 +8,12 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import "https://www.gstatic.com/firebasejs/4.2.0/firebase-app.js";
+import firebase from "../../../node_modules/@firebase/app/dist/esm/index.js";
+import '../../../node_modules/@firebase/database/dist/esm/index.js';
+
+//import "https://www.gstatic.com/firebasejs/4.2.0/firebase-app.js";
 //import "https://www.gstatic.com/firebasejs/4.2.0/firebase-auth.js";
-import "https://www.gstatic.com/firebasejs/4.2.0/firebase-database.js";
+//import "https://www.gstatic.com/firebasejs/4.2.0/firebase-database.js";
 
 //let version = typeof Arcs === 'undefined' || !Arcs.version ? '/' : Arcs.version.replace(/\./g, '_');
 let db_version = '0_3_beta_3';
