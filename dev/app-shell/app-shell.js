@@ -22,6 +22,7 @@ import "../components/suggestion-element.js";
 import "./elements/arc-config.js";
 import "./elements/arc-footer.js";
 import "./elements/arc-handle.js";
+import "./elements/arc-host.js";
 import "./elements/arc-steps.js";
 import "./elements/arc-store.js";
 import "./elements/persistent-arc.js";
