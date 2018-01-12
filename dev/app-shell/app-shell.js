@@ -15,6 +15,8 @@ import "../components/arc-tools/explorer-hotkey.js";
 import "../components/arc-tools/local-data.js";
 import "../components/arc-tools/manifest-data.js";
 import "../components/arc-tools/shell-particles.js";
+// TODO(wkorman): Move dancing-dots to a require within arc-footer?
+import "../components/dancing-dots.js";
 import "../components/simple-tabs.js";
 import "../components/suggestion-element.js";
 
