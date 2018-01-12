@@ -20,6 +20,7 @@ import "../components/suggestion-element.js";
 
 // Elements.
 import "./elements/arc-footer.js";
+import "./elements/arc-steps.js";
 import "./elements/arc-store.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
