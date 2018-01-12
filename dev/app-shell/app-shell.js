@@ -25,6 +25,7 @@ import "./elements/arc-steps.js";
 import "./elements/arc-store.js";
 import "./elements/persistent-arc.js";
 import "./elements/persistent-user.js";
+import "./elements/persistent-users.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',
