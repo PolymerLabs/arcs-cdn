@@ -38,7 +38,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 class LocalData extends HTMLElement {
   connectedCallback() {
     this.text = '';
-    this._dom = Xen.stamp(document.querySelector('template')).events(this).appendTo(this);
+    this._dom = Xen.stamp(template).events(this).appendTo(this);
   }
   set manifest(manifest) {
     this._dom.set({manifest});
