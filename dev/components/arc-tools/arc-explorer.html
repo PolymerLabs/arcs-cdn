@@ -25,7 +25,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <div banner>Shared Arcs</div>
   <div>{{sharedArcs}}</div>
   -->
-  <div banner>Profile Views</div>
+  <div banner>Profile Handles</div>
   <div style="padding: 8px;">{{profiles}}</div>
   <br>
   <!--
@@ -100,9 +100,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       let result = [];
       profiles && profiles.forEach(({key, data}) => {
         let href = `${location.origin}/${location.pathname}?amkey=${key}`;
-        let views = data.views;
-        Object.keys(views || {}).forEach(name => {
-          let {metadata: {tags}, values} = views[name];
+        let handles = data.views;
+        Object.keys(handles || {}).forEach(name => {
+          let {metadata: {tags}, values} = handles[name];
           if (values) {
             values = values.length ? values.map(v => v.rawData) : values.rawData;
           }
