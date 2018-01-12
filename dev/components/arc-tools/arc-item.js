@@ -24,6 +24,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 
 class ArcItem extends XenBase {
   static get observedAttributes() { return ['key','data']; }
+  get template() { return template; }
   get host() {
     return this;
   }

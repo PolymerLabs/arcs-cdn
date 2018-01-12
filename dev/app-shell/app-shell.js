@@ -11,6 +11,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 // Components.
 import "../components/xen/xen.js";
 import "../components/toggle-button.js";
+// TODO(wkorman): Arc Explorer is partially broken in that the data-item content
+// never renders under the Arc Explorer and App State tabs. Need to investigate.
+import "../components/arc-tools/arc-explorer.js";
 import "../components/arc-tools/explorer-hotkey.js";
 import "../components/arc-tools/local-data.js";
 import "../components/arc-tools/manifest-data.js";

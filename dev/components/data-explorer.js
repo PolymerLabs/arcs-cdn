@@ -8,6 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
+import './data-item.js';
+
 const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>
   data-explorer {
@@ -52,9 +54,10 @@ const templateDataItem = Object.assign(document.createElement('template'), {inne
 
 class DataExplorer extends XenBase {
   static get observedAttributes() { return ['object']; }
+  get template() { return template; }
   _doMount() {
     this._itemTemplate = templateDataItem;
-    this._dom = Xen.stamp(template).events(this).appendTo(this);
+    this._dom = Xen.stamp(this.template).events(this).appendTo(this);
   }
   _update(props, state) {
     this._dom.set(this._render(props, state));

@@ -52,6 +52,7 @@ const templateProfile = Object.assign(document.createElement('template'), {inner
 
 class ArcExplorer extends XenBase {
   static get observedAttributes() { return ['user']; }
+  get template() { return template; }
   get host() {
     return this;
   }
