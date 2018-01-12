@@ -28,6 +28,8 @@ import "./elements/persistent-handles.js";
 import "./elements/persistent-manifests.js";
 import "./elements/persistent-user.js";
 import "./elements/persistent-users.js";
+import "./elements/remote-friends-profile-handles.js";
+import "./elements/remote-profile-handles.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',
