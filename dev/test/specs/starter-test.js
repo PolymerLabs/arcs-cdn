@@ -9,6 +9,7 @@
  */
 
 const assert = require('assert');
+const { URL } = require('url');
 
 function pierceShadows(selectors) {
   return browser.execute(function(selectors) {
@@ -67,6 +68,11 @@ function searchElementsForText(elements, textQuery) {
 
 /** Load the selenium utils into the current page. */
 function loadSeleniumUtils() {
+  // wait for the page to load a bit. In the future, if we use this with
+  // non-arcs pages, we should move this out.
+  browser.waitForVisible('<app-main>');
+  browser.waitForVisible('<footer>');
+
   var result = browser.execute(function(baseUrl) {
     const script = document.createElement('script');
     script.type = 'text/javascript';
@@ -185,10 +191,6 @@ function initTestWithNewArc() {
 
   // use a solo URL pointing to our local recipes
   browser.url(`${browser.getUrl()}&solo=${browser.options.baseUrl}artifacts/canonical.manifest`);
-
-  // wait for the page to load a bit, init the test harness for this page
-  browser.waitForVisible('<app-main>');
-  browser.waitForVisible('<footer>');
   loadSeleniumUtils();
 
   // check out some basic structure relative to the app footer
@@ -379,6 +381,42 @@ describe('test Arcs demo flows', function() {
     let annotations = browser.getText('div[slotid="annotation"]');
     assert.equal(6, annotations.length);
     assert.ok(annotations.length > 0 && annotations.every(a => a.length > 0));
+
+    browser.close();
+  });
+
+  it('can use an arc with the default global manifests', function() {
+    initTestWithNewArc();
+
+    // remove solo from our URL to use the default
+    const url = new URL(browser.getUrl());
+    url.searchParams.delete('solo');
+    browser.url(url.href);
+
+    // load our utils in the new page
+    loadSeleniumUtils();
+
+    waitForStillness();
+    browser.waitUntil(
+      () => {
+        const allSuggestions = pierceShadows([
+          'div[slotid="suggestions"]',
+          'suggestion-element'
+        ]);
+        if (!allSuggestions.value || 0 == allSuggestions.value) {
+          return false;
+        }
+
+        // we hit at least a single suggestion, good enough!
+        return true;
+      },
+      5000,
+      `couldn't find any suggestions; this might indicate that a global manifest failed to load`
+    );
+
+    // treat the fact that we found any suggestions as a good enough
+    // indication that there aren't any major issues with globally available
+    // manifests.
 
     browser.close();
   });
