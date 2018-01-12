@@ -1,0 +1,50 @@
+// TODO(wkorman): Note the FireBase auth library is loaded earlier in
+// apps/web/index.html and see comment there for more.
+
+import XenBase from '../components/xen/xen-base.js';
+
+class ArcAuth extends XenBase {
+  get host() {
+    return this;
+  }
+  _didMount() {
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        ArcAuth.log(`user is [${user.displayName}]`);
+        // User is signed in.
+        var displayName = user.displayName;
+        var email = user.email;
+        var emailVerified = user.emailVerified;
+        var photoURL = user.photoURL;
+        var isAnonymous = user.isAnonymous;
+        var uid = user.uid;
+        var providerData = user.providerData;
+        this._credential(user);
+      } else {
+        let provider = new firebase.auth.GoogleAuthProvider()
+        if (false) {
+          firebase.auth().signInWithPopup(provider).then(this._credential.bind(this));
+        } else {
+          firebase.auth().signInWithRedirect(provider);
+          /*
+          firebase.auth().getRedirectResult().then(result => {
+            if (result.user === null) {
+              firebase.auth().signInWithRedirect(provider);
+            } else {
+              this._credential(result);
+            }
+          });
+          */
+        }
+      }
+    });
+  }
+  _credential(user) {
+    ArcAuth.log('credentials: ', user)
+    this._fire('auth', user);
+  }
+}
+ArcAuth.log = XenBase.logFactory('ArcAuth', '#00701a');
+customElements.define('arc-auth', ArcAuth);
+
+export default ArcAuth;
