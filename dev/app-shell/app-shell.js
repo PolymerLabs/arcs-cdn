@@ -1,12 +1,7 @@
-import XenTemplate from "../components/xen/xen-template.js";
-import XenState from "../components/xen/xen-state.js";
-import XenElement from "../components/xen/xen-element.js";
-import XenBase from "../components/xen/xen-base.js";
-
-window.Xen = XenTemplate;
-window.XenState = XenState;
-window.XenElement = XenElement;
-window.XenBase = XenBase;
+import Xen from "../components/xen/xen.js";
+import TB from "../components/toggle-button.js";
+import ST from "../components/simple-tabs.js";
+import "../components/suggestion-element.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',
