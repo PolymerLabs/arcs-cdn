@@ -10,7 +10,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 // Components.
 import "../components/xen/xen.js";
-import "../components/good-map.js";
 import "../components/toggle-button.js";
 import "../components/arc-tools/explorer-hotkey.js";
 import "../components/arc-tools/local-data.js";
@@ -37,7 +36,14 @@ import "./elements/remote-shared-handles.js";
 import "./elements/remote-visited-arcs.js";
 // TODO(wkorman): Nothing uses a watch-group element. Should we just rely
 // on classes that need to instantiate this to import directly and remove here?
+// Why is the XenBase export available to classes that use it above but
+// WatchGroup must be explicitly imported in each even if we import it here
+// (and we tried doing so before all other involved elements).
 import "./elements/watch-group.js";
+
+// For Particles (should be separate import?).
+import "../components/corellia-xen/cx-input.js";
+import "../components/good-map.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',
