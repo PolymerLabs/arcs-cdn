@@ -1,6 +1,7 @@
 import "../components/xen/xen.js";
 import "../components/toggle-button.js";
 import "../components/arc-tools/local-data.js";
+import "../components/arc-tools/manifest-data.js";
 import "../components/simple-tabs.js";
 import "../components/suggestion-element.js";
 import "./elements/arc-store.js";
