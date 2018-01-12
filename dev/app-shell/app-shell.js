@@ -10,6 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 // Components.
 import "../components/xen/xen.js";
+import "../components/good-map.js";
 import "../components/toggle-button.js";
 import "../components/arc-tools/explorer-hotkey.js";
 import "../components/arc-tools/local-data.js";
