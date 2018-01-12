@@ -7,8 +7,10 @@
 # http://polymer.github.io/PATENTS.txt
 
 # this is a list of recipes that are used in our canonical demos.
-import 'Profile/Profile.recipes'
 import 'Events/Events.recipes'
+import 'People/People.recipes'
+import 'Places/Places.recipes'
+import 'Profile/Profile.recipes'
 import 'Restaurants/Restaurants.recipes'
 
 import 'Products/Products.recipes'
