@@ -32,6 +32,9 @@ import "./elements/remote-friends-profile-handles.js";
 import "./elements/remote-profile-handles.js";
 import "./elements/remote-shared-handles.js";
 import "./elements/remote-visited-arcs.js";
+// TODO(wkorman): Nothing uses a watch-group element. Should we just rely
+// on classes that need to instantiate this to import directly and remove here?
+import "./elements/watch-group.js";
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',

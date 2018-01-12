@@ -8,6 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
+import WatchGroup from './watch-group.js';
+
 class RemoteVisitedArcs extends XenBase {
   static get observedAttributes() { return ['user', 'arcs']; }
   _getInitialState() {
