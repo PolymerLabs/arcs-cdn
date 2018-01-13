@@ -93,7 +93,7 @@
               return [fqTypeName, schema];
             }));
 
-            // the meat - create views, store entities in those.
+            // the meat - create handles, store entities in those.
             Object.entries(dataByType).forEach( ([fqTypeName, entities]) => {
               if (!schemas.has(fqTypeName) || !schemas.get(fqTypeName)) {
                 easLog('skipping unknown type '+fqTypeName);
@@ -105,14 +105,14 @@
               const shortTypeName = schema.name;
               const entityClass = schemas.get(fqTypeName).entityClass();
 
-              // tag product views with shortlist
-              let viewTag = shortTypeName=='Product' ? '#shortlist' : '#'+shortTypeName;
+              // tag product handles with shortlist
+              let handleTag = shortTypeName=='Product' ? '#shortlist' : '#'+shortTypeName;
 
-              var view = arc._context.newView(
+              var handle = arc._context.newView(
                 schema.type.viewOf(),
                 'Browser/'+shortTypeName,
                 arc.generateID(),
-                [viewTag]);
+                [handleTag]);
 
               // There are some fields that don't make sense in arcs, and
               // there are some values that aren't in the right format. Let's
@@ -147,7 +147,7 @@
                 });
               }
 
-              filteredEntities.forEach(entity => view.store({id: arc.generateID(), rawData: entity}));
+              filteredEntities.forEach(entity => handle.store({id: arc.generateID(), rawData: entity}));
               easLog(`stored entities of type ${fqTypeName}`, filteredEntities);
             });
           });
@@ -156,7 +156,7 @@
         // Request injection of data from the extension.
         // This must be after the reloadManifests() call above - before then
         // we end up in race conditions (lots of errors about uninitialized
-        // views) because the callback is called before Arcs is initialized
+        // handles) because the callback is called before Arcs is initialized
         // (after this method, _start() returns).
         window.postMessage({method: 'pleaseInjectArcsData'}, '*');
       }

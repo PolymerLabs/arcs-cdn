@@ -137,8 +137,8 @@ function _waitForSuggestionsDrawerToBeOpen() {
     browser.waitUntil(
       () => {
         const footer = pierceShadowsSingle(footerPath);
-        const open = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
-        return open.value;
+        const isOpen = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
+        return isOpen.value;
       },
       500,
       `the suggestions drawer was never open`,
@@ -183,6 +183,9 @@ function initTestWithNewArc() {
   // reset the webdriver window state).
   createNewArc();
 
+  // use a solo URL pointing to our local recipes
+  browser.url(`${browser.getUrl()}&solo=${browser.options.baseUrl}artifacts/canonical.manifest`);
+
   // wait for the page to load a bit, init the test harness for this page
   browser.waitForVisible('<app-main>');
   browser.waitForVisible('<footer>');
@@ -216,22 +219,19 @@ function allSuggestions() {
 }
 
 function acceptSuggestion(textSubstring) {
+  wait(2);
   waitForStillness();
+  openSuggestionDrawer();
   let footerPath = getFooterPath();
 
-  const suggestionsRoot = pierceShadowsSingle(
-    footerPath.concat(['suggestions-element'])
-  );
-  const suggestionsDiv = pierceShadowsSingle(
-    footerPath.concat(['suggestions-element', 'div'])
-  );
   browser.waitUntil(
     () => {
-      const allSuggestions = browser.elementIdElements(
-        suggestionsDiv.value.ELEMENT,
-        'suggest'
-      );
+      const allSuggestions = pierceShadows([
+        'div[slotid="suggestions"]',
+        'suggestion-element'
+      ]);
       if (!allSuggestions.value || 0 == allSuggestions.value) {
+        console.log('No suggestions found.');
         return false;
       }
 
@@ -241,6 +241,7 @@ function acceptSuggestion(textSubstring) {
           textSubstring
         );
         if (!desiredSuggestion) {
+          console.log(`Couldn't find suggestion '${textSubstring}'.`);
           return false;
         }
 
@@ -322,6 +323,7 @@ describe('test Arcs demo flows', function() {
     // Our location is relative to where you are now, so this list is dynamic.
     // Rather than trying to mock this out let's just grab the first
     // restaurant.
+    wait(2);
     const restaurantSelectors = particleSelectors('root', [
       'div.item',
       'div.title'
@@ -334,9 +336,16 @@ describe('test Arcs demo flows', function() {
     acceptSuggestion('You are free');
 
     browser.close();
+
     // to drop into debug mode with a REPL; also a handy way to see the state
     // at the end of the test:
-    // browser.debug();
+    //browser.debug();
+
+    // if you'd like to see the browser logs (you suspect an error, for
+    // instance):
+    //browser.log('browser').value.forEach(log => {
+    //  console.log(`${log.level}:${log.source}:${log.message}`);
+    //});
   });
 
   it('can use the gift shopping demo flow', function() {
@@ -345,8 +354,9 @@ describe('test Arcs demo flows', function() {
     allSuggestions();
 
     acceptSuggestion(
-      "Show Products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on Products from your browsing context and Claire's wishlist (Book: How to Draw plus 2 other items)"
+      'Show products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on products from your browsing context and Claire\'s wishlist (Book: How to Draw plus 2 other items)'
     );
+
     browser.waitForVisible('div[slotid="action"]');
     browser.waitForVisible('div[slotid="annotation"]');
 
@@ -354,12 +364,13 @@ describe('test Arcs demo flows', function() {
     // (1) verify product was moved,
     // (2) verify 'action' slot is not visible after all products were moved.
 
-    acceptSuggestion('Estimate arrival dates, estimate arrival dates'); // TODO: add 'and buy gifts for Claire' when descriptions are fixed.
+    acceptSuggestion('Buy gifts for Claire, estimate arrival date for each product');
     acceptSuggestion(
-      'check manufacturer information for Products from your browsing context'
+      'check manufacturer information for each product in products from your browsing context'
     );
     acceptSuggestion(
-      "recommendations based on Products recommended based on Products from your browsing context and Claire's wishlist"
+      'Recommendations based on products from your browsing context'
+      // TODO: add 'and Claire\'s wishlist' when regex is supported.
     );
 
     // Verify each product has non empty annotation text.

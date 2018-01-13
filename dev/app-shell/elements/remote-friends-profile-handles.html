@@ -8,7 +8,7 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 <script>
-  class RemoteFriendsProfileViews extends XenBase {
+  class RemoteFriendsProfileHandles extends XenBase {
     static get observedAttributes() { return ['arc','friends','user']; }
     _getInitialState() {
       return {
@@ -24,9 +24,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     _watchFriends(db, group, arc, friends, user) {
       friends = friends.map(friend => friend.rawData);
       // include `user` in friends, so we can access generic profile info this way
-      // TODO(sjmiles): is this the right decision? this data is already available in another view
+      // TODO(sjmiles): is this the right decision? this data is already available in another handle
       friends.push({id: user.id});
-      RemoteFriendsProfileViews.log('got raw FRIENDS', friends);
+      RemoteFriendsProfileHandles.log('got raw FRIENDS', friends);
       return friends.map(friend => {
         return {
           // TODO(sjmiles): watch the entire friend record because today we need
@@ -38,40 +38,40 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
           // slows things down, makes it harder to debug, etc.
           node: db.child(`users/${friend.id}`),
           handler: snap => {
-            group.add(this._watchFriendProfileViews(db, arc, friend, snap));
+            group.add(this._watchFriendProfileHandles(db, arc, friend, snap));
           }
         }
       });
     }
-    _watchFriendProfileViews(db, arc, friend, snap) {
+    _watchFriendProfileHandles(db, arc, friend, snap) {
       // get user record
       let user = snap.val();
-      RemoteFriendsProfileViews.log(`READING friend's user [${user.name}]`); // from`, String(snap.ref));
+      RemoteFriendsProfileHandles.log(`READING friend's user [${user.name}]`); // from`, String(snap.ref));
       // find keys for user's profile arcs
       return Arcs.utils.getUserProfileKeys(user).map(key => {
-        //RemoteFriendsProfileViews.log(`watching friend's [${user.name}] profile views`); // from`, String(snap.ref));
+        //RemoteFriendsProfileHandles.log(`watching friend's [${user.name}] profile handles`); // from`, String(snap.ref));
         return {
-          node: db.child(`arcs/${key}/views`),
+          node: db.child(`arcs/${key}/handles`),
           handler: snap => {
-            RemoteFriendsProfileViews.log(`READING friend's [${user.name}] profile views`); // from`, String(snap.ref));
-            let views = snap.val();
-            if (views) {
-              this._processFriendProfileViews(arc, friend, views);
+            RemoteFriendsProfileHandles.log(`READING friend's [${user.name}] profile handles`); // from`, String(snap.ref));
+            let handles = snap.val();
+            if (handles) {
+              this._processFriendProfileHandles(arc, friend, handles);
             }
           }
         }
       });
     }
-    _processFriendProfileViews(arc, friend, views) {
-      //RemoteFriendsProfileViews.log(`friend's profile views`, friend, views);
-      Object.keys(views).forEach(async key => {
-        let {values, metadata: {name, type, tags}} = views[key];
+    _processFriendProfileHandles(arc, friend, handles) {
+      //RemoteFriendsProfileHandles.log(`friend's profile handles`, friend, handles);
+      Object.keys(handles).forEach(async key => {
+        let {values, metadata: {name, type, tags}} = handles[key];
         let tagString = (tags && tags.length ? `${tags.sort().join('_').replace(/#/g, '')}` : '');
         let id = `FRIENDS_PROFILE_${tagString}`;
         // TODO(sjmiles): not always a SetView is it?
         let arcsType = Arcs.utils.typeFromMetaType(type).setViewOf();
         if (values) {
-          let view = await this._requireView(arc, id, arcsType, id, [`#friends_${tagString}`]);
+          let handle = await this._requireHandle(arc, id, arcsType, id, [`#friends_${tagString}`]);
           // TODO(sjmiles): how to know if `values` represents a SetView or Entity?
           //if (!Array.isArray(values)) {
           if ('id' in values) {
@@ -86,16 +86,16 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
               rawData: v.rawData
             };
           });
-          Arcs.utils.addViewData(view, data);
-          RemoteFriendsProfileViews.log(`merged friend's profile view [${id}]`); //, id, view, data);
+          Arcs.utils.addHandleData(handle, data);
+          RemoteFriendsProfileHandles.log(`merged friend's profile handle [${id}]`); //, id, handle, data);
         }
       });
     }
-    async _requireView(arc, id, type, name, tags) {
+    async _requireHandle(arc, id, type, name, tags) {
       return arc.context.findViewById(id) || await arc.context.newView(type, name, id, tags);
     }
   }
-  RemoteFriendsProfileViews.module = document.currentImport;
-  RemoteFriendsProfileViews.log = XenBase.logFactory('RemoteFriendsPVs', '#805acb');
-  customElements.define('remote-friends-profiles-views', RemoteFriendsProfileViews);
+  RemoteFriendsProfileHandles.module = document.currentImport;
+  RemoteFriendsProfileHandles.log = XenBase.logFactory('RemoteFriendsPHs', '#805acb');
+  customElements.define('remote-friends-profiles-handles', RemoteFriendsProfileHandles);
 </script>
