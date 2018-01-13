@@ -252,10 +252,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
       if (state.user) {
         state.userId = state.user.id;
-        Arcs.utils.setUrlParam('user', state.userId);
+        ArcsUtils.setUrlParam('user', state.userId);
       }
       if (state.key) {
-        Arcs.utils.setUrlParam('arc', state.key);
+        ArcsUtils.setUrlParam('arc', state.key);
       }
       if (state.newSteps) {
         this._updateMetadata({steps: state.newSteps});
@@ -525,7 +525,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     }
     async _onArcsHandle(e, arcsHandle) {
       this._installSyntheticHandle('arcsHandle', arcsHandle);
-      let visitedArcs = await Arcs.utils.getHandleData(arcsHandle);
+      let visitedArcs = await ArcsUtils.getHandleData(arcsHandle);
       this._setState({visitedArcs});
       ArcApp.log('visitedArcs: ', visitedArcs);
     }
@@ -605,9 +605,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       }
     }
     async _onApplied(e, plan, props, state) {
-      let description = await Arcs.utils.describeArc(state.arc);
+      let description = await ArcsUtils.describeArc(state.arc);
       if (!description && !state.description) {
-        description = Arcs.utils.randomName();
+        description = ArcsUtils.randomName();
       }
       if (description && description !== state.description) {
         this._updateMetadata({description});

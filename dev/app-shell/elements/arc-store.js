@@ -8,12 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import firebase from "../../../node_modules/@firebase/app/dist/esm/index.js";
-import '../../../node_modules/@firebase/database/dist/esm/index.js';
-
-//import "https://www.gstatic.com/firebasejs/4.2.0/firebase-app.js";
-//import "https://www.gstatic.com/firebasejs/4.2.0/firebase-auth.js";
-//import "https://www.gstatic.com/firebasejs/4.2.0/firebase-database.js";
+// TODO(wkorman): Note the FireBase library is loaded earlier in
+// apps/web/index.html and see comment there for more.
 
 //let version = typeof Arcs === 'undefined' || !Arcs.version ? '/' : Arcs.version.replace(/\./g, '_');
 let db_version = '0_3_beta_3';
@@ -33,5 +29,5 @@ let db = _db.ref(db_version);
 /* for debugging only */
 db.dump = () => db.once('value').then(snap => console.log(db.data = snap.val()));
 
-windows._db = _db;
-windows.db = db;
+window._db = _db;
+window.db = db;
