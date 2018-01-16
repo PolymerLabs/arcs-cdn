@@ -43,7 +43,9 @@
   <extension-app-shell></extension-app-shell>
 
   <script>
-    const pre = Arcs.utils.prettyLogPrefix('ExtensionAppShell', '#2277a8');
+    // TODO(wkorman): We may need to import arcs-utils.js for this method. It's
+    // sufficiently trivial that perhaps we should just inline it.
+    const pre = ArcsUtils.prettyLogPrefix('ExtensionAppShell', '#2277a8');
     const easLog = console.log.bind(console, ...pre);
 
     class ExtensionAppShell extends AppShell {

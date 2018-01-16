@@ -1,28 +1,20 @@
 <!doctype html>
 <html lang="en">
 <head>
-
   <title>Arcs</title>
   <link rel="shortcut icon" href="favicon.ico">
-
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-
-  <link rel="import" href="../../app-shell/app-shell.html">
-
+  <script>
+    window.shellPath = "../../app-shell";
+  </script>
+  <!-- TODO(wkorman): Ideally move Firebase script load to arc-store.js.
+      Currently the FireBase library is not ES Module compatible.
+      See also https://github.com/firebase/firebase-js-sdk/issues/100 -->
+  <script src="https://www.gstatic.com/firebasejs/4.2.0/firebase.js"></script>
+  <script type="module" src="../../app-shell/app-shell.js"></script>
 </head>
 <body>
-
-<!-- optional -->
-<!--
-  <script>
-    document.addEventListener('configure', e => {
-      // configuration object available in e.detail
-    });
-  </script>
--->
-
   <arc-app></arc-app>
-
 </body>
 </html>
