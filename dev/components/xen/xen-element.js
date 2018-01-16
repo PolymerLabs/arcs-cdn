@@ -7,7 +7,6 @@
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-(scope => {
 
 let XenElement = Base => class extends Base {
   constructor() {
@@ -78,9 +77,4 @@ let XenElement = Base => class extends Base {
   }
 }
 
-if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
-  module.exports = XenElement;
-else
-  scope.XenElement = XenElement;
-
-})(this);
+export default XenElement;

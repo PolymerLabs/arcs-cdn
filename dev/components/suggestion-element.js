@@ -7,9 +7,7 @@
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-(() => {
-
-let template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>
   :host {
     display: block;
@@ -65,4 +63,4 @@ class SuggestionElement extends HTMLElement {
 
 customElements.define('suggestion-element', SuggestionElement);
 
-})();
+export default SuggestionElement;

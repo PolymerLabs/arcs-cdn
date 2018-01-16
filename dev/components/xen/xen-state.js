@@ -7,7 +7,6 @@
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
-(scope => {
 
 let nob = () => Object.create(null);
 
@@ -106,9 +105,4 @@ let StaterMixin = Base => class extends Base {
   }
 };
 
-if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
-  module.exports = StaterMixin;
-else
-  scope.XenState = StaterMixin;
-
-})(this);
+export default StaterMixin;
