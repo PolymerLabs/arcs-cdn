@@ -178,6 +178,13 @@ function getFooterPath() {
 }
 
 function initTestWithNewArc() {
+  // clean up extra open tabs
+  const openTabs = browser.getTabIds();
+  browser.switchTab(openTabs[0]);
+  openTabs.slice(1).forEach(tabToClose => {
+    browser.close(tabToClose);
+  });
+
   // TODO(smalls) should we create a user on the fly?
   // note - baseUrl (currently specified on the command line) must end in a
   // trailing '/', and this must not begin with a preceding '/'.
@@ -220,6 +227,18 @@ function allSuggestions() {
   browser.elementIdClick(magnifier.value.ELEMENT);
 }
 
+function getAtLeastOneSuggestion() {
+  const allSuggestions = pierceShadows([
+    'div[slotid="suggestions"]',
+    'suggestion-element'
+  ]);
+  if (!allSuggestions.value || 0 == allSuggestions.value) {
+    console.log('No suggestions found.');
+    return false;
+  }
+  return allSuggestions;
+}
+
 function acceptSuggestion(textSubstring) {
   wait(2);
   waitForStillness();
@@ -228,14 +247,7 @@ function acceptSuggestion(textSubstring) {
 
   browser.waitUntil(
     () => {
-      const allSuggestions = pierceShadows([
-        'div[slotid="suggestions"]',
-        'suggestion-element'
-      ]);
-      if (!allSuggestions.value || 0 == allSuggestions.value) {
-        console.log('No suggestions found.');
-        return false;
-      }
+      const allSuggestions = getAtLeastOneSuggestion();
 
       try {
         const desiredSuggestion = searchElementsForText(
@@ -337,8 +349,6 @@ describe('test Arcs demo flows', function() {
     acceptSuggestion('Make a reservation');
     acceptSuggestion('You are free');
 
-    browser.close();
-
     // to drop into debug mode with a REPL; also a handy way to see the state
     // at the end of the test:
     //browser.debug();
@@ -379,8 +389,6 @@ describe('test Arcs demo flows', function() {
     let annotations = browser.getText('div[slotid="annotation"]');
     assert.equal(6, annotations.length);
     assert.ok(annotations.length > 0 && annotations.every(a => a.length > 0));
-
-    browser.close();
   });
 
   it('can use an arc with the default global manifests', function() {
@@ -397,13 +405,7 @@ describe('test Arcs demo flows', function() {
     waitForStillness();
     browser.waitUntil(
       () => {
-        const allSuggestions = pierceShadows([
-          'div[slotid="suggestions"]',
-          'suggestion-element'
-        ]);
-        if (!allSuggestions.value || 0 == allSuggestions.value) {
-          return false;
-        }
+        getAtLeastOneSuggestion();
 
         // we hit at least a single suggestion, good enough!
         return true;
@@ -415,7 +417,5 @@ describe('test Arcs demo flows', function() {
     // treat the fact that we found any suggestions as a good enough
     // indication that there aren't any major issues with globally available
     // manifests.
-
-    browser.close();
   });
 });
