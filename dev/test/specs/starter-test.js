@@ -364,6 +364,24 @@ describe('test Arcs demo flows', function() {
     // (1) verify product was moved,
     // (2) verify 'action' slot is not visible after all products were moved.
 
+    let buttonSelectors = particleSelectors('action', ['button']);
+    let addButtonNodes = pierceShadows(buttonSelectors);
+    assert.equal(3, addButtonNodes.value.length);
+    browser.elementIdClick(addButtonNodes.value[0].ELEMENT);
+
+    addButtonNodes = pierceShadows(buttonSelectors);
+    assert.equal(2, addButtonNodes.value.length);
+    browser.elementIdClick(addButtonNodes.value[0].ELEMENT);
+
+    addButtonNodes = pierceShadows(buttonSelectors);
+    assert.equal(1, addButtonNodes.value.length);
+    // addButtonNodes.value[0].scroll();
+    // browser.elementIdClick(addButtonNodes.value[0].ELEMENT);
+    // addButtonNodes = pierceShadows(buttonSelectors);
+    // assert.equal(0, addButtonNodes.value.length);
+
+    allSuggestions();
+
     acceptSuggestion('Buy gifts for Claire, estimate arrival date for each product');
     acceptSuggestion(
       'check manufacturer information for each product in products from your browsing context'
