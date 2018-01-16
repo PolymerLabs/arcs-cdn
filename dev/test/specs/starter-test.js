@@ -348,7 +348,9 @@ describe('test Arcs demo flows', function() {
     //});
   });
 
-  it('can use the gift shopping demo flow', function() {
+  // TODO(wkorman): Restore the below once we fix ES modules related issues.
+  // See https://github.com/PolymerLabs/arcs-cdn/issues/142
+  it.skip('can use the gift shopping demo flow', function() {
     initTestWithNewArc();
 
     allSuggestions();
