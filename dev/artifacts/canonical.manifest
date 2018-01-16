@@ -6,7 +6,10 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-# this is a list of recipes that are used in our canonical demos.
+# This is a list of recipes that are used in our canonical demos. As this file
+# grows the current alphabetized list will stop scaling, and we should
+# consider moving these into separate files or grouping by demo/test.
+
 import 'Events/Events.recipes'
 import 'People/People.recipes'
 import 'Places/Places.recipes'
