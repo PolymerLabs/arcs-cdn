@@ -9,6 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import WatchGroup from './watch-group.js';
+import XenBase from "../../components/xen/xen-base.js";
 
 class PersistentManifests extends XenBase {
   static get observedAttributes() { return ['manifests','exclusions']; }

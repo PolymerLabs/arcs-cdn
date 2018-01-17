@@ -9,6 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import './data-item.js';
+import XenBase from "./xen/xen-base.js";
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>

@@ -8,6 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
+import XenBase from "../xen/xen-base.js";
+
 class ShellParticles extends XenBase {
   static get observedAttributes() { return ['arc']; }
   _update(props, state, lastProps) {
