@@ -8,6 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
+import "./data-explorer.js";
+
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<left title="{{name}}" on-click="_onExpandClick">{{name}}</left>
   <right>

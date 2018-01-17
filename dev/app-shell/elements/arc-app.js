@@ -9,6 +9,30 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
  */
 
 import ArcsUtils from "../lib/arcs-utils.js";
+import "../../components/arc-tools/arc-explorer.js";
+import "../../components/arc-tools/explorer-hotkey.js";
+import "../../components/arc-tools/local-data.js";
+import "../../components/arc-tools/manifest-data.js";
+import "../../components/arc-tools/shell-particles.js";
+import "../../components/data-explorer.js";
+import "../../components/simple-tabs.js";
+import "../../components/suggestion-element.js";
+import "../../components/toggle-button.js";
+import "./arc-config.js";
+import "./arc-footer.js";
+import "./arc-handle.js";
+import "./arc-host.js";
+import "./arc-steps.js";
+import "./arc-store.js";
+import "./persistent-arc.js";
+import "./persistent-handles.js";
+import "./persistent-manifests.js";
+import "./persistent-user.js";
+import "./persistent-users.js";
+import "./remote-friends-profile-handles.js";
+import "./remote-profile-handles.js";
+import "./remote-shared-handles.js";
+import "./remote-visited-arcs.js";
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>
