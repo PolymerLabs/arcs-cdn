@@ -18,6 +18,7 @@ import "../../components/data-explorer.js";
 import "../../components/simple-tabs.js";
 import "../../components/suggestion-element.js";
 import "../../components/toggle-button.js";
+import Xen from '../../components/xen/xen-template.js';
 import "./arc-config.js";
 import "./arc-footer.js";
 import "./arc-handle.js";
@@ -33,6 +34,14 @@ import "./remote-friends-profile-handles.js";
 import "./remote-profile-handles.js";
 import "./remote-shared-handles.js";
 import "./remote-visited-arcs.js";
+
+// For particles.
+import "../../components/corellia-xen/cx-input.js";
+import "../../components/good-map.js";
+
+import XenBase from "../../components/xen/xen-base.js";
+
+import "../../lib/ArcsLib.js";
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>

@@ -10,6 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import WatchGroup from './watch-group.js';
 import ArcsUtils from "../lib/arcs-utils.js";
+import XenBase from "../../components/xen/xen-base.js";
 
 class RemoteSharedHandles extends XenBase {
   static get observedAttributes() { return ['arc','friends','user']; }

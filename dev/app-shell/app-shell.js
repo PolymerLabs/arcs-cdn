@@ -8,11 +8,5 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import "../components/xen/xen.js";
-
-import "../lib/ArcsLib.js";
+// TODO(wkorman): Rename arc-app to app-shell and kill this thing.
 import "./elements/arc-app.js";
-
-// For Particles (should be separate import?).
-import "../components/corellia-xen/cx-input.js";
-import "../components/good-map.js";

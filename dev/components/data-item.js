@@ -9,6 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import "./data-explorer.js";
+import XenBase from "./xen/xen-base.js";
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<left title="{{name}}" on-click="_onExpandClick">{{name}}</left>
