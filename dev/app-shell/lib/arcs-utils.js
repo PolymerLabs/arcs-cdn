@@ -8,6 +8,8 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
+import XenBase from "../../components/xen/xen-base.js";
+
 class ArcsUtils {
   static createArc({id, urlMap, slotComposer, context, loader}) {
     // worker paths are relative to worker location, remap urls from there to here
