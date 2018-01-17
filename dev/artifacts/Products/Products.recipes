@@ -80,9 +80,9 @@ recipe
   Interests
 
 # TODO: move these to separate manifests for claire's wishlist / page
-view PageProducts of [Product] #shortlist in 'https://mmandlis.github.io/arcs-stories/0.3.1/Products/data/products.json'
+view PageProducts of [Product] #shortlist in 'data/products.json'
   description `products from your browsing context`
-view ClairesWishlist of [Product] #wishlist in 'https://mmandlis.github.io/arcs-stories/0.3.1/Products/data/wishlist.json'
+view ClairesWishlist of [Product] #wishlist in 'data/wishlist.json'
   description `Claire's wishlist`
-view APerson of Person in 'https://mmandlis.github.io/arcs-stories/0.3.1/Products/data/people.json'
-#view ThePeople of Person in 'https://mmandlis.github.io/arcs-stories/0.2/Products/data/people.json'
+view APerson of Person in 'data/people.json'
+#view ThePeople of Person in 'data/people.json'
