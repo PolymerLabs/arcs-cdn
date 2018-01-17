@@ -11,11 +11,11 @@
 import XenBase from "../../components/xen/xen-base.js";
 
 class ArcsUtils {
-  static createArc({id, urlMap, slotComposer, context, loader}) {
+  static createArc({id, urlMap, slotComposer, context, loader, storageKey}) {
     // worker paths are relative to worker location, remap urls from there to here
     let remap = ArcsUtils._expandUrls(urlMap);
     let pecFactory = ArcsUtils._createPecWorker.bind(null, urlMap[`worker-entry-cdn.js`], remap);
-    return new Arcs.Arc({id, pecFactory, slotComposer, context, loader});
+    return new Arcs.Arc({id, pecFactory, slotComposer, context, loader, storageKey});
   }
   static _expandUrls(urlMap) {
     let remap = {};
@@ -160,7 +160,7 @@ class ArcsUtils {
     // The corrected set is the intersection of `user.arcs` and `user.[profiles|shares]`.
     return arcs && other ? Object.keys(arcs).filter(key => Boolean(other[key])) : [];
   }
-};
+}
 ArcsUtils.log = XenBase.logFactory('ArcsUtils', '#4a148c');
 
 export default ArcsUtils;

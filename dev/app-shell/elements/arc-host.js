@@ -23,7 +23,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 
 class ArcHost extends XenBase {
   static get observedAttributes() {
-    return ['config','plans','plan','manifests','exclusions'];
+    return ['config','plans','plan','manifests','exclusions','key'];
   }
   get template() { return template; }
   _getInitialState() {
@@ -35,10 +35,11 @@ class ArcHost extends XenBase {
     if (props.manifests && props.exclusions) {
       state.effectiveManifests = this._intersectManifests(props.manifests, props.exclusions);
     }
-    if (props.config && props.config !== state.config && state.effectiveManifests) {
+    if (props.key && props.config && props.config !== state.config && state.effectiveManifests) {
       state.config = props.config;
+      state.config.arcKey = props.key;
       state.config.manifests = state.effectiveManifests;
-      this._applyConfig(state.config)
+      this._applyConfig(state.config);
     }
     else if (state.arc && (props.manifests !== lastProps.manifests || props.exclusions != lastProps.exclusions)) {
       ArcHost.log('reloading')
@@ -64,17 +65,17 @@ class ArcHost extends XenBase {
     arc.makeSuggestions = async () => { this._schedulePlanning(state); }
     ArcHost.log('instantiated', arc);
     this._setState({arc});
-    this._fire('arc', arc)
+    this._fire('arc', arc);
   }
   async _createArc(config) {
     // make an id
-    let id = 'demo-' + ArcsUtils.randomId();
+    const id = 'demo-' + ArcsUtils.randomId();
     // create a system loader
-    let loader = this._marshalLoader(config);
+    const loader = this._marshalLoader(config);
     // load manifest
-    let context = await this._loadManifest(config, loader);
+    const context = await this._loadManifest(config, loader);
     // composer
-    let slotComposer = new Arcs.SlotComposer({
+    const slotComposer = new Arcs.SlotComposer({
       rootContext: this.parentElement,
       affordance: config.affordance,
       containerKind: config.containerKind,
@@ -84,9 +85,18 @@ class ArcHost extends XenBase {
     // capture composer so we can push suggestions there
     this._state.slotComposer = slotComposer;
     // send urlMap to the Arc so worker-entry*.js can create mapping loaders
-    let urlMap = loader._urlMap;
+    const urlMap = loader._urlMap;
+    // generate default DB key
+    const storageKey = this._generateStorageKey(config.arcKey);
     // Arc!
-    return ArcsUtils.createArc({id, urlMap, slotComposer, context, loader});
+    return ArcsUtils.createArc({id, urlMap, slotComposer, context, loader, storageKey});
+  }
+  _generateStorageKey(arcKey) {
+    // TODO(sjmiles): should be from a separate import
+    const database = 'arcs-storage.firebaseio.com';
+    const apiKey = 'AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8';
+    const dbVersion = '0_3_4';
+    return `firebase://${database}/${apiKey}/${dbVersion}/arcs/${arcKey}/handles`;
   }
   _marshalLoader(config) {
     // create default URL map
@@ -138,7 +148,7 @@ class ArcHost extends XenBase {
       this._fire('plans', null);
       // TODO(sjmiles): primitive attempt to throttle planning
       setTimeout(async () => {
-        await this._beginPlanning(state)
+        await this._beginPlanning(state);
         state.planning = false;
       }, 300);
     }
@@ -163,7 +173,7 @@ class ArcHost extends XenBase {
     // since it's a just another race-condition in actuality (I've merely slowed one of the racers).
     // The timeout value is a magic number.
     arc.instantiate(plan);
-    return new Promise((resolve, reject) => {
+    return new Promise(resolve => {
       setTimeout(resolve, 200);
     }).then(() => {
       this._fire('applied', plan);

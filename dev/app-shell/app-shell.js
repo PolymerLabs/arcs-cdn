@@ -8,7 +8,11 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
  */
 
+import Xen from '../components/xen/xen-template.js';
+import XenBase from "../components/xen/xen-base.js";
+
 import ArcsUtils from "./lib/arcs-utils.js";
+
 import "../components/arc-tools/arc-explorer.js";
 import "../components/arc-tools/explorer-hotkey.js";
 import "../components/arc-tools/local-data.js";
@@ -18,7 +22,6 @@ import "../components/data-explorer.js";
 import "../components/simple-tabs.js";
 import "../components/suggestion-element.js";
 import "../components/toggle-button.js";
-import Xen from '../components/xen/xen-template.js';
 import "./elements/arc-config.js";
 import "./elements/arc-footer.js";
 import "./elements/arc-handle.js";
@@ -35,13 +38,11 @@ import "./elements/remote-profile-handles.js";
 import "./elements/remote-shared-handles.js";
 import "./elements/remote-visited-arcs.js";
 
-// For particles.
+import "../lib/ArcsLib.js";
+
+// TODO(sjmiles): whitelisted for Particles (should be marshalled elsewhere, e.g. indirected via `whitelist.js`)
 import "../components/corellia-xen/cx-input.js";
 import "../components/good-map.js";
-
-import XenBase from "../components/xen/xen-base.js";
-
-import "../lib/ArcsLib.js";
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>
@@ -163,10 +164,12 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   <persistent-users on-users="_onUsers"></persistent-users>
   <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
   <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
+  <!--
   <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles>
   <remote-profile-handles arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-handles>
   <remote-shared-handles arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-handles>
   <remote-friends-profiles-handles arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-handles>
+  -->
   <arc-handle arc="{{arc}}" data="{{arcsHandleData}}" options="{{arcsHandleOptions}}" on-handle="_onArcsHandle"></arc-handle>
   <arc-handle arc="{{arc}}" data="{{identityHandleData}}" options="{{identityHandleOptions}}" on-handle="_onIdentityHandle"></arc-handle>
   <arc-handle arc="{{arc}}" data="{{identitiesHandleData}}" options="{{identitiesHandleOptions}}" on-handle="_onIdentitiesHandle"></arc-handle>
@@ -191,7 +194,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
       </div>
     </app-toolbar>
   </toolbar>
-  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" key="{{key}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-host>
