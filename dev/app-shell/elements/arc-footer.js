@@ -10,6 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import "../../components/dancing-dots.js";
 import "../../components/x-toast.js";
+import XenBase from "../../components/xen/xen-base.js";
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<style>
