@@ -8,6 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
+import ArcsUtils from "../lib/arcs-utils.js";
+
 class ArcHandle extends XenBase {
   static get observedAttributes() { return ['arc', 'options', 'data']; }
   async _update(props, state, lastProps) {

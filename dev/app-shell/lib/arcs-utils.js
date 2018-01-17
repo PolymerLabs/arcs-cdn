@@ -30,8 +30,8 @@ class ArcsUtils {
     return remap;
   }
   static _createPecWorker(path, map, id) {
-    let channel = new MessageChannel();
-    let worker = new Worker(URL.createObjectURL(new Blob([`importScripts("${path}");`])));
+    const channel = new MessageChannel();
+    const worker = new Worker(path);
     worker.postMessage({id: `${id}:inner`, base: map}, [channel.port1]);
     return channel.port2;
   }
@@ -160,8 +160,5 @@ class ArcsUtils {
   }
 };
 ArcsUtils.log = XenBase.logFactory('ArcsUtils', '#4a148c');
-// TODO(wkorman): Remove the below window installation once app-shell.html is
-// fully converted to ES Modules.
-window.ArcsUtils = ArcsUtils;
 
 export default ArcsUtils;

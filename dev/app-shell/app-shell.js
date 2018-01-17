@@ -11,18 +11,14 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 // Components.
 import "../components/xen/xen.js";
 import "../components/toggle-button.js";
-// TODO(wkorman): Arc Explorer is partially broken in that the data-item content
-// never renders under the Arc Explorer and App State tabs. Need to investigate.
 import "../components/arc-tools/arc-explorer.js";
 import "../components/arc-tools/explorer-hotkey.js";
 import "../components/arc-tools/local-data.js";
 import "../components/arc-tools/manifest-data.js";
 import "../components/arc-tools/shell-particles.js";
+import "../components/data-explorer.js";
 import "../components/simple-tabs.js";
 import "../components/suggestion-element.js";
-
-// Arcs helpers.
-import "./lib/arcs-utils.js";
 
 // Elements.
 import "./elements/arc-config.js";
@@ -40,18 +36,11 @@ import "./elements/remote-friends-profile-handles.js";
 import "./elements/remote-profile-handles.js";
 import "./elements/remote-shared-handles.js";
 import "./elements/remote-visited-arcs.js";
-// TODO(wkorman): Nothing uses a watch-group element. Should we just rely
-// on classes that need to instantiate this to import directly and remove here?
-// Why is the XenBase export available to classes that use it above but
-// WatchGroup must be explicitly imported in each even if we import it here
-// (and we tried doing so before all other involved elements).
 import "./elements/watch-group.js";
+
+import "../lib/ArcsLib.js";
+import "./elements/arc-app.js";
 
 // For Particles (should be separate import?).
 import "../components/corellia-xen/cx-input.js";
 import "../components/good-map.js";
-
-document.body.appendChild(Object.assign(document.createElement('link'), {
-  rel: 'import',
-  href: `${shellPath}/app-shell.html`
-}));

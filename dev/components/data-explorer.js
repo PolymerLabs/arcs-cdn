@@ -54,19 +54,22 @@ const templateDataItem = Object.assign(document.createElement('template'), {inne
 
 class DataExplorer extends XenBase {
   static get observedAttributes() { return ['object']; }
-  get template() { return template; }
+  get template() {
+    return template;
+  }
+  /*
   _doMount() {
-    this._itemTemplate = templateDataItem;
     this._dom = Xen.stamp(this.template).events(this).appendTo(this);
   }
   _update(props, state) {
     this._dom.set(this._render(props, state));
   }
+  */
   _render(props, state) {
     let o = props.object || Object;
     return {
       items: {
-        template: this._itemTemplate,
+        template: templateDataItem,
         models: this._formatValues(o)
       }
     };

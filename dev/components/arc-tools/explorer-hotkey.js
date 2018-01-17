@@ -10,7 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 document.body.appendChild(Object.assign(document.createElement('link'), {
   rel: 'import',
-  href: `${shellPath}/../components/strategy-explorer/strategy-explorer.html`
+  href: `${shellPath}/components/strategy-explorer/strategy-explorer.html`
 }));
 // <link rel="import" href="arc-explorer.html"></link>
 

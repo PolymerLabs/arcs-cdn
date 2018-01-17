@@ -20,7 +20,9 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 
 class DataItem extends XenBase {
   static get observedAttributes() { return ['name','value']; }
-  get template() { return template; }
+  get template() {
+    return template;
+  }
   get host() {
     return this;
   }
