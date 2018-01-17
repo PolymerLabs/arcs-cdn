@@ -9,6 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
  */
 
 import ArcsUtils from "../lib/arcs-utils.js";
+import "../../components/arc-tools/shell-particles.js";
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>
@@ -181,6 +182,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
       <data-explorer style="font-size: 0.6em;" object="{{appState}}"></data-explorer>
     </div>
   </simple-tabs>
+  <shell-particles arc="{{arc}}"></shell-particles>
 </app-tools>`
 });
 
