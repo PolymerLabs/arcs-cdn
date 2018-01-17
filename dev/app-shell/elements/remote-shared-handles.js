@@ -56,14 +56,16 @@ class RemoteSharedHandles extends XenBase {
         // TODO(wkorman): Rename `views` to `handles` below on the next database rebuild.
         path: `arcs/${key}/views`,
         // TODO(sjmiles): firebase knowledge here, maybe push down into watchGroup
-        handler: snapshot => this._remoteHandlesChanged(arc, key, snapshot.val())
+        handler: snapshot => this._remoteHandlesChanged(arc, key, snapshot.val(), sharer)
       }
     });
   }
-  _remoteHandlesChanged(arc, arcKey, handles) {
+  _remoteHandlesChanged(arc, arcKey, handles, sharer) {
     if (handles) {
       Object.keys(handles).forEach(key => {
         let handle = handles[key];
+        // TODO(sjmiles): hack per berni@
+        handle.metadata.name = sharer.name;
         RemoteSharedHandles.log(`remoteHandlesChanged`, handle.metadata.tags);
         ArcsUtils.createOrUpdateHandle(arc, handle, `SHARED[${arcKey}]`);
       });
