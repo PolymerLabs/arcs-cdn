@@ -23,12 +23,11 @@ class RemoteVisitedArcs extends XenBase {
       // disable old watches, enable fresh ones as needed
       state.watch.watches = this._watchVisitedArcs(props.user);
     }
-    if (props.arcs !== lastProps.arcs) {
+    if (props.arcs !== lastProps.arcs && props.user) {
       this._updateVisitedArcs(props.arcs, props.user);
     }
   }
   _watchVisitedArcs(user) {
-    let nodes, handler;
     if (user && user.arcs) {
       RemoteVisitedArcs.log(`watching visited arcs`);
       // build an object for mapping arc keys to arc metadata
@@ -38,7 +37,7 @@ class RemoteVisitedArcs extends XenBase {
         return {
           node: db.child(`arcs/${key}/`),
           handler: snap => this._watchHandler(data, user, snap)
-        }
+        };
       });
     } else {
       this._fire('arcs', []);
