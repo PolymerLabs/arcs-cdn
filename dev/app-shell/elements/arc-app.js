@@ -214,6 +214,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
       <data-explorer style="font-size: 0.6em;" object="{{appState}}"></data-explorer>
     </div>
   </simple-tabs>
+  <shell-particles arc="{{arc}}"></shell-particles>
 </app-tools>`
 });
 

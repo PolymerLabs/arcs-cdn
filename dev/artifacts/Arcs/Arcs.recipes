@@ -5,4 +5,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import 'https://$cdn/artifacts/Profile/Profile.recipes'
+import 'Launcher.manifest'
+
+recipe
+  use #arcmetadata as arcs
+  Launcher
+    arcs = arcs
