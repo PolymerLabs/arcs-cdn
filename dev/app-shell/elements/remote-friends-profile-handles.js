@@ -50,7 +50,7 @@ class RemoteFriendsProfileHandles extends XenBase {
   _watchFriendProfileHandles(db, arc, friend, snap) {
     // get user record
     let user = snap.val();
-    RemoteFriendsProfileHandles.log(`READING friend's user [${user.name}]`); // from`, String(snap.ref));
+    //RemoteFriendsProfileHandles.log(`READING friend's user [${user.name}]`); // from`, String(snap.ref));
     // find keys for user's profile arcs
     return ArcsUtils.getUserProfileKeys(user).map(key => {
       //RemoteFriendsProfileHandles.log(`watching friend's [${user.name}] profile handles`); // from`, String(snap.ref));
