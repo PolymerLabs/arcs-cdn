@@ -12,7 +12,14 @@ recipe
   AddressForm
     address = address
 
+import 'ExtractLocation.manifest'
 import 'GoogleMap.manifest'
 
 recipe
+  use #user as person
+  create as location
+  ExtractLocation
+    person <- person
+    location -> location
   GoogleMap
+    location <- location

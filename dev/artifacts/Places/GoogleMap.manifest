@@ -6,10 +6,9 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-#import 'http://schema.org/PostalAddress'
-import 'PostalAddress.schema'
+import '../Things/GeoCoordinates.schema'
 
 particle GoogleMap in 'source/GoogleMap.js'
-  GoogleMap()
+  GoogleMap(in GeoCoordinates location)
   consume root
-  description `map address`
+  description `Show ${location} on a map`
