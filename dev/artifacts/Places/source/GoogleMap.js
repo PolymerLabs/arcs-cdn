@@ -34,8 +34,9 @@ ${styles}
 <div ${host}>
   <good-map
     api-key="AIzaSyCXI6QO-jc6lxFJM2VCb68R31mD2NAHmCs"
-    latitude="30"
-    longitude="-100" zoom="2"
+    latitude$="{{latitude}}"
+    longitude$="{{longitude}}"
+    zoom="14"
     map-options='{"mapTypeId": "satellite"}'></good-map>
 </div>
 
@@ -44,6 +45,12 @@ ${styles}
   return class extends DomParticle {
     get template() {
       return template;
+    }
+    _render(props) {
+      if (props.location) {
+        const {latitude, longitude} = props.location;
+        return {latitude, longitude};
+      }
     }
   };
 
