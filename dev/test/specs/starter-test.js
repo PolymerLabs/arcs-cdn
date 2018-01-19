@@ -22,17 +22,19 @@ function pierceShadowsSingle(selectors) {
   }, selectors);
 }
 
-/** Wait a short, approximate time (up to 10 seconds). */
-function wait(seconds) {
-  let count = 0;
+/** Wait a short, approximate time (up to 10 seconds) in 100ms increments. */
+function wait(msToWait) {
+  let msWaited = 0;
+  const msIncrement = 100;
+  const start = Date.now();
   browser.waitUntil(
     () => {
-      count += 1;
-      return count >= seconds;
+      msWaited += msIncrement;
+      return msWaited > msToWait;
     },
     10000,
     `we should have exited after a few iterations`,
-    1000
+    msIncrement
   );
 }
 
@@ -122,52 +124,66 @@ function dancingDotsElement() {
   ]);
 }
 
-/** wait for the dancing dots to stop. */
+/** Wait for the dancing dots to stop. */
 function waitForStillness() {
   var element = dancingDotsElement();
+
+  // Currently, the dots sometimes stop & start again. We're introducing a
+  // fudge factor here - the dots have to be stopped for a few consecutive
+  // checks before we'll consider them really stopped.
+  let matches = 0;
+  const desiredMatches = 2;
 
   browser.waitUntil(
     () => {
       var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
-      return null == result.value;
+      if (null == result.value) {
+        matches += 1;
+      } else {
+        if (matches > 0) {
+          console.log(`WARN the dots had stopped dancing, but they've started up again.
+\t\tThis may indicate a bug?`);
+        }
+        matches = 0;
+      }
+      return matches > desiredMatches;
     },
-    5000,
+    7000,
     `the dancing dots can't stop won't stop`,
-    1000
+    500
   );
 }
 
-function _waitForSuggestionsDrawerToBeOpen() {
-  const footerPath = getFooterPath();
-  try {
-    browser.waitUntil(
-      () => {
-        const footer = pierceShadowsSingle(footerPath);
-        const isOpen = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
-        return isOpen.value;
-      },
-      500,
-      `the suggestions drawer was never open`,
-      100
-    );
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
 
+/**
+ * The suggestions drawer animates open & closing.
+ * Add additional logic to deal with this. */
 function openSuggestionDrawer() {
-  // pause before we start; sometimes the drawer is in animation
-  wait(2);
-  const suggestionsOpen = _waitForSuggestionsDrawerToBeOpen();
+  const _isSuggestionsDrawerOpen = () => {
+    const footer = pierceShadowsSingle(getFooterPath());
+    const isOpen = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
+    return isOpen.value;
+  };
+
+  const suggestionsOpen = _isSuggestionsDrawerOpen();
   if (!suggestionsOpen) {
     const dancingDots = dancingDotsElement();
+    console.log(`click: suggestions drawer closed`);
     browser.elementIdClick(dancingDots.value.ELEMENT);
 
-    // after the click, wait a beat for the animation to finish
-    wait(2);
+    // registering the 'open' state may take a little bit
+    browser.waitUntil(_isSuggestionsDrawerOpen,
+      1000,
+      `the suggestions drawer isn't registering with state 'open' after a click`,
+      100);
 
-    if (!_waitForSuggestionsDrawerToBeOpen()) {
+    // after the 'open' state, wait a beat for the animation to finish. This
+    // should only be 80ms but in practice we need a bit more.
+    wait(200);
+
+    if (!_isSuggestionsDrawerOpen()) {
+      console.log('suggestions drawer not opening?');
+      browser.debug();
       throw Error(`suggestions drawer never opened even after a click`);
     }
   }
@@ -224,6 +240,7 @@ function allSuggestions() {
   const magnifier = pierceShadowsSingle(
     getFooterPath().concat(['div[search]', 'i'])
   );
+  console.log(`click: allSuggestions`);
   browser.elementIdClick(magnifier.value.ELEMENT);
 }
 
@@ -240,7 +257,7 @@ function getAtLeastOneSuggestion() {
 }
 
 function acceptSuggestion(textSubstring) {
-  wait(2);
+  console.log(`Trying to accept: ${textSubstring}`); 
   waitForStillness();
   openSuggestionDrawer();
   let footerPath = getFooterPath();
@@ -259,6 +276,7 @@ function acceptSuggestion(textSubstring) {
           return false;
         }
 
+        console.log(`click: desiredSuggestion`);
         browser.elementIdClick(desiredSuggestion.id);
         return true;
       } catch (e) {
@@ -315,6 +333,7 @@ function clickInParticles(slotName, selectors, textQuery) {
       }
 
       if (selected) {
+        console.log(`click: clickInParticles`);
         browser.elementIdClick(selected);
         return true;
       } else {
@@ -337,13 +356,13 @@ describe('test Arcs demo flows', function() {
     // Our location is relative to where you are now, so this list is dynamic.
     // Rather than trying to mock this out let's just grab the first
     // restaurant.
-    wait(2);
     const restaurantSelectors = particleSelectors('root', [
       'div.item',
       'div.title'
     ]);
     waitForVisible(restaurantSelectors);
     let restaurantNodes = pierceShadows(restaurantSelectors);
+    console.log(`click: restaurantSelectors`);
     browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
 
     acceptSuggestion('Make a reservation');
