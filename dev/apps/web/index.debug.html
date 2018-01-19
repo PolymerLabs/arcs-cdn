@@ -23,14 +23,21 @@
   </style>
 
   <script>
-    window.shellPath = "./";
+    window.shellPath = "../..";
   </script>
 
   <!-- TODO(wkorman): Ideally move Firebase script load to arc-store.js.
       Currently the FireBase library is not ES Module compatible.
       See also https://github.com/firebase/firebase-js-sdk/issues/100 -->
   <script src="https://www.gstatic.com/firebasejs/4.2.0/firebase.js"></script>
-  <script type="module" src="./app-shell.js"></script>
+  <!-- firebase config is required before loading runtime -->
+  <script type="module" src="../../app-shell/firebase-config.js"></script>
+  
+  <!-- load runtime (from build [lib] or source [source])
+  <!--<script type="module" src="../../lib/ArcsLib.js"></script>-->
+  <script type="module" src="../../source/ArcsLib.js"></script>
+
+  <script type="module" src="../../app-shell/app-shell.js"></script>
 
 </head>
 <body>
