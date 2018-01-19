@@ -9,3 +9,4 @@
 # this is a list of recipes that are used in our canonical demos.
 import 'Events/Events.recipes'
 import 'Restaurants/Restaurants.recipes'
+import 'Identity/Identity.recipes'
