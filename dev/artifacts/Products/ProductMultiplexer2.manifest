@@ -9,7 +9,7 @@
 import 'Product.schema'
 
 shape HostedParticleShape
-  HostedParticleShape(in Product product, in [~a] others)
+  HostedParticleShape(in Product, in [~a])
   consume annotation
 
 particle ProductMultiplexer2 in 'source/ProductMultiplexer2.js'
