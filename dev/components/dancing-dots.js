@@ -70,6 +70,10 @@ class DancingDots extends HTMLElement {
     if (this._active !== active) {
       this._active = active;
       this._active ? this._start() : this._stop();
+
+      // add a marker to allow other components (and tests) to see when we're
+      // done processing.
+      this[active ? 'setAttribute' : 'removeAttribute']('animate', '');
     }
   }
   get _bullets() {
