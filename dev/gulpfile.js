@@ -88,9 +88,11 @@ let pack = async (files) => {
   }
 };
 
-gulp.task('copy-runtime', ['arcs-build'], async function() {
+gulp.task('pack', async function() {
   await pack(sources.cdn);
 });
+
+gulp.task('copy-runtime', ['arcs-build', 'pack']);
 
 const components = `${target}components/`;
 const arcs = `../../arcs/`;
