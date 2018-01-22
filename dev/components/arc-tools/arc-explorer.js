@@ -92,7 +92,9 @@ class ArcExplorer extends XenBase {
     });
   }
   async _queryHandles(arc) {
-    this._setState({handles: await this._renderHandles(arc)});
+    let arcHandles = await this._renderHandles(arc);
+    let contextHandles = await this._renderHandles(arc.context);
+    this._setState({handles: arcHandles.concat(contextHandles)});
   }
   _render(props, state) {
     let list = (template, models) => { return {template,models}; };
