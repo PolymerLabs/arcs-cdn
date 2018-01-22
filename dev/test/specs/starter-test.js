@@ -45,7 +45,7 @@ function wait(msToWait) {
  *   {id: <element-id>, text: <found text>}
  */
 function searchElementsForText(elements, textQuery) {
-  if (null==elements || 0==elements.length) {
+  if (!elements || 0==elements.length) {
     return;
   }
 
