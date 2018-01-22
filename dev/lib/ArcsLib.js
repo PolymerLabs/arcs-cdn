@@ -16304,10 +16304,10 @@ class FirebaseStorage {
 
   async _join(id, type, key, shouldExist) {
     key = new FirebaseKey(key);
-    // TODO: is it ever going to be possible to autoconstruct new firebase datastores? 
+    // TODO: is it ever going to be possible to autoconstruct new firebase datastores?
     if (key.databaseUrl == undefined || key.apiKey == undefined)
       throw new Error('Can\'t complete partial firebase keys');
-      
+
     if (this._apps[key.projectId] == undefined) {
       for (var app of __WEBPACK_IMPORTED_MODULE_1__platform_firebase_web_js__["a" /* default */].apps) {
         if (app.options.databaseURL == key.databaseURL) {
@@ -16317,7 +16317,7 @@ class FirebaseStorage {
       }
     }
 
-    if (this._apps[key.projectId] == undefined) {      
+    if (this._apps[key.projectId] == undefined) {
       this._apps[key.projectId] = __WEBPACK_IMPORTED_MODULE_1__platform_firebase_web_js__["a" /* default */].initializeApp({
         apiKey: key.apiKey,
         databaseURL: key.databaseUrl
@@ -16325,7 +16325,7 @@ class FirebaseStorage {
     }
 
     var reference = __WEBPACK_IMPORTED_MODULE_1__platform_firebase_web_js__["a" /* default */].database(this._apps[key.projectId]).ref(key.location);
-    
+
     let result = await realTransaction(reference, data => {
       if ((data == null) == shouldExist)
         return; // abort transaction
@@ -16334,7 +16334,7 @@ class FirebaseStorage {
       }
       return data;
     });
-    
+
 
     if (!result.committed)
       return null;
@@ -16372,7 +16372,7 @@ class FirebaseVariable extends FirebaseStorageProvider {
   constructor(type, arc, id, reference, firebaseKey) {
     super(type, arc, id, reference, firebaseKey);
     this.dataSnapshot = undefined;
-    this._pendingGets = [];    
+    this._pendingGets = [];
     this.reference.on('value', dataSnapshot => {
       this.dataSnapshot = dataSnapshot;
       let data = dataSnapshot.val();
@@ -16385,6 +16385,7 @@ class FirebaseVariable extends FirebaseStorageProvider {
   async cloneFrom(store) {
     let {data, version} = await store._getWithVersion();
     await realTransaction(this.reference, data => ({data, version}));
+    this.description = store.description;
   }
 
   async get() {
@@ -16465,6 +16466,7 @@ class FirebaseCollection extends FirebaseStorageProvider {
       data.version = version;
       return data;
     });
+    this.description = store.description;
   }
 
   async toList() {
@@ -16496,6 +16498,7 @@ class FirebaseCollection extends FirebaseStorageProvider {
     return list;
   }
 }
+
 
 /***/ }),
 /* 68 */
@@ -16616,6 +16619,7 @@ class InMemoryCollection extends InMemoryStorageProvider {
   async cloneFrom(handle) {
     let {list, version} = await handle._toListWithVersion();
     this._version = version;
+    this.description = handle.description;
     list.forEach(item => this._items.set(item.id, item));
   }
 
@@ -16703,6 +16707,7 @@ class InMemoryVariable extends InMemoryStorageProvider {
     let {data, version} = await handle._getWithVersion();
     this._stored = data;
     this._version = version;
+    this.description = handle.description;
   }
 
   traceInfo() {

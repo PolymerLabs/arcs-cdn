@@ -261,7 +261,7 @@ function getAtLeastOneSuggestion() {
 }
 
 function acceptSuggestion(textSubstring) {
-  console.log(`Trying to accept: ${textSubstring}`); 
+  console.log(`Trying to accept: ${textSubstring}`);
   waitForStillness();
   openSuggestionDrawer();
   let footerPath = getFooterPath();
@@ -269,7 +269,6 @@ function acceptSuggestion(textSubstring) {
   browser.waitUntil(
     () => {
       const allSuggestions = getAtLeastOneSuggestion();
-
       try {
         const desiredSuggestion = searchElementsForText(
           allSuggestions.value,
@@ -383,9 +382,7 @@ describe('test Arcs demo flows', function() {
     //});
   });
 
-  // TODO(wkorman): Restore the below once we fix ES modules related issues.
-  // See https://github.com/PolymerLabs/arcs-cdn/issues/142
-  it.skip('can use the gift shopping demo flow', function() {
+  it('can use the gift shopping demo flow', function() {
     initTestWithNewArc();
 
     allSuggestions();
