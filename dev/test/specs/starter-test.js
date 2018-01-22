@@ -9,6 +9,7 @@
  */
 
 const assert = require('assert');
+const { URL } = require('url');
 
 function pierceShadows(selectors) {
   return browser.execute(function(selectors) {
@@ -21,17 +22,19 @@ function pierceShadowsSingle(selectors) {
   }, selectors);
 }
 
-/** Wait a short, approximate time (up to 10 seconds). */
-function wait(seconds) {
-  let count = 0;
+/** Wait a short, approximate time (up to 10 seconds) in 100ms increments. */
+function wait(msToWait) {
+  let msWaited = 0;
+  const msIncrement = 100;
+  const start = Date.now();
   browser.waitUntil(
     () => {
-      count += 1;
-      return count >= seconds;
+      msWaited += msIncrement;
+      return msWaited > msToWait;
     },
     10000,
     `we should have exited after a few iterations`,
-    1000
+    msIncrement
   );
 }
 
@@ -67,6 +70,11 @@ function searchElementsForText(elements, textQuery) {
 
 /** Load the selenium utils into the current page. */
 function loadSeleniumUtils() {
+  // wait for the page to load a bit. In the future, if we use this with
+  // non-arcs pages, we should move this out.
+  browser.waitForVisible('<app-main>');
+  browser.waitForVisible('<footer>');
+
   var result = browser.execute(function(baseUrl) {
     const script = document.createElement('script');
     script.type = 'text/javascript';
@@ -116,52 +124,66 @@ function dancingDotsElement() {
   ]);
 }
 
-/** wait for the dancing dots to stop. */
+/** Wait for the dancing dots to stop. */
 function waitForStillness() {
   var element = dancingDotsElement();
+
+  // Currently, the dots sometimes stop & start again. We're introducing a
+  // fudge factor here - the dots have to be stopped for a few consecutive
+  // checks before we'll consider them really stopped.
+  let matches = 0;
+  const desiredMatches = 2;
 
   browser.waitUntil(
     () => {
       var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
-      return null == result.value;
+      if (null == result.value) {
+        matches += 1;
+      } else {
+        if (matches > 0) {
+          console.log(`WARN the dots had stopped dancing, but they've started up again.
+\t\tThis may indicate a bug?`);
+        }
+        matches = 0;
+      }
+      return matches > desiredMatches;
     },
-    5000,
+    7000,
     `the dancing dots can't stop won't stop`,
-    1000
+    500
   );
 }
 
-function _waitForSuggestionsDrawerToBeOpen() {
-  const footerPath = getFooterPath();
-  try {
-    browser.waitUntil(
-      () => {
-        const footer = pierceShadowsSingle(footerPath);
-        const isOpen = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
-        return isOpen.value;
-      },
-      500,
-      `the suggestions drawer was never open`,
-      100
-    );
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
 
+/**
+ * The suggestions drawer animates open & closing.
+ * Add additional logic to deal with this. */
 function openSuggestionDrawer() {
-  // pause before we start; sometimes the drawer is in animation
-  wait(2);
-  const suggestionsOpen = _waitForSuggestionsDrawerToBeOpen();
+  const _isSuggestionsDrawerOpen = () => {
+    const footer = pierceShadowsSingle(getFooterPath());
+    const isOpen = browser.elementIdAttribute(footer.value.ELEMENT, 'open');
+    return isOpen.value;
+  };
+
+  const suggestionsOpen = _isSuggestionsDrawerOpen();
   if (!suggestionsOpen) {
     const dancingDots = dancingDotsElement();
+    console.log(`click: suggestions drawer closed`);
     browser.elementIdClick(dancingDots.value.ELEMENT);
 
-    // after the click, wait a beat for the animation to finish
-    wait(2);
+    // registering the 'open' state may take a little bit
+    browser.waitUntil(_isSuggestionsDrawerOpen,
+      1000,
+      `the suggestions drawer isn't registering with state 'open' after a click`,
+      100);
 
-    if (!_waitForSuggestionsDrawerToBeOpen()) {
+    // after the 'open' state, wait a beat for the animation to finish. This
+    // should only be 80ms but in practice we need a bit more.
+    wait(200);
+
+    if (!_isSuggestionsDrawerOpen()) {
+      console.log('suggestions drawer not opening?');
+      browser.debug();
       throw Error(`suggestions drawer never opened even after a click`);
     }
   }
@@ -172,6 +194,13 @@ function getFooterPath() {
 }
 
 function initTestWithNewArc() {
+  // clean up extra open tabs
+  const openTabs = browser.getTabIds();
+  browser.switchTab(openTabs[0]);
+  openTabs.slice(1).forEach(tabToClose => {
+    browser.close(tabToClose);
+  });
+
   // TODO(smalls) should we create a user on the fly?
   // note - baseUrl (currently specified on the command line) must end in a
   // trailing '/', and this must not begin with a preceding '/'.
@@ -185,10 +214,6 @@ function initTestWithNewArc() {
 
   // use a solo URL pointing to our local recipes
   browser.url(`${browser.getUrl()}&solo=${browser.options.baseUrl}artifacts/canonical.manifest`);
-
-  // wait for the page to load a bit, init the test harness for this page
-  browser.waitForVisible('<app-main>');
-  browser.waitForVisible('<footer>');
   loadSeleniumUtils();
 
   // check out some basic structure relative to the app footer
@@ -215,25 +240,31 @@ function allSuggestions() {
   const magnifier = pierceShadowsSingle(
     getFooterPath().concat(['div[search]', 'i'])
   );
+  console.log(`click: allSuggestions`);
   browser.elementIdClick(magnifier.value.ELEMENT);
 }
 
+function getAtLeastOneSuggestion() {
+  const allSuggestions = pierceShadows([
+    'div[slotid="suggestions"]',
+    'suggestion-element'
+  ]);
+  if (!allSuggestions.value || 0 == allSuggestions.value) {
+    console.log('No suggestions found.');
+    return false;
+  }
+  return allSuggestions;
+}
+
 function acceptSuggestion(textSubstring) {
-  wait(2);
+  console.log(`Trying to accept: ${textSubstring}`); 
   waitForStillness();
   openSuggestionDrawer();
   let footerPath = getFooterPath();
 
   browser.waitUntil(
     () => {
-      const allSuggestions = pierceShadows([
-        'div[slotid="suggestions"]',
-        'suggestion-element'
-      ]);
-      if (!allSuggestions.value || 0 == allSuggestions.value) {
-        console.log('No suggestions found.');
-        return false;
-      }
+      const allSuggestions = getAtLeastOneSuggestion();
 
       try {
         const desiredSuggestion = searchElementsForText(
@@ -245,6 +276,7 @@ function acceptSuggestion(textSubstring) {
           return false;
         }
 
+        console.log(`click: desiredSuggestion`);
         browser.elementIdClick(desiredSuggestion.id);
         return true;
       } catch (e) {
@@ -301,6 +333,7 @@ function clickInParticles(slotName, selectors, textQuery) {
       }
 
       if (selected) {
+        console.log(`click: clickInParticles`);
         browser.elementIdClick(selected);
         return true;
       } else {
@@ -323,19 +356,17 @@ describe('test Arcs demo flows', function() {
     // Our location is relative to where you are now, so this list is dynamic.
     // Rather than trying to mock this out let's just grab the first
     // restaurant.
-    wait(2);
     const restaurantSelectors = particleSelectors('root', [
       'div.item',
       'div.title'
     ]);
     waitForVisible(restaurantSelectors);
     let restaurantNodes = pierceShadows(restaurantSelectors);
+    console.log(`click: restaurantSelectors`);
     browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
 
     acceptSuggestion('Make a reservation');
     acceptSuggestion('You are free');
-
-    browser.close();
 
     // to drop into debug mode with a REPL; also a handy way to see the state
     // at the end of the test:
@@ -379,7 +410,33 @@ describe('test Arcs demo flows', function() {
     let annotations = browser.getText('div[slotid="annotation"]');
     assert.equal(6, annotations.length);
     assert.ok(annotations.length > 0 && annotations.every(a => a.length > 0));
+  });
 
-    browser.close();
+  it('can use an arc with the default global manifests', function() {
+    initTestWithNewArc();
+
+    // remove solo from our URL to use the default
+    const url = new URL(browser.getUrl());
+    url.searchParams.delete('solo');
+    browser.url(url.href);
+
+    // load our utils in the new page
+    loadSeleniumUtils();
+
+    waitForStillness();
+    browser.waitUntil(
+      () => {
+        getAtLeastOneSuggestion();
+
+        // we hit at least a single suggestion, good enough!
+        return true;
+      },
+      5000,
+      `couldn't find any suggestions; this might indicate that a global manifest failed to load`
+    );
+
+    // treat the fact that we found any suggestions as a good enough
+    // indication that there aren't any major issues with globally available
+    // manifests.
   });
 });

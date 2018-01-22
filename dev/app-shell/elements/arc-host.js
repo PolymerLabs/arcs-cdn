@@ -172,8 +172,8 @@ class ArcHost extends XenBase {
     // timeout here is likely to catch the vast majority of the work. This is just a temporary solution,
     // since it's a just another race-condition in actuality (I've merely slowed one of the racers).
     // The timeout value is a magic number.
-    arc.instantiate(plan);
-    return new Promise(resolve => {
+    await arc.instantiate(plan);
+    return new Promise((resolve, reject) => {
       setTimeout(resolve, 200);
     }).then(() => {
       this._fire('applied', plan);

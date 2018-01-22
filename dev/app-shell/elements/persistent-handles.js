@@ -51,8 +51,8 @@ class PersistentHandles extends XenBase {
         return this._syncSet(arc, localHandle, remoteHandle);
       }
       if (localHandle.type.isEntity) {
-        PersistentHandles.log(`Syncing variable ${handleId}`);
-        return this._syncVariable(arc, localHandle, remoteHandle);
+        PersistentHandles.log(`[disabled] Syncing variable ${handleId}`);
+        //return this._syncVariable(arc, localHandle, remoteHandle);
       }
     });
   }

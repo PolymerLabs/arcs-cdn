@@ -757,7 +757,7 @@ class Schema {
               return undefined;
             let [fieldType, jsType] = checkFieldIsValidAndGetTypes(name, 'get');
             let value = target[name];
-            __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(value === undefined || value === null || typeof(value) == jsType,
+            __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(value == undefined || value === null || typeof(value) == jsType,
                    `Field ${name} (type ${fieldType}) has value ${value} (type ${typeof(value)})`);
             return value;
           },
@@ -779,7 +779,10 @@ class Schema {
       dataClone() {
         let clone = {};
         for (let propertyList of [normative, optional]) {
-          Object.keys(propertyList).forEach(prop => clone[prop] = this.rawData[prop]);
+          Object.keys(propertyList).forEach(prop => {
+            if (this.rawData[prop] !== undefined)
+              clone[prop] = this.rawData[prop];
+          });
         }
         return clone;
       }
@@ -1383,16 +1386,16 @@ class Relation extends __WEBPACK_IMPORTED_MODULE_1__entity_js__["a" /* default *
 
 
 // ShapeView {name, direction, type}
-// Slot {name, direction}
+// Slot {name, direction, isRequired, isSet}
 
 function _fromLiteral(member) {
-  if (typeof member == 'object')
+  if (!!member && typeof member == 'object')
     return __WEBPACK_IMPORTED_MODULE_1__type_js__["a" /* default */].fromLiteral(member);
   return member;
 }
 
 function _toLiteral(member) {
-  if (member && member.toLiteral)
+  if (!!member && member.toLiteral)
     return member.toLiteral();
   return member;
 }
@@ -1408,7 +1411,7 @@ class Shape {
           this._typeVars.push({object: view, field});
 
     for (let slot of slots)
-      for (let field of ['name', 'direction'])
+      for (let field of ['name', 'direction', 'isRequired', 'isSet'])
         if (Shape.isTypeVar(slot[field]))
           this._typeVars.push({object: slot, field});
   }
@@ -1419,19 +1422,19 @@ class Shape {
 
   static fromLiteral(data) {
     let views = data.views.map(view => ({type: _fromLiteral(view.type), name: _fromLiteral(view.name), direction: _fromLiteral(view.direction)}));
-    let slots = data.slots.map(slot => ({name: _fromLiteral(slot.name), direction: _fromLiteral(slot.direction)}));
+    let slots = data.slots.map(slot => ({name: _fromLiteral(slot.name), direction: _fromLiteral(slot.direction), isRequired: _fromLiteral(slot.isRequired), isSet: _fromLiteral(slot.isSet)}));
     return new Shape(views, slots);
   }
 
   toLiteral() {
     let views = this.views.map(view => ({type: _toLiteral(view.type), name: _toLiteral(view.name), direction: _toLiteral(view.direction)}));
-    let slots = this.slots.map(slot => ({name: _toLiteral(slot.name), direction: _toLiteral(slot.direction)}));
+    let slots = this.slots.map(slot => ({name: _toLiteral(slot.name), direction: _toLiteral(slot.direction), isRequired: _toLiteral(slot.isRequired), isSet: _toLiteral(slot.isSet)}));
     return {views, slots};
   }
 
   clone() {
     var views = this.views.map(({name, direction, type}) => ({name, direction, type}));
-    var slots = this.slots.map(({name, direction}) => ({name, direction}));
+    var slots = this.slots.map(({name, direction, isRequired, isSet}) => ({name, direction, isRequired, isSet}));
     return new Shape(views, slots);
   }
 
@@ -1440,10 +1443,29 @@ class Shape {
       return false;
 
     // TODO: this isn't quite right as it doesn't deal with duplicates properly
-    for (let otherView of other.views) {
+    if (!this._equalItems(other.views, this.views, this._equalView)) {
+      return false;
+    }
+
+    if (!this._equalItems(other.slots, this.slots, this._equalSlot)) {
+      return false;
+    }
+    return true;
+  }
+
+  _equalView(view, otherView) {
+    return view.name == otherView.name && view.direction == otherView.direction && view.type.equals(otherView.type);
+  }
+
+  _equalSlot(slot, otherSlot) {
+    return slot.name == otherSlot.name && slot.direction == otherSlot.direction && slot.isRequired == otherSlot.isRequired && slot.isSet == otherSlot.isSet;
+  }
+
+  _equalItems(otherItems, items, compareItem) {
+    for (let otherItem of otherItems) {
       let exists = false;
-      for (let view of this.views) {
-        if (view.name == otherView.name && view.direction == otherView.direction && view.type.equals(otherView.type)) {
+      for (let item of items) {
+        if (compareItem(item, otherItem)) {
           exists = true;
           break;
         }
@@ -1452,7 +1474,6 @@ class Shape {
         return false;
     }
 
-    // TODO: compare slots too
     return true;
   }
 
@@ -1476,8 +1497,28 @@ class Shape {
     return true;
   }
 
-  _particleMatches(particleSpec) {
+  static slotsMatch(shapeSlot, particleSlot) {
+    if (Shape.mustMatch(shapeSlot.name) && shapeSlot.name !== particleSlot.name)
+      return false;
+    if (Shape.mustMatch(shapeSlot.direction) && shapeSlot.direction !== particleSlot.direction)
+      return false;
+    if (Shape.mustMatch(shapeSlot.isRequired) && shapeSlot.isRequired !== particleSlot.isRequired)
+      return false;
+    if (Shape.mustMatch(shapeSlot.isSet) && shapeSlot.isSet !== particleSlot.isSet)
+      return false;
+    return true;
+  }
+
+  particleMatches(particleSpec) {
     var viewMatches = this.views.map(view => particleSpec.connections.filter(connection => Shape.viewsMatch(view, connection)));
+    let particleSlots = [];
+    particleSpec.slots.forEach(consumedSlot => {
+      particleSlots.push({name: consumedSlot.name, direction: 'consume', isRequired: consumedSlot.isRequired, isSet: consumedSlot.isSet});
+      consumedSlot.providedSlots.forEach(providedSlot => {
+        particleSlots.push({name: providedSlot.name, direction: 'provide', isSet: providedSlot.isSet});
+      });
+    });
+    var slotMatches = this.slots.map(slot => particleSlots.filter(particleSlot => Shape.slotsMatch(slot, particleSlot)));
 
     var exclusions = [];
 
@@ -1496,8 +1537,7 @@ class Shape {
 
       return false;
     }
-
-    return choose(viewMatches, []);
+    return choose(viewMatches, []) && choose(slotMatches, []);
   }
 }
 
@@ -1729,7 +1769,7 @@ class InnerPEC {
     };
 
     this._apiPort.onInstantiateParticle =
-      ({spec, handles}) => this._instantiateParticle(spec, handles);
+      ({id, spec, handles}) => this._instantiateParticle(id, spec, handles);
 
     this._apiPort.onSimpleCallback = ({callback, data}) => callback(data);
 
@@ -1849,7 +1889,7 @@ class InnerPEC {
     };
   }
 
-  async _instantiateParticle(spec, proxies) {
+  async _instantiateParticle(id, spec, proxies) {
     let name = spec.name;
     var resolve = null;
     var p = new Promise((res, rej) => resolve = res);
@@ -1857,6 +1897,7 @@ class InnerPEC {
     let clazz = await this._loader.loadParticleClass(spec);
     let capabilities = this.defaultCapabilitySet();
     let particle = new clazz(); // TODO: how can i add an argument to DomParticle ctor?
+    particle.id = id;
     particle.capabilities = capabilities;
     this._particles.push(particle);
 
@@ -2543,7 +2584,7 @@ class PECOuterPort extends APIPort {
       {particleDefinition: this.Direct, particleFunction: this.Stringify});
     this.registerRedundantInitializer('DefineHandle', {type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializer('InstantiateParticle',
-      {spec: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_1__particle_spec_js__["a" /* default */]), handles: this.Map(this.Direct, this.Mapped)});
+      {id: this.Direct, spec: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_1__particle_spec_js__["a" /* default */]), handles: this.Map(this.Direct, this.Mapped)});
 
     this.registerCall('UIEvent', {particle: this.Mapped, slotName: this.Direct, event: this.Direct});
     this.registerCall('SimpleCallback', {callback: this.Direct, data: this.Direct});
@@ -2591,7 +2632,7 @@ class PECInnerPort extends APIPort {
       {particleDefinition: this.Direct, particleFunction: this.Direct});
     this.registerInitializerHandler('DefineHandle', {type: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_2__type_js__["a" /* default */]), name: this.Direct});
     this.registerInitializerHandler('InstantiateParticle',
-      {spec: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_1__particle_spec_js__["a" /* default */]), handles: this.Map(this.Direct, this.Mapped)});
+      {id: this.Direct, spec: this.ByLiteral(__WEBPACK_IMPORTED_MODULE_1__particle_spec_js__["a" /* default */]), handles: this.Map(this.Direct, this.Mapped)});
 
     this.registerHandler('UIEvent', {particle: this.Mapped, slotName: this.Direct, event: this.Direct});
     this.registerHandler('SimpleCallback', {callback: this.LocalMapped, data: this.Direct});

@@ -8,26 +8,15 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
  */
 
-import Xen from '../components/xen/xen-template.js';
-import XenBase from "../components/xen/xen-base.js";
-
 import ArcsUtils from "./lib/arcs-utils.js";
 
-import "../components/arc-tools/arc-explorer.js";
-import "../components/arc-tools/explorer-hotkey.js";
-import "../components/arc-tools/local-data.js";
-import "../components/arc-tools/manifest-data.js";
-import "../components/arc-tools/shell-particles.js";
-import "../components/data-explorer.js";
-import "../components/simple-tabs.js";
-import "../components/suggestion-element.js";
-import "../components/toggle-button.js";
+// core
+import Xen from '../components/xen/xen.js';
 import "./elements/arc-config.js";
 import "./elements/arc-footer.js";
 import "./elements/arc-handle.js";
 import "./elements/arc-host.js";
 import "./elements/arc-steps.js";
-import "./elements/arc-store.js";
 import "./elements/persistent-arc.js";
 import "./elements/persistent-handles.js";
 import "./elements/persistent-manifests.js";
@@ -38,9 +27,18 @@ import "./elements/remote-profile-handles.js";
 import "./elements/remote-shared-handles.js";
 import "./elements/remote-visited-arcs.js";
 
-import "../lib/ArcsLib.js";
+// tools
+import "../components/arc-tools/explorer-hotkey.js";
+import "../components/arc-tools/arc-explorer.js";
+import "../components/arc-tools/local-data.js";
+import "../components/arc-tools/manifest-data.js";
+import "../components/arc-tools/shell-particles.js";
+import "../components/data-explorer.js";
+import "../components/simple-tabs.js";
+import "../components/suggestion-element.js";
+import "../components/toggle-button.js";
 
-// TODO(sjmiles): whitelisted for Particles (should be marshalled elsewhere, e.g. indirected via `whitelist.js`)
+// for particles
 import "../components/corellia-xen/cx-input.js";
 import "../components/good-map.js";
 
@@ -221,7 +219,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 </app-tools>`
 });
 
-class AppShell extends XenBase {
+class AppShell extends Xen.Base {
   get host() {
     // TODO(sjmiles): override shadow-root generation so that
     // old-timey systems (e.g. TradingView widgets) can find
@@ -354,11 +352,11 @@ class AppShell extends XenBase {
   }
   _didRender(props, state) {
     // toggles boolean attribute `expanded` on `this`
-    Xen.setBoolAttribute(this, 'expanded', Boolean(state.arcsToolsVisible));
+    Xen.Template.setBoolAttribute(this, 'expanded', Boolean(state.arcsToolsVisible));
     if (state.config) {
       localStorage.setItem('0-3-arcs-dev-tools', state.arcsToolsVisible ? 'open' : 'closed');
     }
-    Xen.setBoolAttribute(this, 'illuminate', Boolean(state.illuminateParticles));
+    Xen.Template.setBoolAttribute(this, 'illuminate', Boolean(state.illuminateParticles));
   }
   _renderUserOptionModels(users, user) {
     let models = [
@@ -395,11 +393,6 @@ class AppShell extends XenBase {
       };
     });
   }
-  /*
-  _hasHandles(state) {
-    return Boolean(state.arcsHandle && state.identityHandle && state.identitiesHandle);
-  }
-  */
   _setIfDirty(object) {
     let dirty = null;
     for (let property in object) {
@@ -695,5 +688,5 @@ class AppShell extends XenBase {
     }
   }
 }
-AppShell.log = XenBase.logFactory('AppShell', '#bb4d00');
+AppShell.log = Xen.Base.logFactory('AppShell', '#bb4d00');
 customElements.define('app-shell', AppShell);
