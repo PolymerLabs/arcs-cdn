@@ -8,6 +8,6 @@
 import 'Launcher.manifest'
 
 recipe
-  use #arcmetadata as arcs
+  map #arcmetadata as arcs
   Launcher
     arcs = arcs

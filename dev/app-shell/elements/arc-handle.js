@@ -9,9 +9,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import ArcsUtils from "../lib/arcs-utils.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from "../../components/xen/xen.js";
 
-class ArcHandle extends XenBase {
+class ArcHandle extends Xen.Base {
   static get observedAttributes() { return ['arc', 'options', 'data']; }
   async _update(props, state, lastProps) {
     let lastData = lastProps.data;
@@ -21,14 +21,13 @@ class ArcHandle extends XenBase {
         Arcs.Manifest.load(options.schemas, arc.loader).then(manifest => this._setState({manifest}));
       }
       if (state.manifest && options) {
-        state.handle = await this._createHandle(arc, state.manifest, options);
+        state.handle = this._createHandle(arc, state.manifest, options);
       }
       lastData = null;
     }
     if (state.handle && data != lastData) {
       // (re)populate
-      this._updateHandle(state.handle, data, arc);
-      //this._fire('handle', state.handle);
+      this._updateHandle(await state.handle, data, arc);
     }
   }
   async _createHandle(arc, manifest, {name, tags, type, id, asContext}) {
@@ -48,11 +47,18 @@ class ArcHandle extends XenBase {
     } else {
       // arc-handle, suitable for `use`, `?`
       handle = await arc.createView(typeOf, name, id, tags, `in-memory://${id}`);
+      //handle = await arc.createView(typeOf, name, id, tags);
     }
-    // observe handle
-    handle.on('change', change => this._fire('handle', handle), this);
     ArcHandle.log('created handle', name, tags);
+    // observe handle
+    handle.on('change', () => this._handleChanged(handle), this);
     return handle;
+  }
+  _handleChanged(handle) {
+    if (this._state.version !== handle._version) {
+      //ArcHandle.log('update, version changed', handle._version);
+      this._fire('handle', handle);
+    }
   }
   _updateHandle(handle, data, arc) {
     if (handle.toList) {
@@ -63,7 +69,8 @@ class ArcHandle extends XenBase {
       data = {id: arc.generateID(), rawData: data};
     }
     ArcsUtils.setHandleData(handle, data);
+    this._state.version = handle._version;
   }
 }
-ArcHandle.log = XenBase.logFactory('ArcHandle', '#c6a700');
+ArcHandle.log = Xen.Base.logFactory('ArcHandle', '#c6a700');
 customElements.define('arc-handle', ArcHandle);

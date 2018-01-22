@@ -177,8 +177,10 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   <arc-handle arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarHandleOptions}}"></arc-handle>
 
   <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
+
   <!-- only for launcher -->
   <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
+
   <!-- toolbar is here only to reserve space in the static flow, the app-toolbar is position-fixed -->
   <toolbar>
     <app-toolbar>
@@ -245,6 +247,8 @@ class AppShell extends Xen.Base {
         type: '[ArcMetadata]',
         name: 'ArcMetadata',
         tags: ['#arcmetadata'],
+        // TODO(sjmiles): as built, this shoud not be `asContext` so that Launcher can write to this view,
+        // but creating in-Arc views is broken atm
         asContext: true
       },
       identityHandleOptions: {
@@ -271,7 +275,7 @@ class AppShell extends Xen.Base {
       },
       friendsAvatarData: {},
       auth: true
-    }
+    };
   }
   _didMount() {
     this.setAttribute('arc-app', '');

@@ -35,14 +35,14 @@ class ArcHost extends XenBase {
     if (props.manifests && props.exclusions) {
       state.effectiveManifests = this._intersectManifests(props.manifests, props.exclusions);
     }
-    if (props.key && props.config && props.config !== state.config && state.effectiveManifests) {
+    if (/*props.key &&*/ props.config && props.config !== state.config && state.effectiveManifests) {
       state.config = props.config;
       state.config.arcKey = props.key;
       state.config.manifests = state.effectiveManifests;
       this._applyConfig(state.config);
     }
     else if (state.arc && (props.manifests !== lastProps.manifests || props.exclusions != lastProps.exclusions)) {
-      ArcHost.log('reloading')
+      ArcHost.log('reloading');
       this._reloadManifests();
     }
     if (props.plan && lastProps.plan !== props.plan) {
@@ -62,7 +62,7 @@ class ArcHost extends XenBase {
   }
   async _applyConfig(config) {
     let arc = await this._createArc(config);
-    arc.makeSuggestions = async () => { this._schedulePlanning(state); }
+    //arc.makeSuggestions = async () => { this._schedulePlanning(state); }
     ArcHost.log('instantiated', arc);
     this._setState({arc});
     this._fire('arc', arc);
@@ -95,8 +95,8 @@ class ArcHost extends XenBase {
     // TODO(sjmiles): should be from a separate import
     const database = 'arcs-storage.firebaseio.com';
     const apiKey = 'AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8';
-    const dbVersion = '0_3_4';
-    return `firebase://${database}/${apiKey}/${dbVersion}/arcs/${arcKey}/handles`;
+    const dbVersion = '0_4';
+    return `firebase://${database}/${apiKey}/${dbVersion}/arcs/${arcKey}`;
   }
   _marshalLoader(config) {
     // create default URL map

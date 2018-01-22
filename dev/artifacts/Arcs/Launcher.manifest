@@ -9,6 +9,7 @@
 import 'ArcMetadata.schema'
 
 particle Launcher in 'source/Launcher.js'
-  Launcher(inout [ArcMetadata] arcs)
+  #Launcher(inout [ArcMetadata] arcs)
+  Launcher(in [ArcMetadata] arcs)
   consume root
   description `arcs launcher`

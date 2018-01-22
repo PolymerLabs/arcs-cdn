@@ -18,7 +18,7 @@ recipe
     person <- person
 
   create #friends as friends
-  use #identities as people
+  map #identities as people
   map #friends_avatar as avatars
   FriendsPicker
     person <- person
