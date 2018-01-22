@@ -45,6 +45,10 @@ function wait(msToWait) {
  *   {id: <element-id>, text: <found text>}
  */
 function searchElementsForText(elements, textQuery) {
+  if (null==elements || 0==elements.length) {
+    return;
+  }
+
   const textToId = elements.map(value => {
     return {
       id: value.ELEMENT,
@@ -148,7 +152,7 @@ function waitForStillness() {
       }
       return matches > desiredMatches;
     },
-    7000,
+    10000,
     `the dancing dots can't stop won't stop`,
     500
   );
