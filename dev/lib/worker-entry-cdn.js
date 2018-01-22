@@ -95,7 +95,8 @@ function assert(test, message) {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__schema_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(25);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__tuple_fields_js__ = __webpack_require__(25);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -283,6 +284,8 @@ class Type {
         return __WEBPACK_IMPORTED_MODULE_2__schema_js__["a" /* default */].fromLiteral;
       case 'SetView':
         return Type.fromLiteral;
+      case 'Tuple':
+        return __WEBPACK_IMPORTED_MODULE_4__tuple_fields_js__["a" /* default */].fromLiteral;
       default:
         return a => a;
     }
@@ -311,6 +314,8 @@ class Type {
       return this.entitySchema.name;
     if (this.isInterface)
       return 'Interface';
+    if (this.isTuple)
+      return this.tupleFields.toString();
     __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])('Add support to serializing type:', this);
   }
 
@@ -331,6 +336,8 @@ class Type {
       } 
       return JSON.stringify(this.entitySchema._model);
     }
+    if (this.isTuple)
+      return this.tupleFields.toString();
     if (this.isManifestReference)
       return this.manifestReferenceName;
     if (this.isInterface)
@@ -345,6 +352,7 @@ addType('Variable');
 addType('SetView', 'type');
 addType('Relation', 'entities');
 addType('Interface', 'shape');
+addType('Tuple', 'fields');
 
 /* harmony default export */ __webpack_exports__["a"] = (Type);
 
@@ -682,7 +690,7 @@ class Schema {
     return true;
   }
   containsAncestry(otherSchema) {
-    if (this.name == otherSchema.name) {
+    if (this.name == otherSchema.name || otherSchema.name == null) {
       nextOtherParent: for (let otherParent of otherSchema.parents) {
         for (let parent of this.parents) {
           if (parent.containsAncestry(otherParent)) {
@@ -868,7 +876,7 @@ class Schema {
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__runtime_js__ = __webpack_require__(24);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_spec_js__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__tracelib_trace_js__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__tracelib_trace_js__ = __webpack_require__(27);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__schema_js__ = __webpack_require__(4);
 /**
@@ -3239,6 +3247,54 @@ let BasicEntity = testEntityClass('BasicEntity');
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
+/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+
+
+class TupleFields {
+  constructor(fieldList) {
+    this.fieldList = fieldList;
+  }
+
+  static fromLiteral(literal) {
+    return new TupleFields(literal.map(a => Type.fromLiteral(a)));
+  }
+
+  toLiteral() {
+    return this.fieldList.map(a => a.toLiteral());
+  }
+
+  clone() {
+    return new TupleFields(this.fieldList.map(a => a.clone()));
+  }
+
+  equals(other) {
+    if (this.fieldList.length !== other.fieldList.length)
+      return false;
+    for (var i = 0; i < this.fieldList.length; i++) {
+      if (!this.fieldList[i].equals(other.fieldList[i]))
+        return false;
+    }
+    return true;
+  }
+}
+/* harmony export (immutable) */ __webpack_exports__["a"] = TupleFields;
+
+
+/***/ }),
+/* 26 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -3277,7 +3333,7 @@ class TypeVariable {
 
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";

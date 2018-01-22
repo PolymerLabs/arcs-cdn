@@ -16,7 +16,7 @@ import 'ExtractLocation.manifest'
 import 'GoogleMap.manifest'
 
 recipe
-  use #user as person
+  map #user as person
   create as location
   ExtractLocation
     person <- person

@@ -12,7 +12,7 @@ import '../Places/AddressForm.manifest'
 
 recipe
   create #avatar as avatar
-  use #user as person
+  map #user as person
   AvatarPicker
     avatar = avatar
     person <- person
@@ -30,7 +30,7 @@ recipe
   FavoriteFoodPicker
     food = food
     person <- person
-    
+
   create #address as address
   AddressForm
     address = address

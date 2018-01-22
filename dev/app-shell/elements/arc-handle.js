@@ -47,7 +47,7 @@ class ArcHandle extends XenBase {
       handle = await arc.context.newView(typeOf, name, id, tags);
     } else {
       // arc-handle, suitable for `use`, `?`
-      handle = await arc.createView(typeOf, name, id, tags);
+      handle = await arc.createView(typeOf, name, id, tags, `in-memory://${id}`);
     }
     // observe handle
     handle.on('change', change => this._fire('handle', handle), this);

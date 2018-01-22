@@ -12,7 +12,7 @@ import 'RestaurantDetail.manifest'
 import '../Places/ExtractLocation.manifest'
 
 recipe
-  use #user as person
+  map #user as person
   create as location
   create as selected
   create #restaurants #nosync as restaurants

@@ -157,21 +157,25 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 
 <app-main>
   <!--<arc-auth on-auth="_onAuth"></arc-auth>-->
+
   <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
   <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
   <persistent-users on-users="_onUsers"></persistent-users>
   <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
   <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
+
   <!--
   <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles>
   <remote-profile-handles arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-handles>
   <remote-shared-handles arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-handles>
   <remote-friends-profiles-handles arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-handles>
   -->
+
   <arc-handle arc="{{arc}}" data="{{arcsHandleData}}" options="{{arcsHandleOptions}}" on-handle="_onArcsHandle"></arc-handle>
   <arc-handle arc="{{arc}}" data="{{identityHandleData}}" options="{{identityHandleOptions}}" on-handle="_onIdentityHandle"></arc-handle>
   <arc-handle arc="{{arc}}" data="{{identitiesHandleData}}" options="{{identitiesHandleOptions}}" on-handle="_onIdentitiesHandle"></arc-handle>
   <arc-handle arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarHandleOptions}}"></arc-handle>
+
   <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
   <!-- only for launcher -->
   <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
@@ -209,7 +213,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
       <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></manifest-data>
     </div>
     <div tab="Arc Explorer">
-      <arc-explorer user="{{user}}"></arc-explorer>
+      <arc-explorer user="{{user}}" arc="{{arc}}"></arc-explorer>
     </div>
     <div tab="App State">
       <data-explorer style="font-size: 0.6em;" object="{{appState}}"></data-explorer>
@@ -240,19 +244,22 @@ class AppShell extends Xen.Base {
         schemas: `${typesPath}/arc-types.manifest`,
         type: '[ArcMetadata]',
         name: 'ArcMetadata',
-        tags: ['#arcmetadata']
+        tags: ['#arcmetadata'],
+        asContext: true
       },
       identityHandleOptions: {
         schemas: `${typesPath}/identity-types.manifest`,
         type: 'Person',
         name: 'User',
-        tags: ['#user']
+        tags: ['#user'],
+        asContext: true
       },
       identitiesHandleOptions: {
         schemas: `${typesPath}/identity-types.manifest`,
         type: '[Person]',
         name: 'Identities',
-        tags: ['#identities']
+        tags: ['#identities'],
+        asContext: true
       },
       friendsAvatarHandleOptions: {
         schemas: `${typesPath}/identity-types.manifest`,
