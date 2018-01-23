@@ -679,11 +679,16 @@ class AppShell extends Xen.Base {
     this._setIfDirty({exclusions});
   }
   _initGeolocation() {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.watchPosition(position => {
-        this._setState({geoCoords: position.coords});
-      });
-    }
+    if (!"geolocation" in navigator) return;
+    navigator.geolocation.watchPosition(position => {
+      const currentCoords = this._state.geoCoords;
+      // Skip setting the position if it's the same as what we've already got.
+      if (currentCoords &&
+          position.coords.latitude == currentCoords.latitude &&
+          position.coords.longitude == currentCoords.longitude)
+        return;
+      this._setState({geoCoords: position.coords});
+    });
   }
 }
 AppShell.log = Xen.Base.logFactory('AppShell', '#bb4d00');
