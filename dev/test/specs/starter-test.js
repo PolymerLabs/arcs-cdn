@@ -10,8 +10,6 @@
 
 const assert = require('assert');
 const { URL } = require('url');
-const { existsSync } = require('fs');
-const { cwd } = require('process');
 
 function pierceShadows(selectors) {
   return browser.execute(function(selectors) {
@@ -139,7 +137,6 @@ function waitForStillness() {
   // checks before we'll consider them really stopped.
   let matches = 0;
   const desiredMatches = 2;
-
 
   browser.waitUntil(
     () => {
