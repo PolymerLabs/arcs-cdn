@@ -51,20 +51,30 @@ class PersistentHandles extends Xen.Base {
         return this._syncSet(arc, localHandle, remoteHandle);
       }
       if (localHandle.type.isEntity) {
-        PersistentHandles.log(`[disabled] Syncing variable ${handleId}`);
-        //return this._syncVariable(arc, localHandle, remoteHandle);
+        //PersistentHandles.log(`[disabled] Syncing variable ${handleId}`);
+        PersistentHandles.log(`Syncing variable ${handleId}`);
+        return this._syncVariable(arc, localHandle, remoteHandle);
       }
     });
   }
   // Synchronize a local variable with a remote variable.
   _syncVariable(arc, localVariable, remoteVariable) {
     var initialLoad = true;
-    let callback = remoteVariable.on('value', snapshot => {
-      if (snapshot.val() && !snapshot.val().id.startsWith(arc.id)) {
+    const callback = remoteVariable.on('value', snapshot => {
+      const localValue = localVariable._stored;
+      const remoteValue = snapshot.val();
+      if (localValue && !remoteValue) {
+        localVariable.clear();
+      } else if (JSON.stringify(localValue) !== JSON.stringify(remoteValue)) {
+        localVariable.set(remoteValue);
+      }
+      /*
+      if (value && !value.id.startsWith(arc.id)) {
         localVariable.set(snapshot.val());
-      } else if (!snapshot.val()) {
+      } else if (!value) {
         localVariable.clear();
       }
+      */
       if (initialLoad) {
         // Once the first load is complete sync starts listening to
         // local changes and applying those to the remote variable.
