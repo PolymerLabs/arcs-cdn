@@ -183,7 +183,6 @@ function openSuggestionDrawer() {
 
     if (!_isSuggestionsDrawerOpen()) {
       console.log('suggestions drawer not opening?');
-      // browser.saveScreenshot(`test/errorShots/suggestions-drawer-closed-${Date.now()}.png`);
       throw Error(`suggestions drawer never opened even after a click`);
     }
   }
