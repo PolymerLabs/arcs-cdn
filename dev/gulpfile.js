@@ -32,7 +32,8 @@ let arcsBuild = async (path) => {
     const options = {cwd: resolve(path), stdio: 'inherit'};
     await execSync('npm install', options);
 
-    await execSync(`node tools${sep}sigh.js`, options);
+    await execSync(`node tools${sep}sigh.js webpack`, options);
+    await execSync(`node tools${sep}sigh.js test`, options);
   } catch(e) {
     console.log(`error running arcs build`, e);
 
@@ -41,6 +42,8 @@ let arcsBuild = async (path) => {
     // default); hopefully arcs is working, and it's hard to predict if
     // arcs-cdn will work if the arcs upon which it's based is known to be
     // failing.
+    // We detect the error here and log instead of skipping the test run above
+    // so there's a record of the action and specific failure.
     if (!argv.ignoreArcFailure) {
       throw Error(`********************
   There was an error executing the arcs build.
