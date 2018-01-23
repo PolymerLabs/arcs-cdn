@@ -55,12 +55,14 @@ class RemoteFriendsProfileHandles extends Xen.Base {
     return ArcsUtils.getUserProfileKeys(user).map(key => {
       //RemoteFriendsProfileHandles.log(`watching friend's [${user.name}] profile handles`); // from`, String(snap.ref));
       return {
-        node: db.child(`arcs/${key}/handles`),
+        node: db.child(`arcs/${key}/views`),
         handler: snap => {
-          RemoteFriendsProfileHandles.log(`READING friend's [${user.name}] profile handles`); // from`, String(snap.ref));
           let handles = snap.val();
           if (handles) {
+            RemoteFriendsProfileHandles.log(`READING friend's [${user.name}] profile handles`); // from`, String(snap.ref));
             this._processFriendProfileHandles(arc, friend, handles);
+          } else {
+            RemoteFriendsProfileHandles.log(`friend [${user.name}] has EMPTY profile`); // from`, String(snap.ref));
           }
         }
       }
