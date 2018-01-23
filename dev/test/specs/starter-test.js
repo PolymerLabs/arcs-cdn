@@ -13,9 +13,6 @@ const { URL } = require('url');
 const { existsSync } = require('fs');
 const { cwd } = require('process');
 
-// Enable extra debugging (such as additional screenshots).
-const debug = false;
-
 function pierceShadows(selectors) {
   return browser.execute(function(selectors) {
     return pierceShadows(selectors);
@@ -143,30 +140,13 @@ function waitForStillness() {
   let matches = 0;
   const desiredMatches = 2;
 
-  // Depends on cwd being set to the proper test directory (currently done in
-  // tools/wdio-wrapper).
-  const screenshotPath = `test/errorShots`;
-  assert.ok(
-    existsSync(screenshotPath),
-    `screen shot path ${screenshotPath} does not exist. Perhaps cwd (${cwd()}) isn't in the current version directory?`
-  );
 
   browser.waitUntil(
     () => {
       var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
       if (null == result.value) {
-        if (debug) {
-          browser.saveScreenshot(`${screenshotPath}/dots-restarted-${Date.now()}-stopped-${matches}.png`);
-        }
         matches += 1;
       } else {
-        if (matches > 0) {
-          console.log(`WARN the dots had stopped dancing, but they've started up again.
-\t\tThis may indicate a bug?`);
-          if (debug) {
-            browser.saveScreenshot(`${screenshotPath}/dots-restarted-${Date.now()}-moving.png`);
-          }
-        }
         matches = 0;
       }
       return matches > desiredMatches;
@@ -206,9 +186,7 @@ function openSuggestionDrawer() {
 
     if (!_isSuggestionsDrawerOpen()) {
       console.log('suggestions drawer not opening?');
-      if (debug) {
-        browser.saveScreenshot(`./suggestions-drawer-closed-${Date.now()}.png`);
-      }
+      // browser.saveScreenshot(`test/errorShots/suggestions-drawer-closed-${Date.now()}.png`);
       throw Error(`suggestions drawer never opened even after a click`);
     }
   }
