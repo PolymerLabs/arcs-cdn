@@ -8,7 +8,7 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
 class ArcsUtils {
   static createArc({id, urlMap, slotComposer, context, loader}) {
@@ -161,6 +161,6 @@ class ArcsUtils {
     return arcs && other ? Object.keys(arcs).filter(key => Boolean(other[key])) : [];
   }
 };
-ArcsUtils.log = XenBase.logFactory('ArcsUtils', '#4a148c');
+ArcsUtils.log = Xen.Base.logFactory('ArcsUtils', '#4a148c');
 
 export default ArcsUtils;

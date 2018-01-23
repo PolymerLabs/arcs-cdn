@@ -7,6 +7,7 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
+import Xen from '../xen/xen.js';
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<style>
@@ -22,7 +23,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   </div>`
 });
 
-class ArcItem extends XenBase {
+class ArcItem extends Xen.Base {
   static get observedAttributes() { return ['key','data']; }
   get template() { return template; }
   get host() {

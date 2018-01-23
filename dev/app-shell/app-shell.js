@@ -207,7 +207,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
       <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></manifest-data>
     </div>
     <div tab="Arc Explorer">
-      <arc-explorer user="{{user}}"></arc-explorer>
+      <arc-explorer arc="{{arc}}" user="{{user}}"></arc-explorer>
     </div>
     <div tab="App State">
       <data-explorer style="font-size: 0.6em;" object="{{appState}}"></data-explorer>

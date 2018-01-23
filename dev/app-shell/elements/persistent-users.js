@@ -8,9 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class PersistentUsers extends XenBase {
+class PersistentUsers extends Xen.Base {
   static get observedAttributes() { return []; }
   _update(props, state, lastProps) {
     if (!state.connected) {
@@ -39,5 +39,5 @@ class PersistentUsers extends XenBase {
     PersistentUsers.log('remoteChanged', users);
   }
 }
-PersistentUsers.log = XenBase.logFactory('PersistentUsers', '#883997');
+PersistentUsers.log = Xen.Base.logFactory('PersistentUsers', '#883997');
 customElements.define('persistent-users', PersistentUsers);

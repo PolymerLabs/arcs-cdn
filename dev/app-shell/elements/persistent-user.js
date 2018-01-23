@@ -9,10 +9,10 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import WatchGroup from './watch-group.js';
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
 (scope => {
-  class PersistentUser extends XenBase {
+  class PersistentUser extends Xen.Base {
     static get observedAttributes() { return ['id','user','key']; }
     _getInitialState() {
       return {
@@ -79,6 +79,6 @@ import XenBase from "../../components/xen/xen-base.js";
       };
     }
   }
-  PersistentUser.log = XenBase.logFactory('PersistentUser', '#65499c');
+  PersistentUser.log = Xen.Base.logFactory('PersistentUser', '#65499c');
   customElements.define('persistent-user', PersistentUser);
 })(this);

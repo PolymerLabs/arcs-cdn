@@ -9,9 +9,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import WatchGroup from './watch-group.js';
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class RemoteVisitedArcs extends XenBase {
+class RemoteVisitedArcs extends Xen.Base {
   static get observedAttributes() { return ['user', 'arcs']; }
   _getInitialState() {
     return {
@@ -81,5 +81,5 @@ class RemoteVisitedArcs extends XenBase {
     }
   }
 }
-RemoteVisitedArcs.log = XenBase.logFactory('RemoteVisitedArcs', '#00796b');
+RemoteVisitedArcs.log = Xen.Base.logFactory('RemoteVisitedArcs', '#00796b');
 customElements.define('remote-visited-arcs', RemoteVisitedArcs);

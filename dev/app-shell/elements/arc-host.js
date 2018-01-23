@@ -9,7 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import ArcsUtils from "../lib/arcs-utils.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<style>
@@ -21,7 +21,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   <slot></slot>`
 });
 
-class ArcHost extends XenBase {
+class ArcHost extends Xen.Base {
   static get observedAttributes() {
     return ['config','plans','plan','manifests','exclusions'];
   }
@@ -175,6 +175,6 @@ class ArcHost extends XenBase {
     this._fire('plans', null);
   }
 }
-ArcHost.log = XenBase.logFactory('ArcHost', '#007ac1');
-ArcHost.groupCollapsed = XenBase.logFactory('ArcHost', '#007ac1', 'groupCollapsed');
+ArcHost.log = Xen.Base.logFactory('ArcHost', '#007ac1');
+ArcHost.groupCollapsed = Xen.Base.logFactory('ArcHost', '#007ac1', 'groupCollapsed');
 customElements.define('arc-host', ArcHost);

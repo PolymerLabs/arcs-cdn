@@ -8,7 +8,7 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../xen/xen.js';
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<style>
@@ -124,7 +124,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 });
 
 // TODO(sorvell): clicking on label should focus input.
-class CorelliaXenInput extends XenBase {
+class CorelliaXenInput extends Xen.Base {
   static get observedAttributes() {
     return ['error'];
   }

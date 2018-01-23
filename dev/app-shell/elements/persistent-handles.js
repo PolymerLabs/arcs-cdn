@@ -9,9 +9,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import ArcsUtils from "../lib/arcs-utils.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class PersistentHandles extends XenBase {
+class PersistentHandles extends Xen.Base {
   static get observedAttributes() { return ['arc','key']; }
   get _db() {
     return db.child(`arcs/${this._props.key}`);
@@ -124,5 +124,5 @@ class PersistentHandles extends XenBase {
     return () => off.forEach(w => w && w());
   }
 }
-PersistentHandles.log = XenBase.logFactory('PersistentHandles', '#aa00c7');
+PersistentHandles.log = Xen.Base.logFactory('PersistentHandles', '#aa00c7');
 customElements.define('persistent-handles', PersistentHandles);

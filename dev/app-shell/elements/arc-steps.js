@@ -8,9 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class ArcSteps extends XenBase {
+class ArcSteps extends Xen.Base {
   static get observedAttributes() { return ['plans','plan','steps','step']; }
   _getInitialState() {
     return {
@@ -130,6 +130,6 @@ class ArcSteps extends XenBase {
     }
   }
 }
-ArcSteps.log = XenBase.logFactory('ArcSteps', '#7b5e57');
-ArcSteps.warn = XenBase.logFactory('ArcSteps', '#7b5e57', 'warn');
+ArcSteps.log = Xen.Base.logFactory('ArcSteps', '#7b5e57');
+ArcSteps.warn = Xen.Base.logFactory('ArcSteps', '#7b5e57', 'warn');
 customElements.define('arc-steps', ArcSteps);

@@ -8,9 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class WatchGroup extends XenBase {
+class WatchGroup extends Xen.Base {
   static get observedAttributes() { return ['watches','db']; }
   add(watches) {
     this._watchAll(this._props.db, watches, this._state.plugs);
@@ -63,7 +63,7 @@ class WatchGroup extends XenBase {
   }
 }
 WatchGroup.watchCount = 0;
-WatchGroup.log = XenBase.logFactory('WatchGroup', '#aa00c7');
+WatchGroup.log = Xen.Base.logFactory('WatchGroup', '#aa00c7');
 customElements.define('watch-group', WatchGroup);
 
 export default WatchGroup;

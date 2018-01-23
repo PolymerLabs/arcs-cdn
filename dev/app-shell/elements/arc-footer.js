@@ -10,7 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import "../../components/dancing-dots.js";
 import "../../components/x-toast.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<style>
@@ -52,7 +52,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   </x-toast>`
 });
 
-class ArcFooter extends XenBase {
+class ArcFooter extends Xen.Base {
   static get observedAttributes() { return ['suggestions', 'dots', 'open', 'search']; }
   get template() { return template; }
   _didMount() {
@@ -127,5 +127,5 @@ class ArcFooter extends XenBase {
     }
   }
 }
-ArcFooter.log = XenBase.logFactory('ArcFooter', '#673AB7');
+ArcFooter.log = Xen.Base.logFactory('ArcFooter', '#673AB7');
 customElements.define('arc-footer', ArcFooter);

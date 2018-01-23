@@ -9,7 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import "./data-explorer.js";
-import XenBase from "./xen/xen-base.js";
+import Xen from './xen/xen.js';
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<left title="{{name}}" on-click="_onExpandClick">{{name}}</left>
@@ -21,7 +21,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   </right>`
 });
 
-class DataItem extends XenBase {
+class DataItem extends Xen.Base {
   static get observedAttributes() { return ['name','value']; }
   get template() {
     return template;

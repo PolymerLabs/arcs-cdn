@@ -7,10 +7,9 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
+import Xen from '../xen/xen.js';
 
-import XenBase from "../xen/xen-base.js";
-
-class ShellParticles extends XenBase {
+class ShellParticles extends Xen.Base {
   static get observedAttributes() { return ['arc']; }
   _update(props, state, lastProps) {
     if (props.arc) {
@@ -25,6 +24,6 @@ class ShellParticles extends XenBase {
     }
   }
 }
-ShellParticles.log = XenBase.logFactory('ShellParticles', '#7b5e57');
-ShellParticles.warn = XenBase.logFactory('ShellParticles', '#7b5e57', 'warn');
+ShellParticles.log = Xen.Base.logFactory('ShellParticles', '#7b5e57');
+ShellParticles.warn = Xen.Base.logFactory('ShellParticles', '#7b5e57', 'warn');
 customElements.define('shell-particles', ShellParticles);

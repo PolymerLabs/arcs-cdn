@@ -10,9 +10,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import WatchGroup from './watch-group.js';
 import ArcsUtils from "../lib/arcs-utils.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class RemoteSharedHandles extends XenBase {
+class RemoteSharedHandles extends Xen.Base {
   static get observedAttributes() { return ['arc','friends','user']; }
   _getInitialState() {
     return {
@@ -73,5 +73,5 @@ class RemoteSharedHandles extends XenBase {
     }
   }
 }
-RemoteSharedHandles.log = XenBase.logFactory('RemoteSHs', '#c79400');
+RemoteSharedHandles.log = Xen.Base.logFactory('RemoteSHs', '#c79400');
 customElements.define('remote-shared-handles', RemoteSharedHandles);

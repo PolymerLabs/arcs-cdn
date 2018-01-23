@@ -8,7 +8,7 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import XenBase from "./xen/xen-base.js";
+import Xen from './xen/xen.js';
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
 `<style>
@@ -32,7 +32,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   <span on-click="_onToggle">{{icon}}</span>`
 });
 
-class ToggleButton extends XenBase {
+class ToggleButton extends Xen.Base {
   static get observedAttributes() { return ['icons','state']; }
   get template() {
     return template;
@@ -63,7 +63,7 @@ class ToggleButton extends XenBase {
   }
 }
 
-ToggleButton.log = XenBase.logFactory('ToggleButton', '#00701a');
+ToggleButton.log = Xen.Base.logFactory('ToggleButton', '#00701a');
 customElements.define('toggle-button', ToggleButton);
 
 export default ToggleButton;

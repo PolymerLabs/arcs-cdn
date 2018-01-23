@@ -9,9 +9,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import ArcsUtils from "../lib/arcs-utils.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class ArcHandle extends XenBase {
+class ArcHandle extends Xen.Base {
   static get observedAttributes() { return ['arc', 'options', 'data']; }
   async _update(props, state, lastProps) {
     let lastData = lastProps.data;
@@ -65,5 +65,5 @@ class ArcHandle extends XenBase {
     ArcsUtils.setHandleData(handle, data);
   }
 }
-ArcHandle.log = XenBase.logFactory('ArcHandle', '#c6a700');
+ArcHandle.log = Xen.Base.logFactory('ArcHandle', '#c6a700');
 customElements.define('arc-handle', ArcHandle);

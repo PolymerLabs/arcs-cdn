@@ -8,9 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class ArcConfig extends XenBase {
+class ArcConfig extends Xen.Base {
   static get observedAttributes() { return ['rootpath']; }
   _update(props, state, lastProps) {
     if (props.rootpath !== lastProps.rootpath) {

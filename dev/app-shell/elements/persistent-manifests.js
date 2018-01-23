@@ -9,9 +9,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import WatchGroup from './watch-group.js';
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class PersistentManifests extends XenBase {
+class PersistentManifests extends Xen.Base {
   static get observedAttributes() { return ['manifests','exclusions']; }
   _getInitialState() {
     return {
@@ -62,5 +62,5 @@ class PersistentManifests extends XenBase {
     localStorage.setItem('0-3-arcs-exclusions', JSON.stringify(exclusions));
   }
 }
-PersistentManifests.log = XenBase.logFactory('PersistentManifests', '#883997');
+PersistentManifests.log = Xen.Base.logFactory('PersistentManifests', '#883997');
 customElements.define('persistent-manifests', PersistentManifests);

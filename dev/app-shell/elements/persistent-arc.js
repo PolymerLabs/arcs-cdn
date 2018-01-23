@@ -10,9 +10,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import WatchGroup from './watch-group.js';
 import ArcsUtils from "../lib/arcs-utils.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class PersistentArc extends XenBase {
+class PersistentArc extends Xen.Base {
   static get observedAttributes() { return ['key','metadata']; }
   _getInitialState() {
     return {
@@ -84,5 +84,5 @@ class PersistentArc extends XenBase {
     };
   }
 }
-PersistentArc.log = XenBase.logFactory('PersistentArc', '#a30000');
+PersistentArc.log = Xen.Base.logFactory('PersistentArc', '#a30000');
 customElements.define('persistent-arc', PersistentArc);

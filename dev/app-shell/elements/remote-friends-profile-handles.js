@@ -10,9 +10,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import WatchGroup from './watch-group.js';
 import ArcsUtils from "../lib/arcs-utils.js";
-import XenBase from "../../components/xen/xen-base.js";
+import Xen from '../../components/xen/xen.js';
 
-class RemoteFriendsProfileHandles extends XenBase {
+class RemoteFriendsProfileHandles extends Xen.Base {
   static get observedAttributes() { return ['arc','friends','user']; }
   _getInitialState() {
     return {
@@ -99,5 +99,5 @@ class RemoteFriendsProfileHandles extends XenBase {
     return arc.context.findViewById(id) || await arc.context.newView(type, name, id, tags);
   }
 }
-RemoteFriendsProfileHandles.log = XenBase.logFactory('RemoteFriendsPHs', '#805acb');
+RemoteFriendsProfileHandles.log = Xen.Base.logFactory('RemoteFriendsPHs', '#805acb');
 customElements.define('remote-friends-profiles-handles', RemoteFriendsProfileHandles);
