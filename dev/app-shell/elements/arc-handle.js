@@ -39,7 +39,7 @@ class ArcHandle extends Xen.Base {
     }
     let schema = manifest.findSchemaByName(type);
     let typeOf = handleOf ? schema.type.setViewOf() : schema.type;
-    tags = ['#nosync'].concat(tags);
+    tags = tags.concat(['#nosync']);
     id = id || arc.generateID();
     let handle;
     if (asContext) {
