@@ -29,7 +29,7 @@ import "./elements/remote-visited-arcs.js";
 
 // tools
 import "../components/arc-tools/explorer-hotkey.js";
-import "../components/arc-tools/arc-explorer.js";
+import "../components/arc-tools/handle-explorer.js";
 import "../components/arc-tools/local-data.js";
 import "../components/arc-tools/manifest-data.js";
 import "../components/arc-tools/shell-particles.js";
@@ -206,8 +206,8 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
       <local-data manifest="{{manifest}}" on-update-manifest="_onUpdateManifest" on-promote-manifest="_onPromoteManifest"></local-data>
       <manifest-data manifests="{{manifests}}" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></manifest-data>
     </div>
-    <div tab="Arc Explorer">
-      <arc-explorer arc="{{arc}}" user="{{user}}"></arc-explorer>
+    <div tab="Handle Explorer">
+      <handle-explorer arc="{{arc}}"></handle-explorer>
     </div>
     <div tab="App State">
       <data-explorer style="font-size: 0.6em;" object="{{appState}}"></data-explorer>

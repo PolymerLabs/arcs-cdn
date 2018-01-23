@@ -30,14 +30,11 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   data-item > left {
     display: flex;
     align-items: center;
-    padding: 4px;
+    padding: 4px 8px 4px 4px;
     justify-content: flex-end;
-    /*
-    flex: 1;
-    min-width: 40px;
-    border-right: 1px solid gray;
-    */
-    width: 128px;
+    font-weight: bold;
+    font-size: 0.9em;
+    width: 96px;
     background-color: whitesmoke;
   }
   data-item > right {
