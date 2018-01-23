@@ -12,7 +12,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 // apps/web/index.html and see comment there for more.
 
 //let version = typeof Arcs === 'undefined' || !Arcs.version ? '/' : Arcs.version.replace(/\./g, '_');
-let db_version = '0_3_beta_3';
+let db_version = '0_3_4';
 
 let firebaseConfig = {
   apiKey: "AIzaSyBme42moeI-2k8WgXh-6YK_wYyjEXo4Oz8",
@@ -31,3 +31,9 @@ db.dump = () => db.once('value').then(snap => console.log(db.data = snap.val()))
 
 window._db = _db;
 window.db = db;
+
+export {
+  _db as database,
+  db,
+  db_version as version
+};

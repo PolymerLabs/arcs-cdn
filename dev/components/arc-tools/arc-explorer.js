@@ -9,7 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import "../data-explorer.js";
-import XenBase from "../xen/xen-base.js";
+import Xen from '../xen/xen.js';
 
 const template = Object.assign(document.createElement('template'), {innerHTML:
   `<style>
@@ -26,6 +26,8 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   <div banner>Shared Arcs</div>
   <div>{{sharedArcs}}</div>
   -->
+  <div banner>Handles By Tag</div>
+  <div style="padding: 8px;">{{handles}}</div>
   <div banner>Profile Handles</div>
   <div style="padding: 8px;">{{profiles}}</div>
   <br>
@@ -44,17 +46,17 @@ const templateArc = Object.assign(document.createElement('template'), {innerHTML
   `<arc-item key="{{key}}" data="{{data}}"></arc-item><br>`
 });
 
-const templateProfile = Object.assign(document.createElement('template'), {innerHTML:
+const templateHandle = Object.assign(document.createElement('template'), {innerHTML:
   `<div style="margin-bottom: 8px;">
     <span>{{name}}</span>
-    <a href="{{href}}" target="_blank"><i class="material-icons" style="font-size: 0.8em; vertical-align: middle;">open_in_new</i></a>
+    <!--<a href="{{href}}" target="_blank"><i class="material-icons" style="font-size: 0.8em; vertical-align: middle;">open_in_new</i></a>-->
   </div>
-  <data-explorer style="font-size: 0.6em;" object="{{data}}"></data-explorer>
+  <data-explorer style="font-size: 0.8em;" object="{{data}}"></data-explorer>
   <br>`
 });
 
-class ArcExplorer extends XenBase {
-  static get observedAttributes() { return ['user']; }
+class ArcExplorer extends Xen.Base {
+  static get observedAttributes() { return ['user','arc']; }
   get template() { return template; }
   get host() {
     return this;
@@ -62,11 +64,14 @@ class ArcExplorer extends XenBase {
   _wouldChangeProp() {
     return true;
   }
-  _willReceiveProps(props, state) {
+  _willReceiveProps(props) {
     this._setState({profiles: null, shared: null});
     if (props.user) {
       this._queryProfileArcs(props.user.profiles);
       this._querySharedArcs(props.user.shared);
+    }
+    if (props.arc) {
+      this._queryHandles(props.arc);
     }
   }
   _queryProfileArcs(profiles) {
@@ -86,15 +91,32 @@ class ArcExplorer extends XenBase {
       };
     });
   }
+  async _queryHandles(arc) {
+    let arcHandles = await this._renderHandles(arc._viewTags);
+    //
+    const find = manifest => {
+      let tags = [...manifest._viewTags];
+      if (manifest.imports) {
+        manifest.imports.forEach(imp => tags = tags.concat(find(imp)));
+      }
+      return tags;
+    };
+    const contextHandles = await this._renderHandles(find(arc.context));
+    //
+    //let contextHandles = await this._renderHandles(arc.context);
+    //
+    this._setState({handles: arcHandles.concat(contextHandles)});
+  }
   _render(props, state) {
     let list = (template, models) => { return {template,models}; };
     let arc_t = templateArc;
-    let profile_t = templateProfile;
+    let handle_t = templateHandle;
     return {
       profileArcs: list(arc_t, state.profiles),
       sharedArcs: list(arc_t, state.shared),
       data: state.data,
-      profiles: list(profile_t, this._renderProfiles(state.profiles))
+      profiles: list(handle_t, this._renderProfiles(state.profiles)),
+      handles: list(handle_t, state.handles || [])
     };
   }
   _renderProfiles(profiles) {
@@ -121,13 +143,34 @@ class ArcExplorer extends XenBase {
     });
     return result;
   }
+  async _renderHandles(handles) {
+    let result = [];
+    if (handles) {
+      for (let [handle, tags] of handles) {
+        let values = `(don't know how to dereference)`;
+        if (handle.toList) {
+          const list = await handle.toList();
+          values = list.map(item => item.rawData);
+        } else {
+          values = await handle.get();
+        }
+        const data = {
+          name: handle.name,
+          tags: tags ? [...tags].join(', ') : '',
+          id: handle.id,
+          //values: JSON.stringify(handle.toList ? await handle.toList() : `await handle.get()`, null, '  ')
+          values
+        };
+        let moniker = handle.id.split(':').pop();
+        result.push({tags: data.tags, data, name: handle.name || data.tags || moniker});
+      }
+    }
+    return result;
+  }
   dumpDb() {
     db.child('arcs').once('value').then(s => {
       this._setState({data: s.val()});
     });
-  }
-  _onPrivatize(e) {
-    UserTools.privatize();
   }
 }
 customElements.define("arc-explorer", ArcExplorer);

@@ -41,7 +41,7 @@ class ArcHost extends Xen.Base {
       this._applyConfig(state.config)
     }
     else if (state.arc && (props.manifests !== lastProps.manifests || props.exclusions != lastProps.exclusions)) {
-      ArcHost.log('reloading')
+      ArcHost.log('reloading');
       this._reloadManifests();
     }
     if (props.plan && lastProps.plan !== props.plan) {
