@@ -15,8 +15,8 @@ class ShellParticles extends Xen.Base {
     if (props.arc) {
       let slots = props.arc.pec.slotComposer._slots;
       slots.forEach(slot => {
-        if (slot._context) {
-          let root = slot._context._context;
+        let root = slot._context && slot._context._context;
+        if (root) {
           let {_name, _particle} = slot._consumeConn;
           root.setAttribute('particle-host', `${_name}::${_particle._name}`);
         }
