@@ -176,7 +176,8 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   <!-- toolbar is here only to reserve space in the static flow, the app-toolbar is position-fixed -->
   <toolbar>
     <app-toolbar>
-      <i style="color: #9c27b0;" title="Arcs" on-click="_onNavClick">donut_small</i>
+      <!--<i style="color: #9c27b0;" title="Arcs" on-click="_onNavClick">donut_small</i>-->
+      <img title="Arcs" on-click="_onNavClick" src="../logo_24x24.svg" style="cursor: pointer;">
       <span arc-title style%="{{titleStatic}}" on-click="_onStartEditingTitle" unsafe-html="{{description}}"></span>
       <select on-change="_onUserSelected">{{usersOptions}}</select>
       <template users-options>
