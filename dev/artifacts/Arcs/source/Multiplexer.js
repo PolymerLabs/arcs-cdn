@@ -21,7 +21,7 @@ defineParticle(({DomParticle}) => {
     }
     async setViews(views) {
       let arc = await this.constructInnerArc();
-      this.on(views, 'list', 'change', async e => {
+      this.on(views, 'list', 'change', async () => {
         var listHandle = views.get('list');
         var list = await listHandle.toList();
 
@@ -44,7 +44,7 @@ defineParticle(({DomParticle}) => {
             continue;
           }
 
-          this.hostedSlotBySlotId.set(slotId, {subId: item.id.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()});
+          this.hostedSlotBySlotId.set(slotId, {subId: item.id});
 
           // TODO(sjmiles): we cannot in general locate a manifest from a source path, in particular I tend
           // to put my source in `source/` folder. For now, just remove `source` from the generated path
