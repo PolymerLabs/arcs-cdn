@@ -28,7 +28,7 @@ document.head.appendChild(Object.assign(document.createElement('style'), {innerT
 
 (function() {
 
-  let explorer = document.body.appendChild(document.createElement('strategy-explorer'));
+  const explorer = document.body.appendChild(document.createElement('strategy-explorer'));
   explorer.className = 'explorer';
   window.addEventListener('keydown', e => {
     if (e.ctrlKey && e.key == 'e') {
@@ -37,10 +37,12 @@ document.head.appendChild(Object.assign(document.createElement('style'), {innerT
     }
   });
 
-  let populate = (population) => explorer.results = population.map(pop => explorer.preparePopulation(pop));
+  const populate = (population) => explorer.results = population.map(pop => explorer.preparePopulation(pop));
   document.addEventListener('generations', e => {
-    explorer.reset();
-    setTimeout(()=>populate(e.detail), 0);
+    if (explorer.reset) {
+      explorer.reset();
+      setTimeout(()=>populate(e.detail), 0);
+    }
   });
 
 /*
