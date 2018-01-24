@@ -274,8 +274,10 @@ let _setSubTemplate = function(node, value, controller) {
   // Aim to re-implement as a plugin.
   let template = value.template;
   if (!template) {
-    let container = node.getRootNode(); //node.parentElement
+    let container = node.getRootNode();
     template = container.querySelector(`template[${value.$template}]`);
+  } else if (typeof template === 'string') {
+    template = Object.assign(document.createElement('template'), {innerHTML: template});
   }
   node.textContent = '';
   if (template && value.models) {
