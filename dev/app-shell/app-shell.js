@@ -326,7 +326,7 @@ class AppShell extends Xen.Base {
       let isProfile = state.user.profiles && state.user.profiles[state.key];
       if (isProfile && !state.arc) {
         AppShell.log('is a profile Arc, setting soloPath to "profile.manifest"');
-        state.config.soloPath = 'profile.manifest';
+        //state.config.soloPath = 'profile.manifest';
       }
       let isShared = state.user.shares && state.user.shares[state.key];
       // unpack button states
