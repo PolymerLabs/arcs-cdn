@@ -8,9 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import Xen from '../xen/xen-template.js';
+import Xen from '../xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     manifest-data [banner] {
       padding: 6px 4px;
@@ -25,9 +25,9 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   </div>
   <div>{{items}}</div>
   <br>`
-});
+);
 
-const manifestItem = Object.assign(document.createElement('template'), {innerHTML:
+const manifestItem = Xen.Template.createTemplate(
   `<div style="padding: 8px 0; border-top: 1px dotted silver;" style%="{{style}}">
     <label title="{{url}}" style="display: flex; align-items: center;">
       <input style="vertical-align: middle; margin: 0 8px; flex-shrink: 0;" type="checkbox" checked="{{include}}" key="{{key}}" on-click="_onCheckInput">
@@ -38,7 +38,7 @@ const manifestItem = Object.assign(document.createElement('template'), {innerHTM
       </div>
     </label>
   </div>`
-});
+);
 
 class ManifestData extends HTMLElement {
   constructor() {
@@ -49,7 +49,7 @@ class ManifestData extends HTMLElement {
   }
   connectedCallback() {
     this.text = '';
-    this._dom = Xen.stamp(template).events(this).appendTo(this);
+    this._dom = Xen.Template.stamp(template).events(this).appendTo(this);
     this.dirty = false;
   }
   set manifests(manifests) {

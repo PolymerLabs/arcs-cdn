@@ -11,7 +11,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import "../data-explorer.js";
 import Xen from '../xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     handle-explorer > [banner] {
       padding: 6px 4px;
@@ -26,16 +26,16 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
 
   <div banner>Context Handles</div>
   <div style="padding: 8px;">{{contextHandles}}</div>`
-});
+);
 
-const handleTemplate = Object.assign(document.createElement('template'), {innerHTML:
+const handleTemplate = Xen.Template.createTemplate(
   `<!--<div style="margin-bottom: 8px;">
     <span>{{name}}</span>
     <a href="{{href}}" target="_blank"><i class="material-icons" style="font-size: 0.8em; vertical-align: middle;">open_in_new</i></a>
   </div>-->
   <data-explorer style="font-size: 0.8em;" object="{{data}}"></data-explorer>
   <br>`
-});
+);
 
 class HandleExplorer extends Xen.Base {
   static get observedAttributes() { return ['arc']; }

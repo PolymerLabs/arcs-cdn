@@ -11,7 +11,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import "./data-explorer.js";
 import Xen from './xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<left title="{{name}}" on-click="_onExpandClick">{{name}}</left>
   <right>
     <div hidden="{{hideexpand}}" on-click="_onExpandClick">+</div>
@@ -19,7 +19,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
     <div hidden="{{notstring}}" title="{{title}}">{{value}}</div>
     <data-explorer hidden="{{notobject}}" object="{{object}}"></data-explorer>
   </right>`
-});
+);
 
 class DataItem extends Xen.Base {
   static get observedAttributes() { return ['name','value']; }

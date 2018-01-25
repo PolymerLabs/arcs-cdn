@@ -12,7 +12,7 @@ import "../../components/dancing-dots.js";
 import "../../components/x-toast.js";
 import Xen from '../../components/xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     :host {
       display: block;
@@ -50,7 +50,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
     </div>
     <slot></slot>
   </x-toast>`
-});
+);
 
 class ArcFooter extends Xen.Base {
   static get observedAttributes() { return ['suggestions', 'dots', 'open', 'search']; }

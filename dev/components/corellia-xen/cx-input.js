@@ -10,7 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import Xen from '../xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     :host {
       display: inline-flex;
@@ -121,7 +121,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
     <slot name="label" class="{{labelClass}}"></slot>
     <div class$="{{underlineClass}}" class="underline"></div>
   </div>`
-});
+);
 
 // TODO(sorvell): clicking on label should focus input.
 class CorelliaXenInput extends Xen.Base {

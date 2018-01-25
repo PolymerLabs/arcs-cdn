@@ -9,7 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 import Xen from '../xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     arc-item {
       display: inline-block;
@@ -21,7 +21,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
     <span unsafe-html="{{name}}"></span>
     <a href="{{href}}" target="_blank"><i class="material-icons" style="font-size: 0.8em; vertical-align: middle;">open_in_new</i></a>
   </div>`
-});
+);
 
 class ArcItem extends Xen.Base {
   static get observedAttributes() { return ['key','data']; }

@@ -10,27 +10,27 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import Xen from './xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
-`<style>
-    :host {
-      display: inline-flex;
-      font-size: 24px;
-      font-style: normal;
-      font-family: 'Material Icons';
-      width: 1em;
-      cursor: pointer;
-      user-select: none;
-    }
-    span {
-      display: inline-block;
-      font: inherit;
-      line-height: 1;
-      -webkit-font-feature-settings: 'liga';
-      -webkit-font-smoothing: antialiased;
-    }
-  </style>
-  <span on-click="_onToggle">{{icon}}</span>`
-});
+const template = Xen.Template.createTemplate(
+  `<style>
+      :host {
+        display: inline-flex;
+        font-size: 24px;
+        font-style: normal;
+        font-family: 'Material Icons';
+        width: 1em;
+        cursor: pointer;
+        user-select: none;
+      }
+      span {
+        display: inline-block;
+        font: inherit;
+        line-height: 1;
+        -webkit-font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+      }
+    </style>
+    <span on-click="_onToggle">{{icon}}</span>`
+);
 
 class ToggleButton extends Xen.Base {
   static get observedAttributes() { return ['icons','state']; }

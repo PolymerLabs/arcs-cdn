@@ -8,7 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+import Xen from './xen/xen.js';
+
+const template = Xen.Template.createTemplate(
   `<style>
     dancing-dots bullet {
       display: inline-block;
@@ -39,7 +41,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
     <bullet three></bullet>
     <bullet four></bullet>
   </div>`
-});
+);
 
 class DancingDots extends HTMLElement {
   constructor() {

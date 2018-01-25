@@ -11,7 +11,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import "../data-explorer.js";
 import Xen from '../xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     arc-explorer > [banner] {
       padding: 6px 4px;
@@ -40,20 +40,20 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   <button on-click="dumpDb">Dump Database</button>
   <data-explorer style="font-size: 0.6em;" object="{{data}}"></data-explorer>
   -->`
-});
+);
 
-const templateArc = Object.assign(document.createElement('template'), {innerHTML:
+const templateArc = Xen.Template.createTemplate(
   `<arc-item key="{{key}}" data="{{data}}"></arc-item><br>`
-});
+);
 
-const templateHandle = Object.assign(document.createElement('template'), {innerHTML:
+const templateHandle = Xen.Template.createTemplate(
   `<div style="margin-bottom: 8px;">
     <span>{{name}}</span>
     <!--<a href="{{href}}" target="_blank"><i class="material-icons" style="font-size: 0.8em; vertical-align: middle;">open_in_new</i></a>-->
   </div>
   <data-explorer style="font-size: 0.8em;" object="{{data}}"></data-explorer>
   <br>`
-});
+);
 
 class ArcExplorer extends Xen.Base {
   static get observedAttributes() { return ['user','arc']; }

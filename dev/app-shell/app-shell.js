@@ -42,7 +42,7 @@ import "../components/toggle-button.js";
 import "../components/corellia-xen/cx-input.js";
 import "../components/good-map.js";
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
 `<style>
   arc-app, [arc-app] {
     display: block;
@@ -216,7 +216,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   </simple-tabs>
   <shell-particles arc="{{arc}}"></shell-particles>
 </app-tools>`
-});
+);
 
 class AppShell extends Xen.Base {
   get host() {

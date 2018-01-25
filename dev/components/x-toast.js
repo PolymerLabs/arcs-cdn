@@ -8,9 +8,11 @@
  * http://polymer.github.io/PATENTS.txt
  */
 
+import Xen from './xen/xen.js';
+
 (function() {
 
-let template = Object.assign(document.createElement('template'), {innerHTML: `
+const template = Xen.Template.createTemplate(`
 
 <style>
   :host {
@@ -39,7 +41,7 @@ let template = Object.assign(document.createElement('template'), {innerHTML: `
 <div header><slot name="toast-header"></slot></div>
 <slot></slot>
 
-`.trim()});
+`.trim());
 
 class XToast extends HTMLElement {
   connectedCallback() {

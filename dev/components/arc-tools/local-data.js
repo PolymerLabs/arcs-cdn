@@ -8,9 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import Xen from '../xen/xen-template.js';
+import Xen from '../xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     local-data [banner] {
       padding: 6px 4px;
@@ -36,12 +36,12 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
     <input style="flex: 1;" value="{{manifest}}" on-change="_onManifestChange">
     <i class="material-icons" title="Promote" on-click="_onPromoteClick">assignment_returned</i>
   </div>`
-});
+);
 
 class LocalData extends HTMLElement {
   connectedCallback() {
     this.text = '';
-    this._dom = Xen.stamp(template).events(this).appendTo(this);
+    this._dom = Xen.Template.stamp(template).events(this).appendTo(this);
   }
   set manifest(manifest) {
     this._dom.set({manifest});
