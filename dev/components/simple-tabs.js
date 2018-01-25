@@ -8,9 +8,9 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import Xen from './xen/xen-template.js';
+import Xen from './xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     :host [crumbs] {
       background-color: #f2f2f2;
@@ -34,11 +34,11 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
   </style>
   <div crumbs>{{crumbs}}</div>
   <slot></slot>`
-});
+);
 
-const crumb = Object.assign(document.createElement('template'), {innerHTML:
+const crumb = Xen.Template.createTemplate(
   `<a selected$="{{selected}}" tab="{{tab}}" on-click="_onCrumbClick">{{crumb}}</a>`
-});
+);
 
 class SimpleTabs extends HTMLElement {
   get template() {
@@ -50,7 +50,7 @@ class SimpleTabs extends HTMLElement {
       this._mounted = true;
       this._root = this.attachShadow({mode: 'open'});
       this._root.addEventListener('slotchange', this.onSlotChange.bind(this));
-      this._dom = Xen.stamp(this.template).events(this).appendTo(this._root);
+      this._dom = Xen.Template.stamp(this.template).events(this).appendTo(this._root);
       this.tab = 0;
     }
   }

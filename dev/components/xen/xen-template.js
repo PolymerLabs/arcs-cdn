@@ -268,6 +268,10 @@ let _set = function(node, property, value, controller) {
   }
 };
 
+const createTemplate = (innerHTML) => {
+  return Object.assign(document.createElement('template'), {innerHTML});
+};
+
 let _setSubTemplate = function(node, value, controller) {
   // TODO(sjmiles): sub-template iteration ability
   // specially implemented to support arcs (serialization boundary)
@@ -277,7 +281,7 @@ let _setSubTemplate = function(node, value, controller) {
     let container = node.getRootNode();
     template = container.querySelector(`template[${value.$template}]`);
   } else if (typeof template === 'string') {
-    template = Object.assign(document.createElement('template'), {innerHTML: template});
+    template = createTemplate(template);
   }
   node.textContent = '';
   if (template && value.models) {
@@ -349,6 +353,7 @@ let stamp = function(template, opts) {
 };
 
 let Xen = {
+  createTemplate,
   setBoolAttribute,
   stamp
 };

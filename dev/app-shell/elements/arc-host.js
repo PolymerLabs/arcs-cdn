@@ -11,7 +11,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import ArcsUtils from "../lib/arcs-utils.js";
 import Xen from '../../components/xen/xen.js';
 
-const template = Object.assign(document.createElement('template'), {innerHTML:
+const template = Xen.Template.createTemplate(
   `<style>
     :host {
       display: block;
@@ -19,7 +19,7 @@ const template = Object.assign(document.createElement('template'), {innerHTML:
     }
   </style>
   <slot></slot>`
-});
+);
 
 class ArcHost extends Xen.Base {
   static get observedAttributes() {
