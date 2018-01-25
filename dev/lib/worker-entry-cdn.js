@@ -81,7 +81,7 @@
 
 function assert(test, message) {
   if (!test) {
-    debugger;
+    //debugger;
     throw new Error(message);
   }
 };
