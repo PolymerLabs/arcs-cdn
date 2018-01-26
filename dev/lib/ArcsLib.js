@@ -81,7 +81,7 @@
 
 function assert(test, message) {
   if (!test) {
-    //debugger;
+    debugger;
     throw new Error(message);
   }
 };
@@ -6667,8 +6667,6 @@ ${this.activeRecipe.toString()}`;
       let storageKey = recipeView.storageKey;
       if (!storageKey)
         storageKey = this.keyForId(recipeView.id);
-      //if (!storageKey)
-      //  storageKey = `in-memory://foo`;
       __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(storageKey, `couldn't find storage key for view '${recipeView}'`);
       let view = await this._storageProviderFactory.connect(recipeView.id, recipeView.type, storageKey);
       __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(view, `view '${recipeView.id}' was not found`);
