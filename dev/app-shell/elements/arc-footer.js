@@ -88,11 +88,20 @@ class ArcFooter extends Xen.Base {
   }
   _onSearchChange(e) {
     let search = e.target.value;
+
+    if (this._searchDebounce) {
+      window.clearTimeout(this._searchDebounce);
+      this._searchDebounce = null;
+    }
+
+    // run immediately?
     if (!search || search == '*' || search[search.length - 1] == ' ') {
       this._doBackendSearch(search);
     } else {
-      this._updateSearchState(search);
+      this._searchDebounce = window.setTimeout(() => this._doBackendSearch(search), 500);
     }
+
+    this._updateSearchState(search);
   }
   _onSearchDone(e) {
     this._doBackendSearch(e.target.value);
