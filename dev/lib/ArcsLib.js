@@ -3196,8 +3196,7 @@ ${e.message}
         } else {
           targetSlot = recipe.newSlot(slotConnectionItem.param);
           targetSlot.localName = slotConnectionItem.name;
-          if (slotConnectionItem.name)
-            items.byName.set(slotConnectionItem.name, targetSlot);
+          items.byName.set(slotConnectionItem.name, targetSlot);
           items.bySlot.set(targetSlot, slotConnectionItem);
         }
         particle.consumedSlotConnections[slotConnectionItem.param].connectToSlot(targetSlot);
@@ -5175,6 +5174,7 @@ class DomContext {
       let slotId = s.getAttribute('slotid');
       let providedSlotSpec = slotSpec.providedSlots.find(ps => ps.name == slotId);
       if (providedSlotSpec) { // Skip non-declared slots
+        //let subId = s.getAttribute('subid');
         let subId = s.subid;
         __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!subId || providedSlotSpec.isSet,
             `Slot provided in ${slotSpec.name} sub-id ${subId} doesn't match set spec: ${providedSlotSpec.isSet}`);
@@ -6667,7 +6667,6 @@ ${this.activeRecipe.toString()}`;
       let storageKey = recipeView.storageKey;
       if (!storageKey)
         storageKey = this.keyForId(recipeView.id);
-      __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(storageKey, `couldn't find storage key for view '${recipeView}'`);
       let view = await this._storageProviderFactory.connect(recipeView.id, recipeView.type, storageKey);
       __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__platform_assert_web_js__["a" /* default */])(view, `view '${recipeView.id}' was not found`);
     }
