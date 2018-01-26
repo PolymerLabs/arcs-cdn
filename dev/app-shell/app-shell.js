@@ -285,7 +285,7 @@ class AppShell extends Xen.Base {
           state.arc, state.user, state.geoCoords);
     }
     if (state.users && (state.users !== lastState.users || !state.identitiesHandleData)) {
-      state.identitiesHandleData = this._sythesizeIdentitiesHandleData(state.users);
+      state.identitiesHandleData = this._synthesizeIdentitiesHandleData(state.users);
     }
     if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
       state.plan = state.plans[0].plan;
@@ -384,7 +384,7 @@ class AppShell extends Xen.Base {
       } : null
     };
   }
-  _sythesizeIdentitiesHandleData(users) {
+  _synthesizeIdentitiesHandleData(users) {
     return Object.keys(users).map(id => {
       return {
         id: id,
