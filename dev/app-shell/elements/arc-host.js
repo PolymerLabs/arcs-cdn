@@ -23,7 +23,7 @@ const template = Xen.Template.createTemplate(
 
 class ArcHost extends Xen.Base {
   static get observedAttributes() {
-    return ['config','plans','plan','manifests','exclusions'];
+    return ['config','plans','plan','manifests','exclusions','nofilter'];
   }
   get template() { return template; }
   _getInitialState() {
@@ -47,8 +47,9 @@ class ArcHost extends Xen.Base {
     if (props.plan && lastProps.plan !== props.plan) {
       this._applySuggestion(state.arc, props.plan);
     }
-    if (props.plans && lastProps.plans !== props.plans) {
-      state.slotComposer.setSuggestions(props.plans);
+    if (props.plans && lastProps.plans !== props.plans || lastProps.nofilter !== props.nofilter) {
+      state.slotComposer.setSuggestions(
+        this._filterSuggestions(props.plans, state.arc._search, props.nofilter));
     }
   }
   _intersectManifests(manifests, exclusions) {
@@ -173,6 +174,19 @@ class ArcHost extends Xen.Base {
     let {arc} = this._state;
     arc._context = await this._loadManifest(this._props.config, arc.loader);
     this._fire('plans', null);
+  }
+  _filterSuggestions(plans, search, nofilter) {
+    // If there is a search, plans are already filtered
+    // nofilter is set when the user searches for '*'
+    if (search || nofilter) return plans;
+
+    // Otherwise only show plans that don't populate either root or toproot.
+    // TODO(seefeld): Don't hardcode roots
+    let results = plans.filter(
+      p => p.plan.slots &&
+      !p.plan.slots.find(s => s.name == 'root' || s.name == 'toproot'));
+
+    return results;
   }
 }
 ArcHost.log = Xen.Base.logFactory('ArcHost', '#007ac1');

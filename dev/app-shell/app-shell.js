@@ -191,7 +191,7 @@ const template = Xen.Template.createTemplate(
       </div>
     </app-toolbar>
   </toolbar>
-  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" nofilter="{{nofilter}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-host>
@@ -638,6 +638,7 @@ class AppShell extends Xen.Base {
       state.arc._search = search;
       this._setState({plans: null});
     }
+    this._setState({nofilter: !!e.detail.nofilter});
   }
   async _onApplied(e, plan, props, state) {
     let description = await ArcsUtils.describeArc(state.arc);
