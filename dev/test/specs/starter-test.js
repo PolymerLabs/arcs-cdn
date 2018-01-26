@@ -366,15 +366,15 @@ describe('test Arcs demo flows', function() {
     acceptSuggestion('Make a reservation');
     acceptSuggestion('You are free');
 
-    // to drop into debug mode with a REPL; also a handy way to see the state
-    // at the end of the test:
-    //browser.debug();
+    // debug hint: to drop into debug mode with a REPL; also a handy way to
+    // see the state at the end of the test:
+    // browser.debug();
 
-    // if you'd like to see the browser logs (you suspect an error, for
-    // instance):
-    //browser.log('browser').value.forEach(log => {
-    //  console.log(`${log.level}:${log.source}:${log.message}`);
-    //});
+    // debug hint: if you'd like to see the browser logs (you suspect an
+    // error, for instance):
+    // browser.log('browser').value.forEach(log => {
+    //   console.log(`${log.level}:${log.source}:${log.message}`);
+    // });
   });
 
   it('can use the gift shopping demo flow', function() {

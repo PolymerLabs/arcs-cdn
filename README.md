@@ -46,6 +46,10 @@ There are 2 main avenues to debug them in this system. The first is to have
 the browser run in a graphical manner (as opposed to the default headless
 configuration). The second is to actually debug the running selenium instance.
 
+There are some debugging hints (code and configuration you can uncomment to
+make debugging easier) in `test/specs/start-test.js` and `test/wdio.conf.js`
+marked with the phrase `debug hint`.
+
 #### Graphical (non-headless)
 
 It may be easiest to see the problem in a browser window to diagnose it. Edit
