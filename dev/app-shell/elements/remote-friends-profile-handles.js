@@ -75,17 +75,17 @@ class RemoteFriendsProfileHandles extends Xen.Base {
       let tagString = (tags && tags.length ? `${tags.sort().join('_').replace(/#/g, '')}` : '');
       let id = `FRIENDS_PROFILE_${tagString}`;
       // TODO(sjmiles): not always a SetView is it?
-      let arcsType = ArcsUtils.typeFromMetaType(type).setViewOf();
+      let arcsType = ArcsUtils.typeFromMetaType(type);
       if (values) {
         let handle = await this._requireHandle(arc, id, arcsType, id, [`#friends_${tagString}`]);
         // TODO(sjmiles): how to know if `values` represents a SetView or Entity?
-        //if (!Array.isArray(values)) {
         if ('id' in values) {
           values = [values];
         } else {
           values = Object.values(values);
         }
         let data = values.map(v => {
+          // TODO(sjmiles): `owner` not generally in schema, should be Entity metadata?
           v.rawData.owner = friend.id;
           return {
             id: v.id, //arc.generateID(),
