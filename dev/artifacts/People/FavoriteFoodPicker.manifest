@@ -6,10 +6,11 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import 'Restaurant.schema'
-import '../People/FavoriteFood.schema'
+import 'FavoriteFood.schema'
+import 'https://$cdn/artifacts/People/Person.schema'
 
-particle FavoriteFoodAnnotation in 'source/FavoriteFoodAnnotation.js'
-  FavoriteFoodAnnotation(in [Restaurant] restaurants, in FavoriteFood food)
-  consume set of annotation
-  description `check restaurants for ${food}._name_ food: ${food.food}`
+particle FavoriteFoodPicker in 'source/FavoriteFoodPicker.js'
+  FavoriteFoodPicker(in Person person, inout FavoriteFood food)
+  consume root
+  description `select ${person}'s favorite foods`
+    food `favorite food`
