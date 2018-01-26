@@ -35,3 +35,12 @@ recipe
   AddressForm
     address = address
 
+# some of these are interesting as standalone arcs
+# e.g. this would be the first part of an arc collecting my food preferences
+
+recipe
+  create #favorite as food
+  use #user as person
+  FavoriteFoodPicker
+    food = food
+    person <- person
