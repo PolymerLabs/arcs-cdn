@@ -109,7 +109,7 @@ defineParticle(({DomParticle, resolver}) => {
         <img src="{{image}}">
       </div>
     </div>
-    <div slotid="annotation" subid$="{{subId}}">
+    <div slotid="annotation" subid="{{subId}}">
   </div>
 </template>
   `;
@@ -144,9 +144,9 @@ ${productStyles}
     }
     _render(props, state) {
       return {
-        items: state.values.map(({rawData}, index) => {
+        items: state.values.map(({rawData, id}, index) => {
           return Object.assign(Object.assign({}, rawData), {
-            subId: rawData.name.replace(/ /g,'').toLowerCase(),
+            subId: id,
             image: resolver ? resolver(rawData.image) : rawData.image,
             index
           });
