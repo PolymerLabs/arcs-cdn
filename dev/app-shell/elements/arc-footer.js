@@ -53,12 +53,22 @@ const template = Xen.Template.createTemplate(
 );
 
 class ArcFooter extends Xen.Base {
-  static get observedAttributes() { return ['dots', 'open', 'search']; }
+  static get observedAttributes() { return ['dots', 'open', 'search', 'suggestionscount']; }
   get template() { return template; }
   _didMount() {
     // TODO(sjmiles): this is a hack, repair asap. App should receive this event and
     // communicate the new state to footer.
     document.addEventListener('plan-choose', e => this._onPlanSelected(e, e.detail));
+  }
+  _willReceiveProps(props, state, lastProps) {
+    // TODO(seefeld):
+    //  This is a hack to see whether the actual contents of the suggestions changed.
+    //  Should happen upstream instead.
+    if (props.suggestionscount !== lastProps.suggestionscount &&
+        !state.open &&
+        this.innerHTML !== state.oldInnerHTML) {
+      this._setState({open: true, oldInnerHTML: this.innerHTML});
+    }
   }
   _render(props, state) {
     return {
