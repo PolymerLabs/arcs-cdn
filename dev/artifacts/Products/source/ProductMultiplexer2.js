@@ -47,7 +47,7 @@ defineParticle(({DomParticle}) => {
             continue;
           }
 
-          this.hostedSlotBySlotId.set(slotId, {subId: product.name.replace(/ /g,'').toLowerCase()});
+          this.hostedSlotBySlotId.set(slotId, {subId: product.id});
 
           let manifestFilePath = hostedParticle.implFile.replace(/\.[^\.]+$/, ".manifest").replace(/\/[^\/]+$/, "/..$&");
           var recipe = `
