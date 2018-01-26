@@ -191,12 +191,12 @@ const template = Xen.Template.createTemplate(
       </div>
     </app-toolbar>
   </toolbar>
-  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" nofilter="{{nofilter}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" nofilter="{{nofilter}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied" on-suggestions="_onNewSuggestions">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-host>
   <footer hidden="{{hideFooter}}">
-    <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" on-suggest="_onSuggest" on-search="_onMakeSuggestions">
+    <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" suggestionscount="{{suggestionscount}}" on-suggest="_onSuggest" on-search="_onMakeSuggestions">
       <div slotid="suggestions"></div>
     </arc-footer>
   </footer>
@@ -651,6 +651,9 @@ class AppShell extends Xen.Base {
     }
     // must re-plan
     this._setState({plans: null});
+  }
+  _onNewSuggestions() {
+    this._setState({suggestionscount: (this._state.suggestionscount || 0) + 1})
   }
   _updateMetadata(data) {
     let {metadata} = this._state;

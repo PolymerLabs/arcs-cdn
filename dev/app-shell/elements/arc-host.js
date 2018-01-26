@@ -48,7 +48,7 @@ class ArcHost extends Xen.Base {
       this._applySuggestion(state.arc, props.plan);
     }
     if (props.plans && lastProps.plans !== props.plans || lastProps.nofilter !== props.nofilter) {
-      this._updateSuggestions(props.plans, state.arc._search, props.nofilter);
+      this._updateSuggestions(state.slotComposer, props.plans, state.arc._search, props.nofilter);
     }
   }
   _intersectManifests(manifests, exclusions) {
@@ -174,7 +174,7 @@ class ArcHost extends Xen.Base {
     arc._context = await this._loadManifest(this._props.config, arc.loader);
     this._fire('plans', null);
   }
-  async _updateSuggestions(plans, search, nofilter) {
+  async _updateSuggestions(slotComposer, plans, search, nofilter) {
     // If there is a search, plans are already filtered
     // nofilter is set when the user searches for '*'
     if (!search && !nofilter) {
@@ -185,7 +185,9 @@ class ArcHost extends Xen.Base {
         !p.plan.slots.find(s => s.name == 'root' || s.name == 'toproot'));
     }
 
-    await state.slotComposer.setSuggestions(plans);  
+    await slotComposer.setSuggestions(plans);
+    
+    this._fire('suggestions', null);
   }
 }
 ArcHost.log = Xen.Base.logFactory('ArcHost', '#007ac1');
