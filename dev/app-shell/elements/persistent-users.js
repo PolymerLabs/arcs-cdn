@@ -9,6 +9,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 */
 
 import Xen from '../../components/xen/xen.js';
+import ArcsUtils from "../lib/arcs-utils.js";
 
 class PersistentUsers extends Xen.Base {
   static get observedAttributes() { return []; }
@@ -22,21 +23,28 @@ class PersistentUsers extends Xen.Base {
   get _usersdb() {
     return db.child('users');
   }
-  async _connect() {
+  _disconnect() {
     if (this._off) {
       this._off();
       this._off = null;
     }
+  }
+  async _connect() {
+    this._disconnect();
     let node = this._usersdb;
     PersistentUsers.log('watching', String(node));
-    let watch = node.on('value', this._remoteChanged.bind(this));
+    let watch = node.on('value', snap => this._debounceRemoteChanged(snap));
     this._off = () => node.off('value', watch);
+  }
+  _debounceRemoteChanged(snap) {
+    this._debounce = ArcsUtils.debounce(this._debounce, () => this._remoteChanged(snap), 3000);
   }
   _remoteChanged(snap) {
     let users = snap.val() || [];
     Object.keys(users).forEach(k => users[k].id = k);
-    this._setState({users})
+    this._setState({users});
     PersistentUsers.log('remoteChanged', users);
+    this._disconnect();
   }
 }
 PersistentUsers.log = Xen.Base.logFactory('PersistentUsers', '#883997');
