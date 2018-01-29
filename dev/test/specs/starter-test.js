@@ -45,7 +45,7 @@ function wait(msToWait) {
  *   {id: <element-id>, text: <found text>}
  */
 function searchElementsForText(elements, textQuery) {
-  if (!elements || 0==elements.length) {
+  if (!elements || 0 == elements.length) {
     return;
   }
 
@@ -154,8 +154,9 @@ function waitForStillness() {
         matches += 1;
       } else {
         if (matches > 0) {
-          console.log(`WARN the dots had stopped dancing, but they've started up again.
-\t\tThis may indicate a bug?`);
+          console.log(
+            `The dots restarted their dance. This may indicate a bug, or that global data was changed by another client.`
+          );
         }
         matches = 0;
       }
@@ -166,7 +167,6 @@ function waitForStillness() {
     500
   );
 }
-
 
 /**
  * The suggestions drawer animates open & closing.
@@ -185,10 +185,12 @@ function openSuggestionDrawer() {
     browser.elementIdClick(dancingDots.value.ELEMENT);
 
     // registering the 'open' state may take a little bit
-    browser.waitUntil(_isSuggestionsDrawerOpen,
+    browser.waitUntil(
+      _isSuggestionsDrawerOpen,
       1000,
       `the suggestions drawer isn't registering with state 'open' after a click`,
-      100);
+      100
+    );
 
     // after the 'open' state, wait a beat for the animation to finish. This
     // should only be 80ms but in practice we need a bit more.
@@ -196,7 +198,6 @@ function openSuggestionDrawer() {
 
     if (!_isSuggestionsDrawerOpen()) {
       console.log('suggestions drawer not opening?');
-      browser.debug();
       throw Error(`suggestions drawer never opened even after a click`);
     }
   }
@@ -226,7 +227,11 @@ function initTestWithNewArc() {
   createNewArc();
 
   // use a solo URL pointing to our local recipes
-  browser.url(`${browser.getUrl()}&solo=${browser.options.baseUrl}artifacts/canonical.manifest`);
+  browser.url(
+    `${browser.getUrl()}&solo=${
+      browser.options.baseUrl
+    }artifacts/canonical.manifest`
+  );
   loadSeleniumUtils();
 
   // check out some basic structure relative to the app footer
@@ -380,15 +385,15 @@ describe('test Arcs demo flows', function() {
     acceptSuggestion('Make a reservation');
     acceptSuggestion('You are free');
 
-    // to drop into debug mode with a REPL; also a handy way to see the state
-    // at the end of the test:
-    //browser.debug();
+    // debug hint: to drop into debug mode with a REPL; also a handy way to
+    // see the state at the end of the test:
+    // browser.debug();
 
-    // if you'd like to see the browser logs (you suspect an error, for
-    // instance):
-    //browser.log('browser').value.forEach(log => {
-    //  console.log(`${log.level}:${log.source}:${log.message}`);
-    //});
+    // debug hint: if you'd like to see the browser logs (you suspect an
+    // error, for instance):
+    // browser.log('browser').value.forEach(log => {
+    //   console.log(`${log.level}:${log.source}:${log.message}`);
+    // });
   });
 
   it('can use the gift shopping demo flow', function() {
@@ -397,7 +402,7 @@ describe('test Arcs demo flows', function() {
     allSuggestions();
 
     acceptSuggestion(
-      'Show products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on products from your browsing context and Claire\'s wishlist (Book: How to Draw plus 2 other items)'
+      `Show products from your browsing context (Minecraft Book plus 2 other items) and choose from Products recommended based on products from your browsing context and Claire's wishlist (Book: How to Draw plus 2 other items)`
     );
 
     browser.waitForVisible('div[slotid="action"]');
@@ -407,7 +412,9 @@ describe('test Arcs demo flows', function() {
     // (1) verify product was moved,
     // (2) verify 'action' slot is not visible after all products were moved.
 
-    acceptSuggestion('Buy gifts for Claire, estimate arrival date for each product');
+    acceptSuggestion(
+      'Buy gifts for Claire, estimate arrival date for each product'
+    );
     acceptSuggestion(
       'check manufacturer information for each product in products from your browsing context'
     );

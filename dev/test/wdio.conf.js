@@ -49,13 +49,13 @@ exports.config = {
       browserName: 'chrome',
       chromeOptions: {
         args: [
-          // arcs note: comment this out to see the system running
+          // debug hint: comment this out to see the system running
           '--headless'
         ]
       }
     }
   ],
-  // arcs node: uncomment to attach a debugger
+  // debug hint: uncomment to attach a debugger
   // execArgv: ['--inspect'],
   //
   // ===================
@@ -91,7 +91,7 @@ exports.config = {
   baseUrl: 'http://localhost',
   //
   // Default timeout for all waitFor* commands.
-  // arcs note: increase this for debugging
+  // debug hint: increase this for debugging
   waitforTimeout: 10002,
   //
   // Default timeout in milliseconds for request
@@ -140,7 +140,7 @@ exports.config = {
   // See the full list at http://mochajs.org/
   mochaOpts: {
     ui: 'bdd',
-    // arcs note: increase this timeout for debugging
+    // debug hint: increase this timeout for debugging
     timeout: 60006
   }
   //
