@@ -138,6 +138,15 @@ function waitForStillness() {
   let matches = 0;
   const desiredMatches = 2;
 
+  // Failures here due to 'the dancing dots can't stop won't stop' tend do
+  // indicate two things:
+  // - Our calculations to reach a 'stable' state may just be taking a long
+  //   time. Increasing the timeout (or making the test scenario simpler) may
+  //   be enough.
+  // - An exception during calculation may have prevented the animation from
+  //   ever stopping. Check the console (comment out headless in
+  //   `wdio.conf.js` to get the browser visible; see README.md for more
+  //   information) and see if there's an error.
   browser.waitUntil(
     () => {
       var result = browser.elementIdAttribute(element.value.ELEMENT, 'animate');
@@ -153,7 +162,7 @@ function waitForStillness() {
       }
       return matches > desiredMatches;
     },
-    10000,
+    20000,
     `the dancing dots can't stop won't stop`,
     500
   );

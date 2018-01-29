@@ -9,6 +9,7 @@
 'use strict';
 
 defineParticle(({ DomParticle }) => {
+
   const host = 'arcs-list';
 
   const html = (strings, ...values) =>
@@ -22,6 +23,13 @@ defineParticle(({ DomParticle }) => {
 
   const style = html`
 <style>
+  [${host}] a {
+    color: inherit;
+    text-decoration: none;
+  }
+  [${host}] i {
+    font-size: 48px;
+  }
   [${host}] .material-icons {
     font-family: 'Material Icons';
     font-style: normal;
@@ -29,50 +37,18 @@ defineParticle(({ DomParticle }) => {
     -webkit-font-smoothing: antialiased;
     vertical-align: middle;
     cursor: pointer;
-  }
-  [${host}] [banner] {
     font-size: 24px;
-    background-color: #ffe082;
-    padding: 32px 16px 8px 16px;
+    padding-right: 4px;
   }
-  [${host}] [arc-item] {
-    display: inline-block;
-    width: 96px;
-    margin: 8px;
-    color: inherit;
-    /*text-decoration: none;*/
-    text-align: center;
-  }
-  [${host}] [arc-item] [description] {
-    font-size: 0.8em;
-    height: 92px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  [${host}] [arc-list-item] {
+  [${host}] [arc-chip] {
     display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    border-bottom: 1px solid silver;
-  }
-  [${host}] a {
-    color: inherit;
-    text-decoration: none;
-  }
-  [${host}] [icon] {
-    padding: 8px;
-  }
-  [${host}] [delete] {
-    visibility: hidden;
-    color: darkred;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  [${host}] [arc-item]:hover [delete], [${host}] [arc-list-item]:hover [delete] {
-    visibility: initial;
-  }
-  [${host}] i {
-    font-size: 48px;
+    flex-direction: column;
+    padding: 16px;
+    margin: 4px;
+    font-size: 18px;
+    color: whitesmoke;
+    border-radius: 9px;
+    min-height: 56px;
   }
 </style>
 `;
@@ -82,50 +58,61 @@ defineParticle(({ DomParticle }) => {
 ${style}
 
 <div ${host}>
-  <div banner style="background-color: #ffe082;">Quick Hits</div>
-  <div>{{arcs}}</div>
-  <div banner style="background-color: #90caf9;">Profile</div>
-  <div>{{profiles}}</div>
-  <div banner style="background-color: #ffe082;">More</div>
-  <div>{{tail}}</div>
+  <div style="display: flex;">
+    <div style="flex: 1;">{{columnA}}</div>
+    <div style="flex: 1;">{{columnB}}</div>
+  </div>
 </div>
 
-<template arc>
-  <div arc-item>
-    <div icon style%="{{iconStyle}}">
-      <span delete style="visibility: hidden;">x</span>
-      <a href="{{href}}" target="_blank"><i class="material-icons">{{icon}}</i><a>
-      <span delete hidden="{{disallowDelete}}" on-click="_onDelete" key="{{arcId}}">x</span>
-    </div>
-    <a href="{{href}}" target="_blank"><div description title="{{description}}" unsafe-html="{{blurb}}"></div></a>
-  </div>
+<template column>
+  <a arc-chip style="{{backStyle}}" href="{{href}}" target="_blank">
+    <div description title="{{description}}" unsafe-html="{{blurb}}"></div>
+    <div style="flex: 1;"></div>
+    <div style="margin-top: 32px;"><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i></div>
+  </a>
 </template>
-
-<template arc-list-item>
-  <div arc-list-item>
-    <span description title="{{description}}" style="flex: 1;"><a href="{{href}}" target="_blank" unsafe-html="{{description}}"></a></span>
-    <span delete hidden="{{disallowDelete}}" on-click="_onDelete" key="{{arcId}}" style="padding: 0 8px">x</span>
-    <div icon style%="{{iconStyle}}">
-      <a href="{{href}}" target="_blank"><i class="material-icons">{{icon}}</i><a>
-    </div>
-  </div>
-</template>
-  `;
+`;
 
   return class extends DomParticle {
     get template() {
       return template;
     }
-    _willReceiveProps(props) {
-      let items = [],
-        profileItems = [];
-      props.arcs.forEach((a, i) => {
+    _willReceiveProps({arcs}) {
+      const collation = this._collateItems(arcs);
+      this._setState(collation);
+    }
+    _shouldRender(props, state) {
+      return Boolean(state.items);
+    }
+    _render(props, {items, profileItems}) {
+      const all = items.concat(profileItems);
+      const pivot = (all.length + 1) >> 1;
+      const columns = [all.slice(0, pivot), all.slice(pivot)];
+      return {
+        columnA: {
+          $template: 'column',
+          models: columns[0],
+        },
+        columnB: {
+          $template: 'column',
+          models: columns[1],
+        }
+      };
+    }
+    _collateItems(arcs) {
+      let result = {
+        items: [],
+        profileItems: []
+      };
+      arcs.forEach((a, i) => {
         // each item goes in either the `items` or `profileItems` list
-        let list = a.profile ? profileItems : items;
+        let list = a.profile ? result.profileItems : result.items;
+        // massage the description
         let blurb =
           a.description.length > 70
             ? a.description.slice(0, 70) + '...'
             : a.description;
+        // populate the selected list
         list.push({
           arcId: a.id,
           // Don't allow deleting the 'New Arc' arc.
@@ -136,39 +123,13 @@ ${style}
           icon: a.icon,
           iconStyle: {
             color: a.color || 'gray'
+          },
+          backStyle: {
+            backgroundColor: a.color || 'gray'
           }
         });
       });
-      this._setState({ items, profileItems });
-    }
-    _shouldRender(props, state) {
-      return Boolean(state.items);
-    }
-    _render(props, state) {
-      return {
-        arcs: {
-          $template: 'arc',
-          models: state.items
-        },
-        profiles: {
-          $template: 'arc',
-          models: state.profileItems
-        },
-        tail: {
-          $template: 'arc-list-item',
-          models: state.items.slice(1)
-        }
-      };
-    }
-    _onDelete(e) {
-      const arcId = e.data.key;
-      const arc = this._props.arcs.find(a => a.id === arcId);
-      if (!arc) {
-        info(`Couldn't find arc to delete [arcId=${arcId}].`);
-        return;
-      }
-      info(`Removing arc [arcId=${arcId}].`);
-      this._views.get('arcs').remove(arc);
+      return result;
     }
   };
 });

@@ -8,8 +8,8 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-import ArcsUtils from "../lib/arcs-utils.js";
 import Xen from '../../components/xen/xen.js';
+import ArcsUtils from '../lib/arcs-utils.js';
 
 const template = Xen.Template.createTemplate(
   `<style>
@@ -134,13 +134,13 @@ class ArcHost extends Xen.Base {
     if (!state.planning) {
       state.planning = true;
       // old plans are stale, evacipate them
-      ArcHost.log('clearing old plans');
-      this._fire('plans', null);
+      //ArcHost.log('clearing old plans');
+      //this._fire('plans', null);
       // TODO(sjmiles): primitive attempt to throttle planning
       setTimeout(async () => {
-        await this._beginPlanning(state)
+        await this._beginPlanning(state);
         state.planning = false;
-      }, 300);
+      }, this._lastProps.plans ? 10000 : 0);
     }
   }
   async _beginPlanning(state) {
