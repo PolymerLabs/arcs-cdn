@@ -134,13 +134,13 @@ class ArcHost extends Xen.Base {
     if (!state.planning) {
       state.planning = true;
       // old plans are stale, evacipate them
-      ArcHost.log('clearing old plans');
-      this._fire('plans', null);
+      //ArcHost.log('clearing old plans');
+      //this._fire('plans', null);
       // TODO(sjmiles): primitive attempt to throttle planning
       setTimeout(async () => {
-        await this._beginPlanning(state)
+        await this._beginPlanning(state);
         state.planning = false;
-      }, 300);
+      }, this._lastProps.plans ? 10000 : 0);
     }
   }
   async _beginPlanning(state) {
