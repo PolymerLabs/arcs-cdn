@@ -29,7 +29,8 @@ class PersistentHandles extends Xen.Base {
     }
     state.watching = new Set();
     state.watchers = [...arc._viewTags].map(([localHandle, tags]) => {
-      if (tags && tags.has('#nosync')) {
+      //if (tags && tags.has('#nosync')) {
+      if (!tags || tags.size == 0 || tags.has('#nosync')) {
         return;
       }
       let handleId = ArcsUtils.getContextHandleId(localHandle.type, tags);
