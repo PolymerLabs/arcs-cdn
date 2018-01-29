@@ -10,7 +10,7 @@ const gulp = require('gulp');
 const execSync = require('child_process').execSync;
 const path = require('path');
 const resolve = path.resolve;
-const sep = path.sep;
+const normalize = path.normalize;
 const argv = require('yargs').argv;
 
 const target = `./lib`;
@@ -32,8 +32,9 @@ let arcsBuild = async (path) => {
     const options = {cwd: resolve(path), stdio: 'inherit'};
     await execSync('npm install', options);
 
-    await execSync(`node tools${sep}sigh.js webpack`, options);
-    await execSync(`node tools${sep}sigh.js test`, options);
+    const sigh = normalize('tools/sigh.js');
+    await execSync(`node ${sigh} webpack`, options);
+    await execSync(`node ${sigh} test`, options);
   } catch(e) {
     console.log(`error running arcs build`, e);
 
