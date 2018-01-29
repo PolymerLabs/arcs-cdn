@@ -141,7 +141,7 @@ exports.config = {
   mochaOpts: {
     ui: 'bdd',
     // arcs note: increase this timeout for debugging
-    timeout: 30003
+    timeout: 60006
   }
   //
   // =====
