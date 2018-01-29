@@ -10,7 +10,7 @@ const gulp = require('gulp');
 const execSync = require('child_process').execSync;
 const path = require('path');
 const resolve = path.resolve;
-const sep = path.sep;
+const normalize = path.normalize;
 const argv = require('yargs').argv;
 
 const target = `./lib`;
@@ -32,7 +32,9 @@ let arcsBuild = async (path) => {
     const options = {cwd: resolve(path), stdio: 'inherit'};
     await execSync('npm install', options);
 
-    await execSync(`node tools${sep}sigh.js`, options);
+    const sigh = normalize('tools/sigh.js');
+    await execSync(`node ${sigh} webpack`, options);
+    await execSync(`node ${sigh} test`, options);
   } catch(e) {
     console.log(`error running arcs build`, e);
 
@@ -41,6 +43,8 @@ let arcsBuild = async (path) => {
     // default); hopefully arcs is working, and it's hard to predict if
     // arcs-cdn will work if the arcs upon which it's based is known to be
     // failing.
+    // We detect the error here and log instead of skipping the test run above
+    // so there's a record of the action and specific failure.
     if (!argv.ignoreArcFailure) {
       throw Error(`********************
   There was an error executing the arcs build.
