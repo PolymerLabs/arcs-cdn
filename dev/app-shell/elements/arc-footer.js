@@ -8,9 +8,10 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
+import ArcsUtils from "../lib/arcs-utils.js";
+import Xen from '../../components/xen/xen.js';
 import "../../components/dancing-dots.js";
 import "../../components/x-toast.js";
-import Xen from '../../components/xen/xen.js';
 
 const template = Xen.Template.createTemplate(
   `<style>
@@ -45,7 +46,7 @@ const template = Xen.Template.createTemplate(
   <x-toast app-footer open="{{toastOpen}}" suggestion-container>
     <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
     <div search>
-      <input value="{{searchText}}" on-input="_onSearchChange" on-blur="_onSearchDone">
+      <input value="{{searchText}}" on-input="_onSearchChange" on-blur="_onSearchCommit">
       <i class="material-icons" on-click="_onSearchClick">search</i>
     </div>
     <slot></slot>
@@ -53,20 +54,18 @@ const template = Xen.Template.createTemplate(
 );
 
 class ArcFooter extends Xen.Base {
-  static get observedAttributes() { return ['dots', 'open', 'search', 'suggestionscount']; }
+  static get observedAttributes() { return ['dots', 'open', 'search']; }
   get template() { return template; }
   _didMount() {
     // TODO(sjmiles): this is a hack, repair asap. App should receive this event and
     // communicate the new state to footer.
     document.addEventListener('plan-choose', e => this._onPlanSelected(e, e.detail));
   }
-  _willReceiveProps(props, state, lastProps) {
+  _willReceiveProps(props, state) {
     // TODO(seefeld):
-    //  This is a hack to see whether the actual contents of the suggestions changed.
+    //  This is a hack to open the footer only if the actual contents of the suggestions changed.
     //  Should happen upstream instead.
-    if (props.suggestionscount !== lastProps.suggestionscount &&
-        !state.open &&
-        this.innerHTML !== state.oldInnerHTML) {
+    if (!state.open && this.innerHTML !== state.oldInnerHTML) {
       this._setState({open: true, oldInnerHTML: this.innerHTML});
     }
   }
@@ -80,50 +79,33 @@ class ArcFooter extends Xen.Base {
   }
   _onPlanSelected(e, suggestion) {
     this._fire('suggest', suggestion);
-    this._doBackendSearch(null);
+    this._commitSearch('');
     this._setState({open: false});
   }
-  _onSearchClick(e) {
-    this._updateSearchState('*');
+  // three user actions can affect search
+  // 1: clicking the search icon (sets search to '*')
+  _onSearchClick() {
+    this._commitSearch('*');
   }
+  // 2. typing in the search box (uses debouncing)
   _onSearchChange(e) {
-    let search = e.target.value;
-
-    if (this._searchDebounce) {
-      window.clearTimeout(this._searchDebounce);
-      this._searchDebounce = null;
-    }
-
+    const search = e.target.value;
+    this._searchDebounce = ArcsUtils.debounce(this._searchDebounce);
     // run immediately?
     if (!search || search == '*' || search[search.length - 1] == ' ') {
-      this._doBackendSearch(search);
+      this._commitSearch(search);
     } else {
-      this._searchDebounce = window.setTimeout(() => this._doBackendSearch(search), 500);
+      this._searchDebounce = ArcsUtils.debounce(this._searchDebounce, () => this._commitSearch(search), 500);
     }
-
-    this._updateSearchState(search);
   }
-  _onSearchDone(e) {
-    this._doBackendSearch(e.target.value);
+  // 3. committing the search input (blurring)
+  _onSearchCommit(e) {
+    this._commitSearch(e.target.value);
   }
-  _prepareSearchTermForBackendSearch(search) {
-    if (search) {
-      search = search.trim();
-      if (search && search !== '*') {
-        return search.toLowerCase();
-      }
-    }
-    return null;
-  }
-  _doBackendSearch(search) {
-    this._fire('search', {
-        search: this._prepareSearchTermForBackendSearch(search),
-        nofilter: search === '*'
-      });  // triggers planner
-    this._updateSearchState(search);
-  }
-  _updateSearchState(search) {
+  _commitSearch(search) {
+    search = search || '';
     this._setState({search, open: true});
+    this._fire('search', {search});
   }
 }
 ArcFooter.log = Xen.Base.logFactory('ArcFooter', '#673AB7');

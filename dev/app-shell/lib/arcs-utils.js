@@ -165,7 +165,9 @@ class ArcsUtils {
     if (key) {
       clearTimeout(key);
     }
-    return setTimeout(action, delay);
+    if (action && delay) {
+      return setTimeout(action, delay);
+    }
   }
 }
 ArcsUtils.log = Xen.Base.logFactory('ArcsUtils', '#4a148c');

@@ -11,6 +11,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import Xen from '../../components/xen/xen.js';
 import ArcsUtils from '../lib/arcs-utils.js';
 
+const Arcs = window.Arcs;
+
 const template = Xen.Template.createTemplate(
   `<style>
     :host {
@@ -32,23 +34,24 @@ class ArcHost extends Xen.Base {
     };
   }
   _willReceiveProps(props, state, lastProps) {
+    const changed = name => props[name] !== lastProps[name];
     if (props.manifests && props.exclusions) {
       state.effectiveManifests = this._intersectManifests(props.manifests, props.exclusions);
     }
-    if (props.config && props.config !== state.config && state.effectiveManifests) {
+    if (props.config && (props.config !== state.config) && state.effectiveManifests) {
       state.config = props.config;
       state.config.manifests = state.effectiveManifests;
-      this._applyConfig(state.config)
+      this._applyConfig(state.config);
     }
-    else if (state.arc && (props.manifests !== lastProps.manifests || props.exclusions != lastProps.exclusions)) {
+    else if (state.arc && (changed('manifests') || changed('exclusions'))) {
       ArcHost.log('reloading');
       this._reloadManifests();
     }
-    if (props.plan && lastProps.plan !== props.plan) {
+    if (props.plan && changed('plan')) {
       this._applySuggestion(state.arc, props.plan);
     }
-    if (props.plans && lastProps.plans !== props.plans || lastProps.nofilter !== props.nofilter) {
-      this._updateSuggestions(state.slotComposer, props.plans, state.arc._search, props.nofilter);
+    if (props.plans && changed('plans')) {
+      this._updateSuggestions(state.slotComposer, props.plans, state.arc._search);
     }
   }
   _intersectManifests(manifests, exclusions) {
@@ -61,10 +64,10 @@ class ArcHost extends Xen.Base {
   }
   async _applyConfig(config) {
     let arc = await this._createArc(config);
-    arc.makeSuggestions = async () => { this._schedulePlanning(state); }
+    //arc.makeSuggestions = async () => { this._schedulePlanning(state); };
     ArcHost.log('instantiated', arc);
     this._setState({arc});
-    this._fire('arc', arc)
+    this._fire('arc', arc);
   }
   async _createArc(config) {
     // make an id
@@ -121,11 +124,10 @@ class ArcHost extends Xen.Base {
         manifests.push(config.manifestPath);
       }
     }
-    let folder = '.';
-    //let path = './arcs.manifest';
-    //let folder = path.split('/').slice(0, -1).join('/') || '.';
-    let content = manifests.map(u => `import '${u}'`).join('\n');
-    return {folder, content};
+    return {
+      folder: '.',
+      content: manifests.map(u => `import '${u}'`).join('\n')
+    };
   }
   _schedulePlanning(state) {
     // results obtained before now are invalid
@@ -163,31 +165,23 @@ class ArcHost extends Xen.Base {
     // since it's a just another race-condition in actuality (I've merely slowed one of the racers).
     // The timeout value is a magic number.
     await arc.instantiate(plan);
-    return new Promise((resolve, reject) => {
-      setTimeout(resolve, 200);
-    }).then(() => {
-      this._fire('applied', plan);
-    });
+    setTimeout(() => this._fire('applied', plan), 200);
   }
   async _reloadManifests() {
     let {arc} = this._state;
     arc._context = await this._loadManifest(this._props.config, arc.loader);
     this._fire('plans', null);
   }
-  async _updateSuggestions(slotComposer, plans, search, nofilter) {
+  async _updateSuggestions(slotComposer, plans, search) {
     // If there is a search, plans are already filtered
-    // nofilter is set when the user searches for '*'
-    if (!search && !nofilter) {
+    if (!search) {
       // Otherwise only show plans that don't populate either root or toproot.
       // TODO(seefeld): Don't hardcode roots
       plans = plans.filter(
-        p => p.plan.slots &&
-        !p.plan.slots.find(s => s.name == 'root' || s.name == 'toproot'));
+        ({plan}) => plan.slots && !plan.slots.find(s => s.name.includes('root'))
+      );
     }
-
     await slotComposer.setSuggestions(plans);
-    
-    this._fire('suggestions', null);
   }
 }
 ArcHost.log = Xen.Base.logFactory('ArcHost', '#007ac1');

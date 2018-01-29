@@ -191,12 +191,12 @@ const template = Xen.Template.createTemplate(
       </div>
     </app-toolbar>
   </toolbar>
-  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" nofilter="{{nofilter}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied" on-suggestions="_onNewSuggestions">
+  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" nofilter="{{nofilter}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-host>
   <footer hidden="{{hideFooter}}">
-    <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" suggestionscount="{{suggestionscount}}" on-suggest="_onSuggest" on-search="_onMakeSuggestions">
+    <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" on-suggest="_onStep" on-search="_onSearch">
       <div slotid="suggestions"></div>
     </arc-footer>
   </footer>
@@ -616,9 +616,6 @@ class AppShell extends Xen.Base {
       this._setState({user: Object.assign(Object.create(null), user)});
     }
   }
-  _onSteps(e, steps) {
-    this._setState({newSteps: steps})
-  }
   _onPlans(e, plans) {
     if (this._setIfDirty({plans})) {
       if (plans) {
@@ -626,19 +623,19 @@ class AppShell extends Xen.Base {
       }
     }
   }
-  _onStep(e, step) {
-    this._setState({plan: step.plan});
-  }
-  _onSuggest(e, suggestion) {
-    this._setState({plan: suggestion.plan});
-  }
-  _onMakeSuggestions(e) {
-    let search = e.detail.search;
-    if (state.arc._search != search) {
-      state.arc._search = search;
+  _onSearch({detail: {search}}) {
+    search = search.trim().toLowerCase();
+    if (this._state.arc._search !== search) {
+      // TODO(sjmiles): setting search to '' causes an exception at init-search.js|L#29)
+      this._state.arc._search = search ? search : null;
       this._setState({plans: null});
     }
-    this._setState({nofilter: !!e.detail.nofilter});
+  }
+  _onSteps(e, steps) {
+    this._setState({newSteps: steps})
+  }
+  _onStep(e, step) {
+    this._setState({plan: step.plan});
   }
   async _onApplied(e, plan, props, state) {
     let description = await ArcsUtils.describeArc(state.arc);
@@ -651,9 +648,6 @@ class AppShell extends Xen.Base {
     }
     // must re-plan
     this._setState({plans: null});
-  }
-  _onNewSuggestions() {
-    this._setState({suggestionscount: (this._state.suggestionscount || 0) + 1})
   }
   _updateMetadata(data) {
     let {metadata} = this._state;
