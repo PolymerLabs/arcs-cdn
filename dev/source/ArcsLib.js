@@ -16,15 +16,13 @@ import SlotComposer from '../../../arcs/runtime/slot-composer.js';
 import Type from '../../../arcs/runtime/type.js';
 import BrowserLoader from './browser-cdn-loader.js';
 
-let Arcs = {
-  version: '0.2',
+window.Arcs = {
+  version: '0.3',
   Arc,
   Description,
   Manifest,
   Planner,
   SlotComposer,
   Type,
-  BrowserLoader,
+  BrowserLoader
 };
-
-window.Arcs = Arcs;
