@@ -53,20 +53,29 @@ const template = Xen.Template.createTemplate(
 );
 
 class ArcFooter extends Xen.Base {
-  static get observedAttributes() { return ['suggestions', 'dots', 'open', 'search']; }
+  static get observedAttributes() { return ['dots', 'open', 'search', 'suggestionscount']; }
   get template() { return template; }
   _didMount() {
     // TODO(sjmiles): this is a hack, repair asap. App should receive this event and
     // communicate the new state to footer.
     document.addEventListener('plan-choose', e => this._onPlanSelected(e, e.detail));
   }
+  _willReceiveProps(props, state, lastProps) {
+    // TODO(seefeld):
+    //  This is a hack to see whether the actual contents of the suggestions changed.
+    //  Should happen upstream instead.
+    if (props.suggestionscount !== lastProps.suggestionscount &&
+        !state.open &&
+        this.innerHTML !== state.oldInnerHTML) {
+      this._setState({open: true, oldInnerHTML: this.innerHTML});
+    }
+  }
   _render(props, state) {
     return {
       dotsDisabled: props.dots == 'disabled',
       dotsActive: props.dots == 'active',
       searchText: state.search || '',
-      toastOpen: state.open == undefined ? true : state.open,
-      suggestions: this._filterPlans(props.suggestions, state.search)
+      toastOpen: state.open == undefined ? true : state.open
     };
   }
   _onPlanSelected(e, suggestion) {
@@ -79,11 +88,20 @@ class ArcFooter extends Xen.Base {
   }
   _onSearchChange(e) {
     let search = e.target.value;
+
+    if (this._searchDebounce) {
+      window.clearTimeout(this._searchDebounce);
+      this._searchDebounce = null;
+    }
+
+    // run immediately?
     if (!search || search == '*' || search[search.length - 1] == ' ') {
       this._doBackendSearch(search);
     } else {
-      this._updateSearchState(search);
+      this._searchDebounce = window.setTimeout(() => this._doBackendSearch(search), 500);
     }
+
+    this._updateSearchState(search);
   }
   _onSearchDone(e) {
     this._doBackendSearch(e.target.value);
@@ -98,33 +116,14 @@ class ArcFooter extends Xen.Base {
     return null;
   }
   _doBackendSearch(search) {
-    this._fire('search', {search: this._prepareSearchTermForBackendSearch(search)});  // triggers planner
+    this._fire('search', {
+        search: this._prepareSearchTermForBackendSearch(search),
+        nofilter: search === '*'
+      });  // triggers planner
     this._updateSearchState(search);
   }
   _updateSearchState(search) {
     this._setState({search, open: true});
-  }
-  _filterPlans(plans, term) {
-    if (!plans) {
-      return [];
-    }
-    if (!term) {
-      // empty string = show suggestions matching current slots, i.e.
-      // suggestions furthering current flow, but not those just appending
-      // TODO(seefeld): Also add suggestions based on in-arc handles?
-      return plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
-    } else if (term === '*' || term.length <= 2) {
-      return plans;
-    } else {
-      let terms = term.trim().toLowerCase().match(/\b(\w+)\b/g);
-      return plans.filter(p => {
-        let desc = p.descriptionText.toLowerCase();
-        let searchPhrase = p.plan.search ? p.plan.search.phrase : '';
-        // TODO: don't match words like "and" etc.
-        // TODO: highlight the matching terms in the description in suggestion UI
-        return terms.some(t => (desc.indexOf(t) >= 0) || (searchPhrase.indexOf(t) >= 0));
-      });
-    }
   }
 }
 ArcFooter.log = Xen.Base.logFactory('ArcFooter', '#673AB7');
