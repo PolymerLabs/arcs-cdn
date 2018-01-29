@@ -160,7 +160,14 @@ class ArcsUtils {
     // The corrected set is the intersection of `user.arcs` and `user.[profiles|shares]`.
     return arcs && other ? Object.keys(arcs).filter(key => Boolean(other[key])) : [];
   }
-};
+  // usage: this._debouncer = debounce(this._debouncer, task, 100);
+  static debounce(key, action, delay) {
+    if (key) {
+      clearTimeout(key);
+    }
+    return setTimeout(action, delay);
+  }
+}
 ArcsUtils.log = Xen.Base.logFactory('ArcsUtils', '#4a148c');
 
 export default ArcsUtils;
