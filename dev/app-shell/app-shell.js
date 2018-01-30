@@ -191,7 +191,7 @@ const template = Xen.Template.createTemplate(
       </div>
     </app-toolbar>
   </toolbar>
-  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" nofilter="{{nofilter}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
+  <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" suggestions="{{suggestions}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-host>
@@ -263,7 +263,7 @@ class AppShell extends Xen.Base {
       },
       friendsAvatarData: {},
       auth: true
-    }
+    };
   }
   _didMount() {
     this.setAttribute('arc-app', '');
@@ -273,7 +273,7 @@ class AppShell extends Xen.Base {
   _update(props, state, lastProps, lastState) {
     // for debugging
     window.app = this;
-    window.state = state;
+    //window.state = state;
     window.arc = state.arc;
     window.user = state.user;
     window.users = state.users;
@@ -287,15 +287,18 @@ class AppShell extends Xen.Base {
     if (state.users && (state.users !== lastState.users || !state.identitiesHandleData)) {
       state.identitiesHandleData = this._synthesizeIdentitiesHandleData(state.users);
     }
-    if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
-      state.plan = state.plans[0].plan;
-    }
     if (state.user) {
       state.userId = state.user.id;
       ArcsUtils.setUrlParam('user', state.userId);
     }
     if (state.key) {
       ArcsUtils.setUrlParam('arc', state.key);
+    }
+    if (!state.plan && state.plans && state.plans.length && (state.config.launcher || state.config.profiler)) {
+      state.plan = state.plans[0].plan;
+    }
+    if (state.plans && (state.plans !== lastState.plans || state.search !== lastState.search)) {
+      this._updateSuggestions(state.plans, state.search);
     }
     if (state.newSteps) {
       this._updateMetadata({steps: state.newSteps});
@@ -369,7 +372,7 @@ class AppShell extends Xen.Base {
           value: id,
           user: users[id].name,
           selected: id == selectedId
-        }
+        };
       }));
     }
     return models;
@@ -425,6 +428,19 @@ class AppShell extends Xen.Base {
     }
     return true;
   }
+  _updateSuggestions(plans) {
+    let suggestions = plans;
+    // If there is a search, plans are already filtered
+    if (!this._state.search) {
+      // Otherwise only show plans that don't populate a root.
+      // TODO(seefeld): Don't hardcode `root`
+      suggestions = plans.filter(
+        ({plan}) => plan.slots && !plan.slots.find(s => s.name.includes('root'))
+      );
+    }
+    AppShell.log('_updateSuggestions');
+    this._setState({suggestions});
+  }
   _onConfig(e, config) {
     let user = null;
     let userId = config.user;
@@ -471,13 +487,13 @@ class AppShell extends Xen.Base {
         this._onNewUser(e);
         return;
       default:
-        userId = e.currentTarget.value
+        userId = e.currentTarget.value;
         break;
     }
     AppShell.log('switching user', user, userId);
     this._setState({user, userId});
   }
-  _onNewUser(e) {
+  _onNewUser() {
     let url = `?arc=profile&user=new`;
     open(url, '_blank');
   }
@@ -520,17 +536,6 @@ class AppShell extends Xen.Base {
           profile: profile
         };
       });
-      /*
-      // prepend New User item
-      data.unshift({
-        key: '*',
-        blurb: 'New User',
-        description: 'New User',
-        icon: 'new_releases',
-        color: 'gray',
-        href: `?arc=profile&user=new`
-      });
-      */
       // prepend New Arc item
       data.unshift({
         key: '*',
@@ -546,7 +551,7 @@ class AppShell extends Xen.Base {
   _onFriends(e, friends) {
     this._setIfDirty({friends});
   }
-  _onNewArcClick(e) {
+  _onNewArcClick() {
     open(`${location.origin}${location.pathname}`, `_blank`);
   }
   _onKey(e, key) {
@@ -617,6 +622,7 @@ class AppShell extends Xen.Base {
     }
   }
   _onPlans(e, plans) {
+    AppShell.log('_onPlans');
     if (this._setIfDirty({plans})) {
       if (plans) {
         this._fire('generations', plans.generations, document);
@@ -624,18 +630,28 @@ class AppShell extends Xen.Base {
     }
   }
   _onSearch({detail: {search}}) {
-    search = search.trim().toLowerCase();
-    if (this._state.arc._search !== search) {
+    const state = this._state;
+    if (search !== state.search) {
+      AppShell.log('_onSearch: search has changed');
+      // TODO(sjmiles): probably this should be part of update()
+      search = search.trim().toLowerCase();
+      // TODO(sjmiles): installing the search term should be the job of arc-host
       // TODO(sjmiles): setting search to '' causes an exception at init-search.js|L#29)
-      this._state.arc._search = search ? search : null;
-      this._setState({plans: null});
+      state.arc._search = search ? search : null;
+      // re-plan only if the search has changed (beyond simple filtering)
+      if ((state.search && search && search !== '*') || (state.search !== '*' && search && search !== '*')) {
+        // TODO(sjmiles): installing the search term should be the job of arc-host
+        // TODO(sjmiles): setting search to '' causes an exception at init-search.js|L#29)
+        this._setState({plans: null});
+      }
+      this._setState({search});
     }
   }
   _onSteps(e, steps) {
-    this._setState({newSteps: steps})
+    this._setState({newSteps: steps});
   }
-  _onStep(e, step) {
-    this._setState({plan: step.plan});
+  _onStep(e, {plan}) {
+    this._setState({plan});
   }
   async _onApplied(e, plan, props, state) {
     let description = await ArcsUtils.describeArc(state.arc);

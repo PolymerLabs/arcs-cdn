@@ -25,7 +25,7 @@ const template = Xen.Template.createTemplate(
 
 class ArcHost extends Xen.Base {
   static get observedAttributes() {
-    return ['config','plans','plan','manifests','exclusions','nofilter'];
+    return ['config','plans','suggestions','plan','manifests','exclusions'];
   }
   get template() { return template; }
   _getInitialState() {
@@ -50,21 +50,22 @@ class ArcHost extends Xen.Base {
     if (props.plan && changed('plan')) {
       this._applySuggestion(state.arc, props.plan);
     }
-    if (props.plans && changed('plans')) {
-      this._updateSuggestions(state.slotComposer, props.plans, state.arc._search);
+    if (props.suggestions && changed('suggestions')) {
+      state.slotComposer.setSuggestions(props.suggestions);
     }
   }
   _intersectManifests(manifests, exclusions) {
     return manifests.filter(m => !exclusions.includes(m));
   }
-  async _update(props, state) {
+  _update(props, state) {
     if (state.arc && !props.plans) {
       this._schedulePlanning(state);
     }
   }
   async _applyConfig(config) {
     let arc = await this._createArc(config);
-    //arc.makeSuggestions = async () => { this._schedulePlanning(state); };
+    // TODO(sjmiles): IIUC callback that is invoked by runtime idle callback, seems redundant atm (?)
+    //arc.makeSuggestions = () => this._schedulePlanning(this._state);
     ArcHost.log('instantiated', arc);
     this._setState({arc});
     this._fire('arc', arc);
@@ -158,6 +159,10 @@ class ArcHost extends Xen.Base {
     return await ArcsUtils.makePlans(arc, 5000) || [];
   }
   async _applySuggestion(arc, plan) {
+    // aggressively remove old suggestions when a suggestion is applied
+    this._state.slotComposer.setSuggestions([]);
+    // TODO(sjmiles): remove above in favor of an event, like this:
+    // this._fire('suggestions');
     // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
     // we need some additional signals in combination with a more robust system for invalidating
     // suggestions. Currently, most of the asynchrony is _short-term_, such that a simple
@@ -171,17 +176,6 @@ class ArcHost extends Xen.Base {
     let {arc} = this._state;
     arc._context = await this._loadManifest(this._props.config, arc.loader);
     this._fire('plans', null);
-  }
-  async _updateSuggestions(slotComposer, plans, search) {
-    // If there is a search, plans are already filtered
-    if (!search) {
-      // Otherwise only show plans that don't populate either root or toproot.
-      // TODO(seefeld): Don't hardcode roots
-      plans = plans.filter(
-        ({plan}) => plan.slots && !plan.slots.find(s => s.name.includes('root'))
-      );
-    }
-    await slotComposer.setSuggestions(plans);
   }
 }
 ArcHost.log = Xen.Base.logFactory('ArcHost', '#007ac1');

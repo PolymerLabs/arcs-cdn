@@ -87,16 +87,20 @@ class ArcFooter extends Xen.Base {
   _onSearchClick() {
     this._commitSearch('*');
   }
-  // 2. typing in the search box (uses debouncing)
+  // 2. typing in the search box (w/debouncing)
   _onSearchChange(e) {
+    // TODO(sjmiles): backend search is too slow to do while typing, disable this code
+    // unless and until there is a fast option (i.e. text search on existing suggestions)
+    /*
     const search = e.target.value;
-    this._searchDebounce = ArcsUtils.debounce(this._searchDebounce);
-    // run immediately?
-    if (!search || search == '*' || search[search.length - 1] == ' ') {
-      this._commitSearch(search);
-    } else {
-      this._searchDebounce = ArcsUtils.debounce(this._searchDebounce, () => this._commitSearch(search), 500);
-    }
+    // throttle re-planning until typing has stopped
+    let delay = 500;
+    // unless one of these is true
+    //if (!search || search == '*' || search[search.length - 1] == ' ') {
+    //  delay = 1;
+    //}
+    this._searchDebounce = ArcsUtils.debounce(this._searchDebounce, () => this._commitSearch(search), delay);
+    */
   }
   // 3. committing the search input (blurring)
   _onSearchCommit(e) {
