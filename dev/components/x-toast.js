@@ -21,7 +21,6 @@ const template = Xen.Template.createTemplate(`
     left: 0;
     right: 0;
     bottom: 0;
-    border: 1px solid silver;
     transform: translate3d(0, 100%, 0) translateY(-33px);
     transition: transform 80ms ease-in;
   }
@@ -29,12 +28,14 @@ const template = Xen.Template.createTemplate(`
     transform: translate3d(0, 0, 0);
   }
   [header] {
+    font-size: 0.8em;
+    text-align: center;
     background-color: white;
+    /*
     height: 32px;
     line-height: 32px;
-    text-align: center;
-    font-size: 0.8em;
     border-bottom: 1px solid #dddddd;
+    */
     box-sizing: border-box;
   }
 </style>

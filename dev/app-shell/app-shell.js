@@ -44,19 +44,27 @@ import "../components/good-map.js";
 
 const template = Xen.Template.createTemplate(
 `<style>
-  arc-app, [arc-app] {
+  body {
+    background-color: gray;
+  }
+  app-shell, [app-shell] {
     display: block;
+    max-width: 768px;
+    margin: 0 auto;
+    background-color: white;
   }
   app-main {
     display: block;
+    min-height: 100vh;
     overflow: hidden;
   }
   app-tools {
     display: none;
+    background-color: white;
   }
   toolbar {
     display: block;
-    height: 40px;
+    height: 56px;
   }
   .material-icons, toolbar i {
     font-family: 'Material Icons';
@@ -71,20 +79,18 @@ const template = Xen.Template.createTemplate(
   app-toolbar {
     position: fixed;
     top: 0;
-    left: 0;
-    right: 0;
-    height: 40px;
+    max-width: 768px;
+    height: 56px;
     display: flex;
     align-items: center;
     white-space: nowrap;
-    padding-left: 12px;
+    padding-left: 16px;
     box-sizing: border-box;
-    background-color: whitesmoke;
+    background-color: white;
     z-index: 1000;
-    transform: translate(0,0,0); /* makes it a layer so other layers scroll underneath, is there a better way? */
   }
   app-toolbar > *, app-toolbar > [buttons] > * {
-    padding-right: 12px;
+    padding-right: 16px;
   }
   app-toolbar > [arc-title] {
     flex: 1;
@@ -98,24 +104,25 @@ const template = Xen.Template.createTemplate(
     margin-right: 8px;
     width: 96px;
   }
-  [arc-app][launcher] app-toolbar > [buttons] {
+  [launcher] app-toolbar > [buttons] {
     display: none;
   }
   app-toolbar > [buttons] {
-    display: none;
+    display: flex;
     white-space: nowrap;
     align-items: center;
     padding-right: 0;
   }
   footer {
     display: block;
+    position: relative;
     height: 40px;
   }
   arc-footer {
     position: fixed;
     bottom: 0;
-    left: 0;
-    right: 0;
+    width: 100%;
+    max-width: 768px;
     background-color: white;
   }
   [hidden] {
@@ -137,7 +144,7 @@ const template = Xen.Template.createTemplate(
   }
   /* wider-than-mobile */
   @media (min-width: 500px) {
-    [expanded] app-main, [expanded] app-toolbar, [expanded] arc-footer {
+    app-shell[expanded], [expanded] app-main, [expanded] app-toolbar, [expanded] arc-footer {
       margin: 0;
       width: 424px;
       max-width: 424px;
@@ -155,7 +162,7 @@ const template = Xen.Template.createTemplate(
   }
 </style>
 
-<app-main>
+<app-main launcher$="{{launcher}}">
   <!--<arc-auth on-auth="_onAuth"></arc-auth>-->
   <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
   <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
@@ -183,7 +190,7 @@ const template = Xen.Template.createTemplate(
       <template users-options>
         <option value="{{value}}" selected="{{selected}}">{{user}}</option>
       </template>
-      <div buttons style%="{{toolbarButtonsStyle}}">
+      <div buttons>
         <toggle-button title="Arc Contains Profile Data" state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
         <toggle-button title="Share this Arc" state="{{sharedState}}" on-state="_onSharedState" icons="link supervisor_account"></toggle-button>
         <toggle-button title="Cast" on-state="_onCastState" icons="cast cast_connected"></toggle-button>
@@ -195,8 +202,8 @@ const template = Xen.Template.createTemplate(
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-host>
-  <footer hidden="{{hideFooter}}">
-    <arc-footer dots="{{dots}}" hidden="{{hideFooter}}" on-suggest="_onStep" on-search="_onSearch">
+  <footer>
+    <arc-footer dots="{{dots}}" on-suggest="_onStep" on-search="_onSearch">
       <div slotid="suggestions"></div>
     </arc-footer>
   </footer>
@@ -266,7 +273,7 @@ class AppShell extends Xen.Base {
     };
   }
   _didMount() {
-    this.setAttribute('arc-app', '');
+    this.setAttribute('app-shell', '');
     this._initHotKeys();
     this._initGeolocation();
   }
@@ -313,8 +320,6 @@ class AppShell extends Xen.Base {
     if (state.key === '*') {
       state.key = '';
     }
-    // show toolbar buttons if not launcher
-    state.toolbarButtonsStyle = !state.config || state.config.launcher ? '' : 'display: flex;';
     // unpack arc metadata for rendering
     if (state.metadata) {
       state.description = state.metadata.description;
@@ -340,6 +345,8 @@ class AppShell extends Xen.Base {
     if (state.config && state.config.launcher) {
       state.launcherUser = state.user;
     }
+    // launcher state can affect rendering
+    state.launcher = Boolean(!state.config || state.config.launcher);
     // do not send config data to arc-host before `user` is ready
     state.hostConfig = state.user ? state.config : null;
     // populate user select
@@ -347,7 +354,6 @@ class AppShell extends Xen.Base {
       $template: 'users-options',
       models: this._renderUserOptionModels(state.users, state.user)
     };
-    state.hideFooter = state.config && state.config.launcher;
     state.dots = state.plans == null ? 'active' : '';
     // must have `auth` before doing anything else
     return state.auth ? state : null;
@@ -438,7 +444,6 @@ class AppShell extends Xen.Base {
         ({plan}) => plan.slots && !plan.slots.find(s => s.name.includes('root'))
       );
     }
-    AppShell.log('_updateSuggestions');
     this._setState({suggestions});
   }
   _onConfig(e, config) {
@@ -622,7 +627,6 @@ class AppShell extends Xen.Base {
     }
   }
   _onPlans(e, plans) {
-    AppShell.log('_onPlans');
     if (this._setIfDirty({plans})) {
       if (plans) {
         this._fire('generations', plans.generations, document);
@@ -632,7 +636,6 @@ class AppShell extends Xen.Base {
   _onSearch({detail: {search}}) {
     const state = this._state;
     if (search !== state.search) {
-      AppShell.log('_onSearch: search has changed');
       // TODO(sjmiles): probably this should be part of update()
       search = search.trim().toLowerCase();
       // TODO(sjmiles): installing the search term should be the job of arc-host
@@ -678,7 +681,7 @@ class AppShell extends Xen.Base {
     AppShell.log(`onUpdateManifest: [${manifestPath}]`);
     this._setState({manifestPath});
   }
-  _onPromoteManifest(e) {
+  _onPromoteManifest() {
     let state = this._state;
     //AppShell.log(`onPromoteManifest: [${state.manifestPath}]`);
     if (state.manifestPath) {
@@ -695,13 +698,13 @@ class AppShell extends Xen.Base {
   }
   _initGeolocation() {
     if ("geolocation" in navigator) {
-      navigator.geolocation.watchPosition(position => {
-        const currentCoords = this._state.geoCoords;
+      navigator.geolocation.watchPosition(({coords}) => {
         // Skip setting the position if it's the same as what we've already got.
-        if (!currentCoords ||
-            position.coords.latitude != currentCoords.latitude ||
-            position.coords.longitude != currentCoords.longitude) {
-          this._setState({geoCoords: position.coords});
+        const lastCoords = this._state.geoCoords;
+        if (!lastCoords ||
+            coords.latitude != lastCoords.latitude ||
+            coords.longitude != lastCoords.longitude) {
+          this._setState({geoCoords: coords});
         }
       });
     }
