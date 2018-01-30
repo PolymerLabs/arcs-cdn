@@ -11,52 +11,55 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import ArcsUtils from "../lib/arcs-utils.js";
 import Xen from '../../components/xen/xen.js';
 
+const db = window.db;
+
 class PersistentHandles extends Xen.Base {
-  static get observedAttributes() { return ['arc','key']; }
-  get _db() {
-    return db.child(`arcs/${this._props.key}`);
+  static get observedAttributes() { return ['arc','key','handles']; }
+  _getInitialState() {
+    return {
+      watchers: []
+    };
   }
-  _update(props, state, lastProps) {
-    if (props.key && props.arc) { //} != lastProps.arc) {
-      this._watchHandles(props.arc);
+  _update(props, state) {
+    if (props.key && props.arc && !props.handles) {
+      state.db = db.child(`arcs/${props.key}`);
+      this._watchHandles(props.arc, state);
+      this._fire('handles', true);
     }
   }
-  _watchHandles(arc) {
+  _watchHandles(arc, state) {
     PersistentHandles.log('Syncing handles');
-    let state = this._state;
-    if (state.watchers) {
-      state.watchers.forEach(w => w && w());
-    }
+    state.watchers.forEach(w => w && w());
     state.watching = new Set();
-    state.watchers = [...arc._handleTags].map(([localHandle, tags]) => {
-      //if (tags && tags.has('#nosync')) {
-      if (!tags || tags.size == 0 || tags.has('#nosync')) {
-        return;
-      }
-      let handleId = ArcsUtils.getContextHandleId(localHandle.type, tags);
-      if (state.watching.has(handleId)) {
-        return;
-      }
-      state.watching.add(handleId);
-      // TODO(wkorman): Rename `views` to `handles` below on the next database rebuild.
-      let remoteHandleMeta = this._db.child(`views/${handleId}`);
-      // TODO(sjmiles): maybe not do this unless we have to (reducing FB thrash)
-      remoteHandleMeta.child('metadata').update({
-        type: ArcsUtils.metaTypeFromType(localHandle.type),
-        name: localHandle.name || null,
-        tags: [...tags]
-      });
-      let remoteHandle = remoteHandleMeta.child('values');
-      if (localHandle.type.isSetView) {
-        PersistentHandles.log(`Syncing set ${handleId}`);
-        return this._syncSet(arc, localHandle, remoteHandle);
-      }
-      if (localHandle.type.isEntity) {
-        //PersistentHandles.log(`[disabled] Syncing variable ${handleId}`);
-        PersistentHandles.log(`Syncing variable ${handleId}`);
-        return this._syncVariable(arc, localHandle, remoteHandle);
-      }
+    state.watchers = [...arc._handleTags].map(tagEntry => this._watchHandle(arc, state, tagEntry));
+  }
+  _watchHandle(arc, state, [localHandle, tags]) {
+    if (!tags || tags.size == 0 || tags.has('#nosync')) {
+      return;
+    }
+    let handleId = ArcsUtils.getContextHandleId(localHandle.type, tags);
+    if (state.watching.has(handleId)) {
+      return;
+    }
+    state.watching.add(handleId);
+    // TODO(wkorman): Rename `views` to `handles` below on the next database rebuild.
+    let remoteHandleMeta = state.db.child(`views/${handleId}`);
+    // TODO(sjmiles): maybe not do this unless we have to (reducing FB thrash)
+    remoteHandleMeta.child('metadata').update({
+      type: ArcsUtils.metaTypeFromType(localHandle.type),
+      name: localHandle.name || null,
+      tags: [...tags]
     });
+    let remoteHandle = remoteHandleMeta.child('values');
+    if (localHandle.type.isSetView) {
+      PersistentHandles.log(`Syncing set ${handleId}`);
+      return this._syncSet(arc, localHandle, remoteHandle);
+    }
+    if (localHandle.type.isEntity) {
+      //PersistentHandles.log(`[disabled] Syncing variable ${handleId}`);
+      PersistentHandles.log(`Syncing variable ${handleId}`);
+      return this._syncVariable(arc, localHandle, remoteHandle);
+    }
   }
   // Synchronize a local variable with a remote variable.
   _syncVariable(arc, localVariable, remoteVariable) {
@@ -69,13 +72,6 @@ class PersistentHandles extends Xen.Base {
       } else if (JSON.stringify(localValue) !== JSON.stringify(remoteValue)) {
         localVariable.set(remoteValue);
       }
-      /*
-      if (value && !value.id.startsWith(arc.id)) {
-        localVariable.set(snapshot.val());
-      } else if (!value) {
-        localVariable.clear();
-      }
-      */
       if (initialLoad) {
         // Once the first load is complete sync starts listening to
         // local changes and applying those to the remote variable.
