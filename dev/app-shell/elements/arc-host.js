@@ -11,6 +11,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import Xen from '../../components/xen/xen.js';
 import ArcsUtils from '../lib/arcs-utils.js';
 
+const Arcs = window.Arcs;
+
 const template = Xen.Template.createTemplate(
   `<style>
     :host {
@@ -23,7 +25,7 @@ const template = Xen.Template.createTemplate(
 
 class ArcHost extends Xen.Base {
   static get observedAttributes() {
-    return ['config','plans','plan','manifests','exclusions'];
+    return ['config','plans','suggestions','plan','manifests','exclusions'];
   }
   get template() { return template; }
   _getInitialState() {
@@ -32,39 +34,41 @@ class ArcHost extends Xen.Base {
     };
   }
   _willReceiveProps(props, state, lastProps) {
+    const changed = name => props[name] !== lastProps[name];
     if (props.manifests && props.exclusions) {
       state.effectiveManifests = this._intersectManifests(props.manifests, props.exclusions);
     }
-    if (props.config && props.config !== state.config && state.effectiveManifests) {
+    if (props.config && (props.config !== state.config) && state.effectiveManifests) {
       state.config = props.config;
       state.config.manifests = state.effectiveManifests;
-      this._applyConfig(state.config)
+      this._applyConfig(state.config);
     }
-    else if (state.arc && (props.manifests !== lastProps.manifests || props.exclusions != lastProps.exclusions)) {
+    else if (state.arc && (changed('manifests') || changed('exclusions'))) {
       ArcHost.log('reloading');
       this._reloadManifests();
     }
-    if (props.plan && lastProps.plan !== props.plan) {
+    if (props.plan && changed('plan')) {
       this._applySuggestion(state.arc, props.plan);
     }
-    if (props.plans && lastProps.plans !== props.plans) {
-      state.slotComposer.setSuggestions(props.plans);
+    if (props.suggestions && changed('suggestions')) {
+      state.slotComposer.setSuggestions(props.suggestions);
     }
   }
   _intersectManifests(manifests, exclusions) {
     return manifests.filter(m => !exclusions.includes(m));
   }
-  async _update(props, state) {
+  _update(props, state) {
     if (state.arc && !props.plans) {
       this._schedulePlanning(state);
     }
   }
   async _applyConfig(config) {
     let arc = await this._createArc(config);
-    arc.makeSuggestions = async () => { this._schedulePlanning(state); }
+    // TODO(sjmiles): IIUC callback that is invoked by runtime idle callback, seems redundant atm (?)
+    //arc.makeSuggestions = () => this._schedulePlanning(this._state);
     ArcHost.log('instantiated', arc);
     this._setState({arc});
-    this._fire('arc', arc)
+    this._fire('arc', arc);
   }
   async _createArc(config) {
     // make an id
@@ -121,11 +125,10 @@ class ArcHost extends Xen.Base {
         manifests.push(config.manifestPath);
       }
     }
-    let folder = '.';
-    //let path = './arcs.manifest';
-    //let folder = path.split('/').slice(0, -1).join('/') || '.';
-    let content = manifests.map(u => `import '${u}'`).join('\n');
-    return {folder, content};
+    return {
+      folder: '.',
+      content: manifests.map(u => `import '${u}'`).join('\n')
+    };
   }
   _schedulePlanning(state) {
     // results obtained before now are invalid
@@ -140,22 +143,27 @@ class ArcHost extends Xen.Base {
       setTimeout(async () => {
         await this._beginPlanning(state);
         state.planning = false;
-      }, this._lastProps.plans ? 10000 : 0);
+      }, 500); //this._lastProps.plans ? 10000 : 0);
     }
   }
   async _beginPlanning(state) {
+    let time = Date.now();
     let plans;
     while (state.invalid) {
       state.invalid = false;
       plans = await this._plan(state.arc);
     }
-    ArcHost.log(`plans`, plans);
+    time = ((Date.now() - time) / 1000).toFixed(2);
+    ArcHost.log(`plans`, plans, `${time}s`);
     this._fire('plans', plans);
   }
   async _plan(arc) {
     return await ArcsUtils.makePlans(arc, 5000) || [];
   }
   async _applySuggestion(arc, plan) {
+    // aggressively remove old suggestions when a suggestion is applied
+    this._setState({suggestions: []});
+    //this._state.slotComposer.setSuggestions([]);
     // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
     // we need some additional signals in combination with a more robust system for invalidating
     // suggestions. Currently, most of the asynchrony is _short-term_, such that a simple
@@ -163,11 +171,7 @@ class ArcHost extends Xen.Base {
     // since it's a just another race-condition in actuality (I've merely slowed one of the racers).
     // The timeout value is a magic number.
     await arc.instantiate(plan);
-    return new Promise((resolve, reject) => {
-      setTimeout(resolve, 200);
-    }).then(() => {
-      this._fire('applied', plan);
-    });
+    setTimeout(() => this._fire('applied', plan), 200);
   }
   async _reloadManifests() {
     let {arc} = this._state;

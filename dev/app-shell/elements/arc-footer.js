@@ -8,9 +8,10 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
+import ArcsUtils from "../lib/arcs-utils.js";
+import Xen from '../../components/xen/xen.js';
 import "../../components/dancing-dots.js";
 import "../../components/x-toast.js";
-import Xen from '../../components/xen/xen.js';
 
 const template = Xen.Template.createTemplate(
   `<style>
@@ -19,10 +20,15 @@ const template = Xen.Template.createTemplate(
     }
     x-toast {
       background-color: white;
+      /*border: 1px solid silver;*/
+      border-bottom: 0;
+      border-radius: 16px 16px 0 0;
+      overflow: hidden;
+      box-shadow: 0px 0px 6px 2px rgba(102,102,102,0.15);
     }
     i {
       font-family: 'Material Icons';
-      font-size: 24px;
+      font-size: 32px;
       font-style: normal;
       -webkit-font-feature-settings: 'liga';
       -webkit-font-smoothing: antialiased;
@@ -32,12 +38,14 @@ const template = Xen.Template.createTemplate(
     [search] {
       display: flex;
       align-items: center;
-      padding: 4px;
+      padding: 0 8px 8px 8px;
       border-bottom: 1px dotted silver;
     }
     [search] input {
       flex: 1;
+      font-size: 1.2em;
       padding: 7px;
+      margin: 0 8px;
       border: none;
       outline: none;
     }
@@ -45,86 +53,74 @@ const template = Xen.Template.createTemplate(
   <x-toast app-footer open="{{toastOpen}}" suggestion-container>
     <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
     <div search>
-      <input value="{{searchText}}" on-input="_onSearchChange" on-blur="_onSearchDone">
       <i class="material-icons" on-click="_onSearchClick">search</i>
+      <input placeholder="Search" value="{{searchText}}" on-keypress="_onKeypress" on-input="_onSearchChange" on-blur="_onSearchCommit">
+      <i class="material-icons" on-click="_onSearchClick">add</i>
     </div>
     <slot></slot>
   </x-toast>`
 );
 
 class ArcFooter extends Xen.Base {
-  static get observedAttributes() { return ['suggestions', 'dots', 'open', 'search']; }
+  static get observedAttributes() { return ['dots', 'open', 'search']; }
   get template() { return template; }
   _didMount() {
     // TODO(sjmiles): this is a hack, repair asap. App should receive this event and
     // communicate the new state to footer.
     document.addEventListener('plan-choose', e => this._onPlanSelected(e, e.detail));
   }
+  _willReceiveProps(props, state) {
+    // TODO(seefeld):
+    //  This is a hack to open the footer only if the actual contents of the suggestions changed.
+    //  Should happen upstream instead.
+    if (!state.open && this.innerHTML !== state.oldInnerHTML) {
+      this._setState({open: true, oldInnerHTML: this.innerHTML});
+    }
+  }
   _render(props, state) {
     return {
       dotsDisabled: props.dots == 'disabled',
       dotsActive: props.dots == 'active',
       searchText: state.search || '',
-      toastOpen: state.open == undefined ? true : state.open,
-      suggestions: this._filterPlans(props.suggestions, state.search)
+      toastOpen: state.open == undefined ? true : state.open
     };
   }
   _onPlanSelected(e, suggestion) {
     this._fire('suggest', suggestion);
-    this._doBackendSearch(null);
+    this._commitSearch('');
     this._setState({open: false});
   }
-  _onSearchClick(e) {
-    this._updateSearchState('*');
+  // three user actions can affect search
+  // 1: clicking the search icon (sets search to '*')
+  _onSearchClick() {
+    this._commitSearch('*');
   }
+  // 2. typing in the search box (w/debouncing)
   _onSearchChange(e) {
-    let search = e.target.value;
-    if (!search || search == '*' || search[search.length - 1] == ' ') {
-      this._doBackendSearch(search);
-    } else {
-      this._updateSearchState(search);
+    // TODO(sjmiles): backend search is a bit slow to do while typing, perhaps we use simple-mode
+    // text search to provide immediate results?
+    const search = e.target.value;
+    // throttle re-planning until typing has stopped
+    let delay = 500;
+    // unless one of these is true
+    //if (!search || search == '*' || search[search.length - 1] == ' ') {
+    //  delay = 1;
+    //}
+    this._searchDebounce = ArcsUtils.debounce(this._searchDebounce, () => this._commitSearch(search), delay);
+  }
+  // 3. committing the search input (enter-key or blurring)
+  _onKeypress(e) {
+    if (e.key === 'Enter') {
+      this._onSearchCommit(e);
     }
   }
-  _onSearchDone(e) {
-    this._doBackendSearch(e.target.value);
+  _onSearchCommit(e) {
+    this._commitSearch(e.target.value);
   }
-  _prepareSearchTermForBackendSearch(search) {
-    if (search) {
-      search = search.trim();
-      if (search && search !== '*') {
-        return search.toLowerCase();
-      }
-    }
-    return null;
-  }
-  _doBackendSearch(search) {
-    this._fire('search', {search: this._prepareSearchTermForBackendSearch(search)});  // triggers planner
-    this._updateSearchState(search);
-  }
-  _updateSearchState(search) {
+  _commitSearch(search) {
+    search = search || '';
     this._setState({search, open: true});
-  }
-  _filterPlans(plans, term) {
-    if (!plans) {
-      return [];
-    }
-    if (!term) {
-      // empty string = show suggestions matching current slots, i.e.
-      // suggestions furthering current flow, but not those just appending
-      // TODO(seefeld): Also add suggestions based on in-arc handles?
-      return plans.filter(p => p.plan.slots && !p.plan.slots.find(s => s.name == 'root'));
-    } else if (term === '*' || term.length <= 2) {
-      return plans;
-    } else {
-      let terms = term.trim().toLowerCase().match(/\b(\w+)\b/g);
-      return plans.filter(p => {
-        let desc = p.descriptionText.toLowerCase();
-        let searchPhrase = p.plan.search ? p.plan.search.phrase : '';
-        // TODO: don't match words like "and" etc.
-        // TODO: highlight the matching terms in the description in suggestion UI
-        return terms.some(t => (desc.indexOf(t) >= 0) || (searchPhrase.indexOf(t) >= 0));
-      });
-    }
+    this._fire('search', {search});
   }
 }
 ArcFooter.log = Xen.Base.logFactory('ArcFooter', '#673AB7');

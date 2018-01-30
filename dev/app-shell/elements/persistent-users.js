@@ -37,7 +37,9 @@ class PersistentUsers extends Xen.Base {
     this._off = () => node.off('value', watch);
   }
   _debounceRemoteChanged(snap) {
-    this._debounce = ArcsUtils.debounce(this._debounce, () => this._remoteChanged(snap), 3000);
+    // debounce if we already have some users data
+    const delay = this._state.users ? 3000 : 1;
+    this._debounce = ArcsUtils.debounce(this._debounce, () => this._remoteChanged(snap), delay);
   }
   _remoteChanged(snap) {
     let users = snap.val() || [];
