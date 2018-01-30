@@ -28,7 +28,7 @@ class PersistentHandles extends Xen.Base {
       state.watchers.forEach(w => w && w());
     }
     state.watching = new Set();
-    state.watchers = [...arc._viewTags].map(([localHandle, tags]) => {
+    state.watchers = [...arc._handleTags].map(([localHandle, tags]) => {
       //if (tags && tags.has('#nosync')) {
       if (!tags || tags.size == 0 || tags.has('#nosync')) {
         return;

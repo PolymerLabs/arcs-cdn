@@ -55,9 +55,9 @@ class HandleExplorer extends Xen.Base {
     }
   }
   async _queryHandles(arc) {
-    const arcHandles = await this._digestHandles(arc._viewTags);
+    const arcHandles = await this._digestHandles(arc._handleTags);
     const find = manifest => {
-      let tags = [...manifest._viewTags];
+      let tags = [...manifest._handleTags];
       if (manifest.imports) {
         manifest.imports.forEach(imp => tags = tags.concat(find(imp)));
       }

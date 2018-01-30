@@ -92,10 +92,10 @@ class ArcExplorer extends Xen.Base {
     });
   }
   async _queryHandles(arc) {
-    let arcHandles = await this._renderHandles(arc._viewTags);
+    let arcHandles = await this._renderHandles(arc._handleTags);
     //
     const find = manifest => {
-      let tags = [...manifest._viewTags];
+      let tags = [...manifest._handleTags];
       if (manifest.imports) {
         manifest.imports.forEach(imp => tags = tags.concat(find(imp)));
       }

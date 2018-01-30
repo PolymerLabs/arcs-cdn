@@ -112,7 +112,7 @@ class ArcsUtils {
       }
   }
   static async _requireHandle(arc, type, name, id, tags) {
-    let handle = arc.context.findViewById(id);
+    let handle = arc.context.findHandleById(id);
     if (!handle) {
       handle = await arc.context.newView(type, name, id, tags);
       ArcsUtils.log('synthesized handle', id, tags);
