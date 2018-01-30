@@ -31,11 +31,6 @@ const template = Xen.Template.createTemplate(`
     font-size: 0.8em;
     text-align: center;
     background-color: white;
-    /*
-    height: 32px;
-    line-height: 32px;
-    border-bottom: 1px solid #dddddd;
-    */
     box-sizing: border-box;
   }
 </style>

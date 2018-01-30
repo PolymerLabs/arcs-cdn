@@ -8,7 +8,7 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-//import ArcsUtils from "../lib/arcs-utils.js";
+import ArcsUtils from "../lib/arcs-utils.js";
 import Xen from '../../components/xen/xen.js';
 import "../../components/dancing-dots.js";
 import "../../components/x-toast.js";
@@ -97,9 +97,8 @@ class ArcFooter extends Xen.Base {
   }
   // 2. typing in the search box (w/debouncing)
   _onSearchChange(e) {
-    // TODO(sjmiles): backend search is too slow to do while typing, disable this code
-    // unless and until there is a fast option (i.e. text search on existing suggestions)
-    /*
+    // TODO(sjmiles): backend search is a bit slow to do while typing, perhaps we use simple-mode
+    // text search to provide immediate results?
     const search = e.target.value;
     // throttle re-planning until typing has stopped
     let delay = 500;
@@ -108,7 +107,6 @@ class ArcFooter extends Xen.Base {
     //  delay = 1;
     //}
     this._searchDebounce = ArcsUtils.debounce(this._searchDebounce, () => this._commitSearch(search), delay);
-    */
   }
   // 3. committing the search input (enter-key or blurring)
   _onKeypress(e) {
