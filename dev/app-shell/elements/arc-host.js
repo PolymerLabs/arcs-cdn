@@ -143,16 +143,18 @@ class ArcHost extends Xen.Base {
       setTimeout(async () => {
         await this._beginPlanning(state);
         state.planning = false;
-      }, this._lastProps.plans ? 10000 : 0);
+      }, 500); //this._lastProps.plans ? 10000 : 0);
     }
   }
   async _beginPlanning(state) {
+    let time = Date.now();
     let plans;
     while (state.invalid) {
       state.invalid = false;
       plans = await this._plan(state.arc);
     }
-    ArcHost.log(`plans`, plans);
+    time = ((Date.now() - time) / 1000).toFixed(2);
+    ArcHost.log(`plans`, plans, `${time}s`);
     this._fire('plans', plans);
   }
   async _plan(arc) {
@@ -160,9 +162,8 @@ class ArcHost extends Xen.Base {
   }
   async _applySuggestion(arc, plan) {
     // aggressively remove old suggestions when a suggestion is applied
-    this._state.slotComposer.setSuggestions([]);
-    // TODO(sjmiles): remove above in favor of an event, like this:
-    // this._fire('suggestions');
+    this._setState({suggestions: []});
+    //this._state.slotComposer.setSuggestions([]);
     // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
     // we need some additional signals in combination with a more robust system for invalidating
     // suggestions. Currently, most of the asynchrony is _short-term_, such that a simple
