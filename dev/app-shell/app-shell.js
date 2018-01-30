@@ -56,7 +56,6 @@ const template = Xen.Template.createTemplate(
   app-main {
     display: block;
     min-height: 100vh;
-    overflow: hidden;
   }
   app-tools {
     display: none;
@@ -79,6 +78,7 @@ const template = Xen.Template.createTemplate(
   app-toolbar {
     position: fixed;
     top: 0;
+    width: 100%;
     max-width: 768px;
     height: 56px;
     display: flex;
@@ -311,6 +311,9 @@ class AppShell extends Xen.Base {
       this._updateMetadata({steps: state.newSteps});
       state.newSteps = null;
     }
+    if (state.arcsToolsVisible !== lastState.arcsToolsVisible) {
+      localStorage.setItem('0-3-arcs-dev-tools', state.arcsToolsVisible ? 'open' : 'closed');
+    }
     super._update(props, state);
   }
   _render(props, state) {
@@ -359,10 +362,8 @@ class AppShell extends Xen.Base {
     return state.auth ? state : null;
   }
   _didRender(props, state) {
-    // toggles boolean attribute `expanded` on `this`
-    Xen.Template.setBoolAttribute(this, 'expanded', Boolean(state.arcsToolsVisible));
     if (state.config) {
-      localStorage.setItem('0-3-arcs-dev-tools', state.arcsToolsVisible ? 'open' : 'closed');
+      Xen.Template.setBoolAttribute(this, 'expanded', Boolean(state.arcsToolsVisible));
     }
     Xen.Template.setBoolAttribute(this, 'illuminate', Boolean(state.illuminateParticles));
   }

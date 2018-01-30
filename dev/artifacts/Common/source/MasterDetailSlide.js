@@ -18,19 +18,26 @@ defineParticle(({DomParticle}) => {
     position: relative;
   }
   [${host}] [detail-panel] {
-    position: fixed;
-    top: 40px;
+    position: sticky;
+    top: 64px;
+    height: 0;
+    transform: translate3d(0, 100vh, 0);
+    transition: all 200ms ease-out;
+    box-sizing: border-box;
+  }
+  [${host}] [detail-panel][open] {
+    transform: translate3d(0, 0, 0);
+  }
+  [${host}] [abs-panel] {
+    position: absolute;
+    top: 0;
     right: 0;
-    bottom: 72px;
     left: 0;
-    overflow: auto;
-    opacity: 0;
     border-radius: 16px;
     padding: 0 16px;
-    transform: translate3d(0, 1000px, 0);
-    transition: all 300ms ease-out;
     box-sizing: border-box;
     background-color: white;
+    box-shadow: 0px 0px 6px 2px rgba(252,252,252,0.65);
   }
   [${host}] button {
     background-color: transparent;
@@ -38,12 +45,17 @@ defineParticle(({DomParticle}) => {
   }
 </style>
 <div ${host}>
-  <div style="{{master}}">
-    <div slotid="master"></div>
+  <!-- CSS tricks: zero-height position:sticky panel can autosize horizontally while not scrolling and not
+       pushing siblings out of position. Contained absolute panel can have vertical size without affecting
+       outer flow. -->
+  <div detail-panel open$="{{open}}">
+    <div abs-panel>
+      <div style="padding: 8px; text-align: right;"><button on-click="_onBack">X</button></div>
+      <div slotid="detail"></div>
+    </div>
   </div>
-  <div detail-panel style="{{detail}}">
-    <div style="padding: 8px; text-align: right;"><button on-click="_onBack">X</button></div>
-    <div slotid="detail"></div>
+  <div master-panel style="{{master}}">
+    <div slotid="master"></div>
   </div>
 </div>
     `.trim();
@@ -52,14 +64,21 @@ defineParticle(({DomParticle}) => {
     get template() {
       return template;
     }
-    _render({selected}) {
+    _render({selected}, {back}) {
       let hasSelection = selected && (selected.name || selected.id);
       return {
-        detail: hasSelection ? 'transform: translate3d(0,0,0); opacity: 1;' : ''
+        open: Boolean(hasSelection && !back)
       };
     }
     _onBack() {
-      this._views.get('selected').clear();
+      // trigger animation
+      this._setState({back: true});
+      // wait for animation to complete
+      setTimeout(() => {
+        // remove selection
+        this._views.get('selected').clear();
+        this._setState({back: false});
+      }, 400);
     }
   };
 
