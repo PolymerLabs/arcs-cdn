@@ -58,10 +58,10 @@ class ArcHandle extends Xen.Base {
     ArcHandle.log('updating handle', handle.name, data);
     if (handle.toList) {
       data = Object.keys(data).map(key => {
-        return {id: arc.generateID(), rawData: data[key]};
+        return {id: handle.id, rawData: data[key]};
       });
     } else {
-      data = {id: arc.generateID(), rawData: data};
+      data = {id: handle.id, rawData: data};
     }
     ArcsUtils.setHandleData(handle, data);
   }

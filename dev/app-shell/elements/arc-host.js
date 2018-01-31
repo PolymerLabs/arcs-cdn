@@ -163,7 +163,6 @@ class ArcHost extends Xen.Base {
   async _applySuggestion(arc, plan) {
     // aggressively remove old suggestions when a suggestion is applied
     this._setState({suggestions: []});
-    //this._state.slotComposer.setSuggestions([]);
     // TODO(sjmiles): instantiation takes some non-deterministic amount of time to complete,
     // we need some additional signals in combination with a more robust system for invalidating
     // suggestions. Currently, most of the asynchrony is _short-term_, such that a simple
