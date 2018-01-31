@@ -111,7 +111,7 @@ class ArcFooter extends Xen.Base {
   // 3. committing the search input (enter-key or blurring)
   _onKeypress(e) {
     if (e.key === 'Enter') {
-      this._onSearchCommit(e);
+      this._onSearchCommit(e.target.value || '*');
     }
   }
   _onSearchCommit(e) {
