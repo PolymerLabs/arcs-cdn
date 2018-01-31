@@ -35,7 +35,8 @@ class DataItem extends Xen.Base {
   }
   _render(props, state) {
     let type = typeof props.value;
-    let isobject = (type === 'object'), isstring = (type === 'string'), isbool = (type==='boolean');
+    let isnull = props.value === null;
+    let isobject = (type === 'object' && !isnull), isstring = (type === 'string' || isnull), isbool = (type==='boolean');
     if (!isNaN(Number(props.name))) {
       state.expanded = true;
     }
@@ -46,7 +47,7 @@ class DataItem extends Xen.Base {
       notobject: !isobject || !state.expanded,
       object: isobject && state.expanded ? props.value : null,
       hideexpand: state.expanded || !isobject,
-      value: /*isstring ? props.value.slice(-54) :*/ props.value,
+      value: isnull ? '(null)' : props.value,
       title: isstring ? props.value : props.name
     };
   }
