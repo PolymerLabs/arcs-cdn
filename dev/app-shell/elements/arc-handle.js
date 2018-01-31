@@ -10,6 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import ArcsUtils from "../lib/arcs-utils.js";
 import Xen from '../../components/xen/xen.js';
+const Arcs = window.Arcs;
 
 class ArcHandle extends Xen.Base {
   static get observedAttributes() { return ['arc', 'options', 'data']; }
