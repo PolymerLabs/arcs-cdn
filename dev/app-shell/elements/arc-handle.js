@@ -50,7 +50,7 @@ class ArcHandle extends Xen.Base {
       handle = await arc.createHandle(typeOf, name, id, tags);
     }
     // observe handle
-    handle.on('change', change => this._fire('handle', handle), this);
+    handle.on('change', change => this._fire('handle', handle), arc);
     ArcHandle.log('created handle', name, tags);
     return handle;
   }

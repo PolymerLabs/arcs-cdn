@@ -17,6 +17,9 @@ defineParticle(({DomParticle}) => {
   [${host}] {
     position: relative;
   }
+  [${host}][empty] {
+    display: none;
+  }
   [${host}] [detail-panel] {
     position: sticky;
     top: 64px;
@@ -46,7 +49,7 @@ defineParticle(({DomParticle}) => {
     border: none;
   }
 </style>
-<div ${host}>
+<div ${host} empty$="{{empty}}">
   <!-- CSS tricks: zero-height position:sticky panel can autosize horizontally while not scrolling and not
        pushing siblings out of position. Contained absolute panel can have vertical size without affecting
        outer flow. -->
@@ -68,7 +71,11 @@ defineParticle(({DomParticle}) => {
     }
     _render({selected}, {back}) {
       let hasSelection = selected && (selected.name || selected.id);
+      if (!hasSelection) {
+        this._setState({back: false});
+      }
       return {
+        empty: !hasSelection,
         open: Boolean(hasSelection && !back)
       };
     }
@@ -80,7 +87,7 @@ defineParticle(({DomParticle}) => {
         // remove selection
         this._views.get('selected').clear();
         this._setState({back: false});
-      }, 400);
+      }, 300);
     }
   };
 

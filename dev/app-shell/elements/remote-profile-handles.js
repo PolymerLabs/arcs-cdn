@@ -51,17 +51,17 @@ class RemoteProfileHandles extends Xen.Base {
         // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
         let handle = await ArcsUtils.createOrUpdateHandle(arc, remotes[key], 'PROFILE');
         RemoteProfileHandles.log('created/updated handle', handle.id);
-        this._synthesizeFriendsHandle(friends, handle);
+        this._synthesizeFriendsHandle(arc, friends, handle);
         //this._fire('handle', {handle});
       });
     }
   }
   // TODO(sjmiles): special handling for `friends` handle, should this be factored out?
-  _synthesizeFriendsHandle(friends, handle) {
+  _synthesizeFriendsHandle(arc, friends, handle) {
     // TODO(sjmiles): `friends` is only captured once, assumption is that this handle is immortal
     if (!friends && handle.id == 'PROFILE_!Person!_friends') {
       this._state.friends = handle;
-      handle.on('change', this._friendsHandleChanged.bind(this, handle), this);
+      handle.on('change', this._friendsHandleChanged.bind(this, handle), arc);
       this._friendsHandleChanged(handle);
     }
   }

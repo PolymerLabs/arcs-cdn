@@ -82,7 +82,7 @@ class PersistentHandles extends Xen.Base {
           } else if (change.data === undefined) {
             remoteVariable.remove();
           }
-        }, {});
+        }, arc);
       }
     });
     return () => remoteVariable.off('value', callback);
@@ -105,7 +105,7 @@ class PersistentHandles extends Xen.Base {
     // fire *before* the value event fires on the parent, we use the value
     // event to detect when initial loading is done. That is when we start
     // listening to local set changes.
-    remoteSet.once('value', snapshot => {
+    remoteSet.once('value', () => {
       // At this point we're guaranteed the initial remote load is done.
       localSet.on('change', change => {
         if (change.add) {
@@ -126,7 +126,7 @@ class PersistentHandles extends Xen.Base {
         } else {
           PersistentHandles.log('Unsupported change', change);
         }
-      }, {});
+      }, arc);
     });
     return () => off.forEach(w => w && w());
   }
