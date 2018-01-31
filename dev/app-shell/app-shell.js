@@ -49,7 +49,7 @@ const template = Xen.Template.createTemplate(
   }
   app-shell, [app-shell] {
     display: block;
-    max-width: 768px;
+    max-width: 640px;
     margin: 0 auto;
     background-color: white;
   }
@@ -79,7 +79,7 @@ const template = Xen.Template.createTemplate(
     position: fixed;
     top: 0;
     width: 100%;
-    max-width: 768px;
+    max-width: 640px;
     height: 56px;
     display: flex;
     align-items: center;
@@ -122,7 +122,7 @@ const template = Xen.Template.createTemplate(
     position: fixed;
     bottom: 0;
     width: 100%;
-    max-width: 768px;
+    max-width: 640px;
     background-color: white;
   }
   [hidden] {
@@ -131,13 +131,12 @@ const template = Xen.Template.createTemplate(
   [illuminate] [particle-host] {
     border: 1px solid #ea80fc;
     border-top: 18px solid #ea80fc;
-    position: relative;
     border-radius: 8px 8px 0 0;
   }
   [illuminate] [particle-host]::before {
     content: attr(particle-host);
-    position: absolute;
-    top: -16px;
+    position: relative;
+    top: -18px;
     left: 4px;
     font-size: 12px;
     font-family: monospace;
