@@ -255,8 +255,10 @@ function allSuggestions() {
   waitForStillness();
   openSuggestionDrawer();
 
+  // There are two 'i' elements -- the first is 'search' and the second is
+  // 'add'. For test purposes we're looking for the search element.
   const magnifier = pierceShadowsSingle(
-    getFooterPath().concat(['div[search]', 'i'])
+    getFooterPath().concat(['div[search]', 'i:first-child'])
   );
   console.log(`click: allSuggestions`);
   browser.elementIdClick(magnifier.value.ELEMENT);

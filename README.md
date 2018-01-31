@@ -47,7 +47,7 @@ the browser run in a graphical manner (as opposed to the default headless
 configuration). The second is to actually debug the running selenium instance.
 
 There are some debugging hints (code and configuration you can uncomment to
-make debugging easier) in `test/specs/start-test.js` and `test/wdio.conf.js`
+make debugging easier) in `test/specs/starter-test.js` and `test/wdio.conf.js`
 marked with the phrase `debug hint`.
 
 #### Graphical (non-headless)
