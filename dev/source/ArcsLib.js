@@ -15,6 +15,7 @@ import Planner from '../../../arcs/runtime/planner.js';
 import SlotComposer from '../../../arcs/runtime/slot-composer.js';
 import Type from '../../../arcs/runtime/type.js';
 import BrowserLoader from './browser-cdn-loader.js';
+import scheduler from '../../../arcs/runtime/scheduler.js';
 
 window.Arcs = {
   version: '0.3',
@@ -24,5 +25,6 @@ window.Arcs = {
   Planner,
   SlotComposer,
   Type,
-  BrowserLoader
+  BrowserLoader,
+  scheduler: scheduler
 };
