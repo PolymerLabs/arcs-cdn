@@ -365,7 +365,8 @@ function clickInParticles(slotName, selectors, textQuery) {
 }
 
 describe('test Arcs demo flows', function() {
-  it('can use the restaurant demo flow', function() {
+  // TODO(seefeld): Disabled per https://github.com/PolymerLabs/arcs-cdn/issues/181
+  it.skip('can use the restaurant demo flow', function() {
     initTestWithNewArc();
 
     allSuggestions();
