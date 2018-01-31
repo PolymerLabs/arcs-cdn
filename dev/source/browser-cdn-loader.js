@@ -12,13 +12,19 @@ import Loader from '../../../arcs/runtime/loader.js';
 import particle from '../../../arcs/runtime/particle.js';
 import DomParticle from '../../../arcs/runtime/dom-particle.js';
 
+const dumbCache = {};
+
 export default class BrowserLoader extends Loader {
   constructor(urlMap) {
     super();
     this._urlMap = urlMap;
-    // TODO: Update all callers to pass a valid base URL to avoid the use of
-    //       location here. `new URL(base)` should be valid.
-    //this._base = new URL(base || '', global.location).href;
+  }
+  _loadURL(url) {
+    const resource = dumbCache[url];
+    if (resource) {
+      //console.warn('dumbCache hit for', url);
+    }
+    return resource || (dumbCache[url] = super._loadURL(url));
   }
   _resolve(path) {
     //return new URL(path, this._base).href;
@@ -64,4 +70,4 @@ export default class BrowserLoader extends Loader {
     let resolver = this._resolve.bind(this);
     return particleWrapper({particle, Particle: particle.Particle, DomParticle, resolver});
   }
-};
+}
