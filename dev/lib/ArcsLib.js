@@ -81,6 +81,7 @@
 
 function assert(test, message) {
   if (!test) {
+    debugger;
     throw new Error(message);
   }
 };
@@ -6378,13 +6379,19 @@ class StorageProviderFactory {
 
 
 
+const dumbCache = {};
+
 class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js__["a" /* default */] {
   constructor(urlMap) {
     super();
     this._urlMap = urlMap;
-    // TODO: Update all callers to pass a valid base URL to avoid the use of
-    //       location here. `new URL(base)` should be valid.
-    //this._base = new URL(base || '', global.location).href;
+  }
+  _loadURL(url) {
+    const resource = dumbCache[url];
+    if (resource) {
+      //console.warn('dumbCache hit for', url);
+    }
+    return resource || (dumbCache[url] = super._loadURL(url));
   }
   _resolve(path) {
     //return new URL(path, this._base).href;
@@ -6432,7 +6439,7 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
   }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = BrowserLoader;
-;
+
 
 
 /***/ }),
