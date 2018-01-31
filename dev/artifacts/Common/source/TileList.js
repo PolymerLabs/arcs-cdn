@@ -22,7 +22,6 @@ defineParticle(({DomParticle, resolver}) => {
     color: whitesmoke;
   }
   [${host}] > [card] {
-    /*line-height: 0;*/
     margin: 8px;
     width: calc(50% - 24px);
   }
@@ -38,7 +37,7 @@ defineParticle(({DomParticle, resolver}) => {
   }
 </style>
 
-<template items>
+<template tiled-items>
   <div card>
     <div slotid="action" subid="{{id}}"></div>
     <div slotid="item" subid="{{id}}" key="{{id}}" on-click="_onSelect"></div>
@@ -59,7 +58,7 @@ defineParticle(({DomParticle, resolver}) => {
       //console.log('');
       return {
         items: {
-          $template: 'items',
+          $template: 'tiled-items',
           models: items.sort((a,b) => a.name > b.name ? 1 : a.name === b.name ? 0 : -1).map(item => {
             return {
               id: item.id

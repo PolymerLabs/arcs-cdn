@@ -33,11 +33,13 @@ defineParticle(({DomParticle}) => {
     top: 0;
     right: 0;
     left: 0;
+    height: calc(100vh - 64px);
     border-radius: 16px;
     padding: 0 16px;
     box-sizing: border-box;
     background-color: white;
     box-shadow: 0px 0px 6px 2px rgba(252,252,252,0.65);
+    overflow-y: auto;
   }
   [${host}] button {
     background-color: transparent;
