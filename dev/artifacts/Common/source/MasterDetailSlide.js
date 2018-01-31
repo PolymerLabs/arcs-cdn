@@ -17,7 +17,7 @@ defineParticle(({DomParticle}) => {
   [${host}] {
     position: relative;
   }
-  [${host}][empty] {
+  [${host}] [empty] {
     display: none;
   }
   [${host}] [detail-panel] {
@@ -49,11 +49,11 @@ defineParticle(({DomParticle}) => {
     border: none;
   }
 </style>
-<div ${host} empty$="{{empty}}">
+<div ${host}>
   <!-- CSS tricks: zero-height position:sticky panel can autosize horizontally while not scrolling and not
        pushing siblings out of position. Contained absolute panel can have vertical size without affecting
        outer flow. -->
-  <div detail-panel open$="{{open}}">
+  <div detail-panel open$="{{open}}" empty$="{{empty}}">
     <div abs-panel>
       <div style="padding: 8px; text-align: right;"><button on-click="_onBack">X</button></div>
       <div slotid="detail"></div>
