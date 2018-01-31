@@ -640,7 +640,7 @@ class AppShell extends Xen.Base {
       search = search.trim().toLowerCase();
       // TODO(sjmiles): installing the search term should be the job of arc-host
       // TODO(sjmiles): setting search to '' causes an exception at init-search.js|L#29)
-      state.arc._search = search ? search : null;
+      state.arc.search = search && search !== '*' ? search : null;
       // re-plan only if the search has changed (beyond simple filtering)
       if ((state.search && search && search !== '*') || (state.search !== '*' && search && search !== '*')) {
         // TODO(sjmiles): installing the search term should be the job of arc-host
