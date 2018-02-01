@@ -6,12 +6,7 @@
 # subject to an additional IP rights grant found at
 # http://polymer.github.io/PATENTS.txt
 
-import 'Restaurant.schema'
-import '../Events/Event.schema'
-import '../Arcs/Description.schema'
-
-particle ReservationForm in 'source/ReservationForm.js'
-  ReservationForm(in Restaurant selected, inout Event event, out [Description] descriptions)
-  consume action
-  description `make a reservation`
-    event `reservation`
+schema Description
+  optional
+    Text key
+    Text value
