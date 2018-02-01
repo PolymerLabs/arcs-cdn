@@ -12,6 +12,8 @@ import Loader from '../../../arcs/runtime/loader.js';
 import particle from '../../../arcs/runtime/particle.js';
 import DomParticle from '../../../arcs/runtime/dom-particle.js';
 
+const logFactory = (preamble, color, log='log') => console[log].bind(console, `Ptcl:%c${preamble}`, `background: ${color}; color: white; padding: 1px 6px 2px 7px; border-radius: 4px;`);
+const html = (strings, ...values) => (strings[0] + values.map((v, i) => v + strings[i + 1]).join('')).trim();
 const dumbCache = {};
 
 export default class BrowserLoader extends Loader {
@@ -54,7 +56,7 @@ export default class BrowserLoader extends Loader {
     };
     importScripts(path);
     delete self.defineParticle;
-    return this.unwrapParticle(result[0]);
+    return this.unwrapParticle(result[0], logFactory(fileName.split('/').pop(), 'blue'));
   }
   mapParticleUrl(path) {
     let parts = path.split('/');
@@ -63,11 +65,11 @@ export default class BrowserLoader extends Loader {
     let name = suffix.split('.').shift();
     this._urlMap[name] = folder;
   }
-  unwrapParticle(particleWrapper) {
+  unwrapParticle(particleWrapper, log) {
     // TODO(sjmiles): regarding `resolver`:
     //  _resolve method allows particles to request remapping of assets paths
     //  for use in DOM
     let resolver = this._resolve.bind(this);
-    return particleWrapper({particle, Particle: particle.Particle, DomParticle, resolver});
+    return particleWrapper({particle, Particle: particle.Particle, DomParticle, resolver, log, html});
   }
 }

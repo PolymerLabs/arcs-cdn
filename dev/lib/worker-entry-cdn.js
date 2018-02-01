@@ -1576,6 +1576,8 @@ class Shape {
 
 
 
+const logFactory = (preamble, color, log='log') => console[log].bind(console, `Ptcl:%c${preamble}`, `background: ${color}; color: white; padding: 1px 6px 2px 7px; border-radius: 4px;`);
+const html = (strings, ...values) => (strings[0] + values.map((v, i) => v + strings[i + 1]).join('')).trim();
 const dumbCache = {};
 
 class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js__["a" /* default */] {
@@ -1618,7 +1620,7 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
     };
     importScripts(path);
     delete self.defineParticle;
-    return this.unwrapParticle(result[0]);
+    return this.unwrapParticle(result[0], logFactory(fileName.split('/').pop(), 'blue'));
   }
   mapParticleUrl(path) {
     let parts = path.split('/');
@@ -1627,12 +1629,12 @@ class BrowserLoader extends __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js_
     let name = suffix.split('.').shift();
     this._urlMap[name] = folder;
   }
-  unwrapParticle(particleWrapper) {
+  unwrapParticle(particleWrapper, log) {
     // TODO(sjmiles): regarding `resolver`:
     //  _resolve method allows particles to request remapping of assets paths
     //  for use in DOM
     let resolver = this._resolve.bind(this);
-    return particleWrapper({particle: __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__["a" /* default */], Particle: __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__["a" /* default */].Particle, DomParticle: __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_dom_particle_js__["a" /* default */], resolver});
+    return particleWrapper({particle: __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__["a" /* default */], Particle: __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__["a" /* default */].Particle, DomParticle: __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_dom_particle_js__["a" /* default */], resolver, log, html});
   }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = BrowserLoader;
