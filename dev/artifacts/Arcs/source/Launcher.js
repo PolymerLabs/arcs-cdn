@@ -44,7 +44,7 @@ defineParticle(({ DomParticle, log, html }) => {
   }
   [${host}] [delete] {
     position: absolute;
-    right: 4px;
+    right: 2px;
     top: 4px;
     visibility: hidden;
   }

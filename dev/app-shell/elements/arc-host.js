@@ -59,7 +59,7 @@ class ArcHost extends Xen.Base {
   }
   _update(props, state) {
     if (state.arc && !props.plans) {
-      this._schedulePlanning(state);
+      this._schedulePlanning();
     }
   }
   async _applyConfig(config) {
@@ -72,7 +72,7 @@ class ArcHost extends Xen.Base {
   }
   _runtimeHandlesUpdated() {
     ArcHost.log('_runtimeHandlesUpdated');
-    this._schedulePlanning(this._state);
+    this._schedulePlanning();
   }
   async _createArc(config) {
     // make an id
@@ -134,7 +134,8 @@ class ArcHost extends Xen.Base {
       content: manifests.map(u => `import '${u}'`).join('\n')
     };
   }
-  _schedulePlanning(state) {
+  _schedulePlanning() {
+    const state = this._state;
     // results obtained before now are invalid
     state.invalid = true;
     // only wait for one _beginPlanning at a time

@@ -568,23 +568,24 @@ class AppShell extends Xen.Base {
       this._modifyProfileState(true);
     }
   }
-  async _onArcsHandle(e, arcsHandle) {
-    this._installSyntheticHandle('arcsHandle', arcsHandle);
-    let visitedArcs = await ArcsUtils.getHandleData(arcsHandle);
-    this._setState({visitedArcs});
-    AppShell.log('visitedArcs: ', visitedArcs);
-  }
-  _onIdentityHandle(e, identityHandle) {
-    this._installSyntheticHandle('identityHandle', identityHandle);
-  }
-  _onIdentitiesHandle(e, identitiesHandle) {
-    this._installSyntheticHandle('identitiesHandle', identitiesHandle);
-  }
-  _installSyntheticHandle(name, handle) {
-    AppShell.log('_installSyntheticHandle', name, handle);
+  async _onArcsHandle(e, handle) {
     this._setState({
       plans: null,
-      [name]: handle
+      arcsHandle: handle,
+      visitedArcs: await ArcsUtils.getHandleData(handle)
+    });
+    AppShell.log('onArcsHandle: ', this._state.visitedArcs);
+  }
+  _onIdentityHandle(e, handle) {
+    this._setState({
+      plans: null,
+      identityHandle: handle
+    });
+  }
+  _onIdentitiesHandle(e, handle) {
+    this._setState({
+      plans: null,
+      identitiesHandle: handle
     });
   }
   _onMetadata(e, metadata) {
@@ -642,8 +643,6 @@ class AppShell extends Xen.Base {
       state.arc.search = search && search !== '*' ? search : null;
       // re-plan only if the search has changed (beyond simple filtering)
       if ((state.search && search && search !== '*') || (state.search !== '*' && search && search !== '*')) {
-        // TODO(sjmiles): installing the search term should be the job of arc-host
-        // TODO(sjmiles): setting search to '' causes an exception at init-search.js|L#29)
         this._setState({plans: null});
       }
       this._setState({search});
