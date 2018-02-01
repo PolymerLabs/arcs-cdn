@@ -581,12 +581,11 @@ class AppShell extends Xen.Base {
     this._installSyntheticHandle('identitiesHandle', identitiesHandle);
   }
   _installSyntheticHandle(name, handle) {
-    AppShell.log(name, handle);
-    let state = {
-      plans: null
-    };
-    state[name] = handle;
-    this._setState(state);
+    AppShell.log('_installSyntheticHandle', name, handle);
+    this._setState({
+      plans: null,
+      [name]: handle
+    });
   }
   _onMetadata(e, metadata) {
     this._setIfDirty({metadata});
