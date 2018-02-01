@@ -365,8 +365,8 @@ function clickInParticles(slotName, selectors, textQuery) {
 }
 
 describe('test Arcs demo flows', function() {
-  // TODO(seefeldb): Disabled per https://github.com/PolymerLabs/arcs-cdn/issues/181
-  it.skip('can use the restaurant demo flow', function() {
+  // TODO(seefeldb): Check for "Make a reservation" to appear on list view
+  it('can use the restaurant demo flow', function() {
     initTestWithNewArc();
 
     allSuggestions();
@@ -385,8 +385,8 @@ describe('test Arcs demo flows', function() {
     console.log(`click: restaurantSelectors`);
     browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
 
-    acceptSuggestion('Make a reservation');
-    acceptSuggestion('You are free');
+    acceptSuggestion('Table for 2');
+    acceptSuggestion('from your calendar');
 
     // debug hint: to drop into debug mode with a REPL; also a handy way to
     // see the state at the end of the test:
