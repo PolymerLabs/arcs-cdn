@@ -8,18 +8,9 @@
 
 'use strict';
 
-defineParticle(({ DomParticle }) => {
+defineParticle(({ DomParticle, log, html }) => {
 
   const host = 'arcs-list';
-
-  const html = (strings, ...values) =>
-    (strings[0] + values.map((v, i) => v + strings[i + 1]).join('')).trim();
-
-  const info = console.log.bind(
-    console.log,
-    '%cLauncher',
-    `background: #008081; color: white; padding: 1px 6px 2px 7px; border-radius: 6px;`
-  );
 
   const style = html`
 <style>
@@ -41,6 +32,7 @@ defineParticle(({ DomParticle }) => {
     padding-right: 4px;
   }
   [${host}] [arc-chip] {
+    position: relative;
     display: flex;
     flex-direction: column;
     padding: 16px;
@@ -49,6 +41,15 @@ defineParticle(({ DomParticle }) => {
     color: whitesmoke;
     border-radius: 9px;
     min-height: 56px;
+  }
+  [${host}] [delete] {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    visibility: hidden;
+  }
+  [${host}] [arc-chip]:hover [delete] {
+    visibility: visible;
   }
 </style>
 `;
@@ -65,11 +66,14 @@ ${style}
 </div>
 
 <template column>
-  <a arc-chip style="{{backStyle}}" href="{{href}}" target="_blank">
-    <div description title="{{description}}" unsafe-html="{{blurb}}"></div>
-    <div style="flex: 1;"></div>
-    <div style="margin-top: 32px;"><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i></div>
-  </a>
+  <div arc-chip style="{{backStyle}}">
+    <div delete class="material-icons" key="{{arcId}}" on-click="_onDelete">remove_circle_outline</div>
+    <a href="{{href}}" target="_blank">
+      <div description title="{{description}}" unsafe-html="{{blurb}}"></div>
+      <div style="flex: 1;"></div>
+      <div style="margin-top: 32px;"><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i></div>
+    </a>
+  </div>
 </template>
 `;
 
@@ -130,6 +134,16 @@ ${style}
         });
       });
       return result;
+    }
+    _onDelete(e) {
+      const arcId = e.data.key;
+      const arc = this._props.arcs.find(a => a.id === arcId);
+      if (!arc) {
+        log(`Couldn't find arc to delete [arcId=${arcId}].`);
+      } else {
+        log(`Removing arc [arcId=${arcId}].`);
+        this._views.get('arcs').remove(arc);
+      }
     }
   };
 });
