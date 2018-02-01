@@ -276,8 +276,16 @@ function getAtLeastOneSuggestion() {
   return allSuggestions;
 }
 
+function waitForSuggestion(textSubstring) {
+  _waitForAndMaybeAcceptSuggestion(textSubstring, false);
+}
+
 function acceptSuggestion(textSubstring) {
-  console.log(`Trying to accept: ${textSubstring}`);
+  _waitForAndMaybeAcceptSuggestion(textSubstring, true);
+}
+
+function _waitForAndMaybeAcceptSuggestion(textSubstring, accept) {
+  console.log(`Waiting for: ${textSubstring}`);
   waitForStillness();
   openSuggestionDrawer();
   let footerPath = getFooterPath();
@@ -295,8 +303,8 @@ function acceptSuggestion(textSubstring) {
           return false;
         }
 
-        console.log(`click: desiredSuggestion`);
-        browser.elementIdClick(desiredSuggestion.id);
+        console.log(`found: desiredSuggestion`);
+        if (accept) browser.elementIdClick(desiredSuggestion.id);
         return true;
       } catch (e) {
         if (e.message.includes('stale element reference')) {
@@ -313,7 +321,7 @@ function acceptSuggestion(textSubstring) {
     `couldn't find suggestion ${textSubstring}`
   );
   // TODO: return the full suggestion text for further verification.
-  console.log(`Accepted suggestion: ${textSubstring}`);
+  console.log(`${accept ? 'Accepted' : 'Found'} suggestion: ${textSubstring}`);
 }
 
 function particleSelectors(slotName, selectors) {
@@ -365,7 +373,6 @@ function clickInParticles(slotName, selectors, textQuery) {
 }
 
 describe('test Arcs demo flows', function() {
-  // TODO(seefeldb): Check for "Make a reservation" to appear on list view
   it('can use the restaurant demo flow', function() {
     initTestWithNewArc();
 
@@ -381,6 +388,7 @@ describe('test Arcs demo flows', function() {
       'div.title'
     ]);
     waitForVisible(restaurantSelectors);
+    waitForSuggestion('Make a reservation');
     let restaurantNodes = pierceShadows(restaurantSelectors);
     console.log(`click: restaurantSelectors`);
     browser.elementIdClick(restaurantNodes.value[0].ELEMENT);
