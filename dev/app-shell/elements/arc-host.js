@@ -64,11 +64,15 @@ class ArcHost extends Xen.Base {
   }
   async _applyConfig(config) {
     let arc = await this._createArc(config);
-    // TODO(sjmiles): IIUC callback that is invoked by runtime idle callback ...
-    arc.makeSuggestions = () => this._schedulePlanning(this._state);
+    // TODO(sjmiles): IIUC callback that is invoked by runtime onIdle event
+    arc.makeSuggestions = () => this._runtimeHandlesUpdated();
     ArcHost.log('instantiated', arc);
     this._setState({arc});
     this._fire('arc', arc);
+  }
+  _runtimeHandlesUpdated() {
+    ArcHost.log('_runtimeHandlesUpdated');
+    this._schedulePlanning(this._state);
   }
   async _createArc(config) {
     // make an id
