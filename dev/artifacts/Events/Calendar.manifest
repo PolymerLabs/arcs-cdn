@@ -7,9 +7,10 @@
 # http://polymer.github.io/PATENTS.txt
 
 import 'Event.schema'
+import '../Arcs/Description.schema'
 
 particle Calendar in 'source/Calendar.js'
-  Calendar(inout Event event)
+  Calendar(inout Event event, out [Description] descriptions)
   consume action
   consume modifier
-  description `calendar: You are ${event.availability} ${event.humanReadableTime}`
+  description `Select a time from your calendar`

@@ -202,9 +202,17 @@ ${styles}
       const event = Object.assign({}, props.event && props.event.rawData || {});
       this._event = event;
       this._savedStartDate = event.startDate || (new Date()).toJSON().slice(0,16);
-      if (!event.availability) {
+      if (!event.startDate) {
         this._storeNewEvent(this._savedStartDate);
       }
+
+      const conflicts = this._findConflicts(this._savedStartDate);
+      this.setParticleDescription(
+        'you are ' +
+        (conflicts.length ? `busy with ${conflicts[0].name}` : 'free') +
+        ' ' + this._generateHumanReadableTime(this._savedStartDate) +
+        '. Select a different time from your calendar');
+
     }
     _render(props, state) {
       const events = this._getEventsForDate(this._savedStartDate);
@@ -358,12 +366,9 @@ ${styles}
     }
     _storeNewEvent(startDate) {
       const event = this._views.get('event');
-      const conflicts = this._findConflicts(startDate);
       const newEvent = Object.assign({}, (this._event || {}), {
         startDate: startDate,
-        endDate: startDate,
-        availability: conflicts.length ? `busy with ${conflicts[0].name}` : 'free',
-        humanReadableTime: this._generateHumanReadableTime(startDate)
+        endDate: startDate
       });
       event.set(new event.entityClass(newEvent));
     }
