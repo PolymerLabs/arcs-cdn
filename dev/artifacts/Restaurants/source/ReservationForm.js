@@ -154,9 +154,9 @@ ${styles}
       }
       this._setState({ currentEvent: event });
 
-      if (props.selected && !event.description) {
-        event.description = this.createDescription(props.selected.id, event.participants, event.startDate);
-      }
+      this.setParticleDescription(
+        props.selected &&
+        this.createDescription(props.selected.id, event.participants, event.startDate));
 
       if (!props.event || JSON.stringify(event) !== JSON.stringify(props.event.rawData)) {
         this._storeNewEvent(event);
