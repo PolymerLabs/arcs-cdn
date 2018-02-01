@@ -155,8 +155,9 @@ ${styles}
       this._setState({ currentEvent: event });
 
       this.setParticleDescription(
-        props.selected &&
-        this.createDescription(props.selected.id, event.participants, event.startDate));
+        props.selected
+          ? this.createDescription(props.selected.id, event.participants, event.startDate)
+          : "check for available tables");
 
       if (!props.event || JSON.stringify(event) !== JSON.stringify(props.event.rawData)) {
         this._storeNewEvent(event);
