@@ -95,8 +95,8 @@ function assert(test, message) {
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__shape_js__ = __webpack_require__(10);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__schema_js__ = __webpack_require__(4);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(27);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__tuple_fields_js__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__type_variable_js__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__tuple_fields_js__ = __webpack_require__(27);
 // @license
 // Copyright (c) 2017 Google Inc. All rights reserved.
 // This code may only be used under the BSD style license found at
@@ -874,9 +874,173 @@ class Schema {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__ = __webpack_require__(20);
+/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+
+
+
+
+
+
+//let log = !global.document || (global.logging === false) ? () => {} : console.log.bind(console, `---------- DomParticle::`);
+//console.log(!!global.document, global.logging, log);
+
+let log = false ? console.log.bind(console) : () => {};
+
+/** @class DomParticle
+ * Particle that does stuff with DOM.
+ */
+class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__["a" /* default */])(__WEBPACK_IMPORTED_MODULE_1__particle_js__["b" /* Particle */]) {
+  /** @method get template()
+   * Override to return a String defining primary markup.
+   */
+  get template() {
+    return '';
+  }
+  /** @method getTemplate(slotName)
+   * Override to return a String defining primary markup for the given slot name.
+   */
+  getTemplate(slotName) {
+    // TODO: only supports a single template for now. add multiple templates support.
+    return this.template;
+  }
+  /** @method _shouldRender(props, state)
+   * Override to return false if the Particle won't use
+   * it's slot.
+   */
+  _shouldRender(props, state) {
+    return true;
+  }
+  /** @method _render(props, state)
+   * Override to return a dictionary to map into the template.
+   */
+  _render(props, state) {
+    return {};
+  }
+  /** @method _willReceiveProps(props)
+   * Override if necessary, to do things when props change.
+   */
+  _willReceiveProps(props) {
+  }
+  /** @method get config()
+   * Override if necessary, to modify superclass config.
+   */
+  get config() {
+    // TODO(sjmiles): getter that does work is a bad idea, this is temporary
+    return {
+      views: this.spec.inputs.map(i => i.name),
+      // TODO(mmandlis): this.spec needs to be replace with a particle-spec loaded from
+      // .manifest files, instead of .ptcl ones.
+      slotNames: [...this.spec.slots.values()].map(s => s.name)
+    };
+  }
+  _info() {
+    return `---------- DomParticle::[${this.spec.name}]`;
+  }
+  async setViews(views) {
+    this._views = views;
+    let config = this.config;
+    //let readableViews = config.views.filter(name => views.get(name).canRead);
+    //this.when([new ViewChanges(views, readableViews, 'change')], async () => {
+    this.when([new __WEBPACK_IMPORTED_MODULE_1__particle_js__["c" /* ViewChanges */](views, config.views, 'change')], async () => {
+      await this._updateAllViews(views, config);
+    });
+    // make sure we invalidate once, even if there are no incoming views
+    this._setState({});
+  }
+  async _updateAllViews(views, config) {
+    // acquire (async) list data from views
+    let data = await Promise.all(
+      config.views
+      .map(name => views.get(name))
+      .map(view => view.toList ? view.toList() : view.get())
+    );
+    // convert view data (array) into props (dictionary)
+    let props = Object.create(null);
+    config.views.forEach((name, i) => {
+      props[name] = data[i];
+    });
+    this._setProps(props);
+  }
+  _update(props, state) {
+    if (this._shouldRender(this._props, this._state)) { // TODO: should _shouldRender be slot specific?
+      this.relevance = 1; // TODO: improve relevance signal.
+    }
+    this.config.slotNames.forEach(s => this.render(s, ['model']));
+  }
+
+  render(slotName, contentTypes) {
+    let slot = this.getSlot(slotName);
+    if (!slot) {
+      return; // didn't receive StartRender.
+    }
+    contentTypes.forEach(ct => slot._requestedContentTypes.add(ct));
+    if (this._shouldRender(this._props, this._state)) {
+      let content = {};
+      if (slot._requestedContentTypes.has('template')) {
+        content['template'] = this._initializeRender(slot);
+      }
+      if (slot._requestedContentTypes.has('model')) {
+        content['model'] = this._render(this._props, this._state);
+      }
+      slot.render(content);
+    } else if (slot.isRendered) {
+      // Send empty object, to clear rendered slot contents.
+      slot.render({});
+    }
+  }
+  _initializeRender(slot) {
+    let template = this.getTemplate(slot.slotName);
+    this._findHandlerNames(template).forEach(name => {
+      slot.clearEventHandlers(name);
+      slot.registerEventHandler(name, eventlet => {
+        if (this[name]) {
+          this[name](eventlet, this._state, this._views);
+        }
+      });
+    });
+    return template;
+  }
+  _findHandlerNames(html) {
+    let handlers = new Map();
+    let re = /on-.*?=\"([^\"]*)"/gmi;
+    for (let m=re.exec(html); m; m=re.exec(html)) {
+      handlers.set(m[1], true);
+    }
+    return Array.from(handlers.keys());
+  }
+  setParticleDescription(pattern) {
+    if (typeof pattern === 'string') {
+      return super.setParticleDescription(pattern);
+    }
+    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!!pattern.template && !!pattern.model, 'Description pattern must either be string or have template and model');
+    super.setDescriptionPattern('_template_', pattern.template);
+    super.setDescriptionPattern('_model_', JSON.stringify(pattern.model));
+  }
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (DomParticle);
+
+
+/***/ }),
+/* 7 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__runtime_js__ = __webpack_require__(25);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_spec_js__ = __webpack_require__(3);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__tracelib_trace_js__ = __webpack_require__(28);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__tracelib_trace_js__ = __webpack_require__(29);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__platform_assert_web_js__ = __webpack_require__(0);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__schema_js__ = __webpack_require__(4);
 /**
@@ -914,8 +1078,6 @@ class Particle {
     this.states = new Map();
     this._slotByName = new Map();
     this.capabilities = capabilities || {};
-    this.hostedSlotBySlotId = new Map();
-    this.handleByHostedHandle = new Map();
   }
 
   /** @method setViews(views)
@@ -1059,6 +1221,18 @@ class Particle {
     }
     return false;
   }
+  // TODO: Move to transformation-particle class.
+  // TODO: Don't serialize schemas, once partial schemas are in use.
+  serializeSchema(hostedParticle) {
+    let hostedConnSchemas = new Set();
+    hostedParticle.connections.forEach(conn => {
+      hostedConnSchemas.add((conn.type.isSetView ? conn.type.primitiveType() : conn.type).entitySchema.toString());
+    });
+    var schemaString =
+`${[...hostedConnSchemas].map(schema => schema.toString()).join('\n\r')}
+${hostedParticle.toString()}`;
+    return schemaString;
+  }
 }
 /* harmony export (immutable) */ __webpack_exports__["b"] = Particle;
 
@@ -1111,7 +1285,7 @@ class StateChanges {
 
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -1123,214 +1297,6 @@ class StateChanges {
 // http://polymer.github.io/PATENTS.txt
 
 /* harmony default export */ __webpack_exports__["a"] = ({});
-
-
-/***/ }),
-/* 8 */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__particle_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__ = __webpack_require__(20);
-/**
- * @license
- * Copyright (c) 2017 Google Inc. All rights reserved.
- * This code may only be used under the BSD style license found at
- * http://polymer.github.io/LICENSE.txt
- * Code distributed by Google as part of this project is also
- * subject to an additional IP rights grant found at
- * http://polymer.github.io/PATENTS.txt
- */
-
-
-
-
-
-
-
-//let log = !global.document || (global.logging === false) ? () => {} : console.log.bind(console, `---------- DomParticle::`);
-//console.log(!!global.document, global.logging, log);
-
-let log = false ? console.log.bind(console) : () => {};
-
-/** @class DomParticle
- * Particle that does stuff with DOM.
- */
-class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__browser_lib_xen_state_js__["a" /* default */])(__WEBPACK_IMPORTED_MODULE_1__particle_js__["b" /* Particle */]) {
-  /** @method get template()
-   * Override to return a String defining primary markup.
-   */
-  get template() {
-    return '';
-  }
-  /** @method getTemplate(slotName)
-   * Override to return a String defining primary markup for the given slot name.
-   */
-  getTemplate(slotName) {
-    // TODO: only supports a single template for now. add multiple templates support.
-    return this.template;
-  }
-  /** @method _shouldRender(props, state)
-   * Override to return false if the Particle won't use
-   * it's slot.
-   */
-  _shouldRender(props, state) {
-    return true;
-  }
-  /** @method _render(props, state)
-   * Override to return a dictionary to map into the template.
-   */
-  _render(props, state) {
-    return {};
-  }
-  /** @method _willReceiveProps(props)
-   * Override if necessary, to do things when props change.
-   */
-  _willReceiveProps(props) {
-  }
-  /** @method get config()
-   * Override if necessary, to modify superclass config.
-   */
-  get config() {
-    // TODO(sjmiles): getter that does work is a bad idea, this is temporary
-    return {
-      views: this.spec.inputs.map(i => i.name),
-      // TODO(mmandlis): this.spec needs to be replace with a particle-spec loaded from
-      // .manifest files, instead of .ptcl ones.
-      slotNames: [...this.spec.slots.values()].map(s => s.name)
-    };
-  }
-  _info() {
-    return `---------- DomParticle::[${this.spec.name}]`;
-  }
-  async setViews(views) {
-    this._views = views;
-    let config = this.config;
-    //let readableViews = config.views.filter(name => views.get(name).canRead);
-    //this.when([new ViewChanges(views, readableViews, 'change')], async () => {
-    this.when([new __WEBPACK_IMPORTED_MODULE_1__particle_js__["c" /* ViewChanges */](views, config.views, 'change')], async () => {
-      // acquire (async) list data from views
-      let data = await Promise.all(
-        config.views
-        .map(name => views.get(name))
-        .map(view => view.toList ? view.toList() : view.get())
-      );
-      // convert view data (array) into props (dictionary)
-      let props = Object.create(null);
-      config.views.forEach((name, i) => {
-        props[name] = data[i];
-      });
-      this._setProps(props);
-    });
-    // make sure we invalidate once, even if there are no incoming views
-    this._setState({});
-  }
-  _update(props, state) {
-    if (this._shouldRender(this._props, this._state)) { // TODO: should _shouldRender be slot specific?
-      this.relevance = 1; // TODO: improve relevance signal.
-    }
-    this.config.slotNames.forEach(s => this.render(s, ['model']));
-  }
-
-  render(slotName, contentTypes) {
-    let slot = this.getSlot(slotName);
-    if (!slot) {
-      return; // didn't receive StartRender.
-    }
-    contentTypes.forEach(ct => slot._requestedContentTypes.add(ct));
-    if (this._shouldRender(this._props, this._state)) {
-      let content = {};
-      if (slot._requestedContentTypes.has('template')) {
-        content['template'] = this._initializeRender(slot);
-      }
-      if (slot._requestedContentTypes.has('model')) {
-        content['model'] = this._render(this._props, this._state);
-      }
-      slot.render(content);
-    } else if (slot.isRendered) {
-      // Send empty object, to clear rendered slot contents.
-      slot.render({});
-    }
-  }
-
-  // TODO: renderHostedSlot and combineHostedContent are methods needed for transformation particle
-  // that renders UI. Consider adding a TransformationParticle base class.
-  renderHostedSlot(slotName, hostedSlotId, content) {
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(this.hostedSlotBySlotId.has(hostedSlotId), `Missing model for slot ID ${hostedSlotId}`);
-    this.hostedSlotBySlotId.get(hostedSlotId).content = content;
-
-    let slot = this.getSlot(slotName);
-    if (slot) {
-      let combinedContent = this.combineHostedContent(Object.keys(content));
-
-      // TODO: group multiple calls together!
-      if (combinedContent) {
-        slot.render(combinedContent);
-      } else if (slot.isRendered) {
-        slot.render({});
-      }
-    }
-  }
-  // Groups all rendered contents produced by the hosted particles, and sets the subId in each model.
-  combineHostedContent(contentTypes) {
-    let result = {};
-    let includeModel = contentTypes.indexOf('model') >= 0;
-    let includeTemplate = contentTypes.indexOf('template') >= 0;
-    if (includeModel) {
-      result.model = {items: []};
-    }
-    for (let value of this.hostedSlotBySlotId.values()) {
-      let content = value.content;
-      if (!content) {
-        continue;
-      }
-      if (includeModel) {
-        result.model.items.push(Object.assign(content.model || {}, {subId: value.subId}));
-      }
-      // TODO: Currently using the first available template. Add support for multiple templates.
-      if (includeTemplate && !result.template) {
-        let template = content.template;
-        // Replace hosted particle handle names with the corresponding transformation particle handles.
-        this.handleByHostedHandle.forEach((handleName, hostedHandleName) => {
-          template = template.replace(new RegExp(`\{\{(${hostedHandleName})(.*)\}\}`), `{{${handleName}$2}}`);
-        });
-        result.template = template;
-      }
-    }
-    return result;
-  }
-  _initializeRender(slot) {
-    let template = this.getTemplate(slot.slotName);
-    this._findHandlerNames(template).forEach(name => {
-      slot.clearEventHandlers(name);
-      slot.registerEventHandler(name, eventlet => {
-        if (this[name]) {
-          this[name](eventlet, this._state, this._views);
-        }
-      });
-    });
-    return template;
-  }
-  _findHandlerNames(html) {
-    let handlers = new Map();
-    let re = /on-.*?=\"([^\"]*)"/gmi;
-    for (let m=re.exec(html); m; m=re.exec(html)) {
-      handlers.set(m[1], true);
-    }
-    return Array.from(handlers.keys());
-  }
-  setParticleDescription(pattern) {
-    if (typeof pattern === 'string') {
-      return super.setParticleDescription(pattern);
-    }
-    __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__["a" /* default */])(!!pattern.template && !!pattern.model, 'Description pattern must either be string or have template and model');
-    super.setDescriptionPattern('_template_', pattern.template);
-    super.setDescriptionPattern('_model_', JSON.stringify(pattern.model));
-  }
-}
-
-/* harmony default export */ __webpack_exports__["a"] = (DomParticle);
 
 
 /***/ }),
@@ -1523,7 +1489,7 @@ class Shape {
     particleSpec.slots.forEach(consumedSlot => {
       particleSlots.push({name: consumedSlot.name, direction: 'consume', isRequired: consumedSlot.isRequired, isSet: consumedSlot.isSet});
       consumedSlot.providedSlots.forEach(providedSlot => {
-        particleSlots.push({name: providedSlot.name, direction: 'provide', isSet: providedSlot.isSet});
+        particleSlots.push({name: providedSlot.name, direction: 'provide', isRequired: false, isSet: providedSlot.isSet});
       });
     });
     var slotMatches = this.slots.map(slot => particleSlots.filter(particleSlot => Shape.slotsMatch(slot, particleSlot)));
@@ -1560,8 +1526,8 @@ class Shape {
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__arcs_runtime_loader_js__ = __webpack_require__(24);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_dom_particle_js__ = __webpack_require__(8);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__arcs_runtime_particle_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__arcs_runtime_dom_particle_js__ = __webpack_require__(6);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -1792,7 +1758,11 @@ class InnerPEC {
     this._apiPort.onConstructArcCallback = ({callback, arc}) => callback(arc);
 
     this._apiPort.onAwaitIdle = ({version}) =>
-      this.idle.then(a => this._apiPort.Idle({version, relevance: this.relevance}));
+      this.idle.then(a => {
+        // TODO: dom-particles update is async, this is a workaround to allow dom-particles to
+        // update relevance, after handles are updated. Needs better idle signal.
+        setTimeout(() => { this._apiPort.Idle({version, relevance: this.relevance}); }, 0);
+      });
 
     this._apiPort.onUIEvent = ({particle, slotName, event}) => particle.fireEvent(slotName, event);
 
@@ -3236,13 +3206,14 @@ class Identifier {
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(8);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__platform_vm_web_js__ = __webpack_require__(18);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_2__fetch_web_js__ = __webpack_require__(21);
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_3__platform_assert_web_js__ = __webpack_require__(0);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__particle_js__ = __webpack_require__(6);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__dom_particle_js__ = __webpack_require__(8);
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__converters_jsonldToManifest_js__ = __webpack_require__(16);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_4__particle_js__ = __webpack_require__(7);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_5__dom_particle_js__ = __webpack_require__(6);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_6__transformation_dom_particle_js__ = __webpack_require__(26);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_7__converters_jsonldToManifest_js__ = __webpack_require__(16);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -3252,7 +3223,7 @@ class Identifier {
  * subject to an additional IP rights grant found at
  * http://polymer.github.io/PATENTS.txt
  */
- 
+
 
 
 
@@ -3299,9 +3270,9 @@ class Loader {
   _loadURL(url) {
     if (/\/\/schema.org\//.test(url)) {
       if (url.endsWith('/Thing')) {
-        return __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__fetch_web_js__["a" /* default */])('https://schema.org/Product.jsonld').then(res => res.text()).then(data => __WEBPACK_IMPORTED_MODULE_6__converters_jsonldToManifest_js__["a" /* default */].convert(data, {'@id': 'schema:Thing'}));
+        return __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__fetch_web_js__["a" /* default */])('https://schema.org/Product.jsonld').then(res => res.text()).then(data => __WEBPACK_IMPORTED_MODULE_7__converters_jsonldToManifest_js__["a" /* default */].convert(data, {'@id': 'schema:Thing'}));
       }
-      return __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__fetch_web_js__["a" /* default */])(url + '.jsonld').then(res => res.text()).then(data => __WEBPACK_IMPORTED_MODULE_6__converters_jsonldToManifest_js__["a" /* default */].convert(data));
+      return __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__fetch_web_js__["a" /* default */])(url + '.jsonld').then(res => res.text()).then(data => __WEBPACK_IMPORTED_MODULE_7__converters_jsonldToManifest_js__["a" /* default */].convert(data));
     }
     return __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__fetch_web_js__["a" /* default */])(url).then(res => res.text());
   }
@@ -3330,7 +3301,7 @@ class Loader {
   }
 
   unwrapParticle(particleWrapper) {
-    return particleWrapper({particle: __WEBPACK_IMPORTED_MODULE_4__particle_js__["a" /* default */], Particle: __WEBPACK_IMPORTED_MODULE_4__particle_js__["a" /* default */].Particle, DomParticle: __WEBPACK_IMPORTED_MODULE_5__dom_particle_js__["a" /* default */]});
+    return particleWrapper({particle: __WEBPACK_IMPORTED_MODULE_4__particle_js__["a" /* default */], Particle: __WEBPACK_IMPORTED_MODULE_4__particle_js__["a" /* default */].Particle, DomParticle: __WEBPACK_IMPORTED_MODULE_5__dom_particle_js__["a" /* default */], TransformationDomParticle: __WEBPACK_IMPORTED_MODULE_6__transformation_dom_particle_js__["a" /* default */]});
   }
 
 }
@@ -3399,6 +3370,77 @@ let BasicEntity = testEntityClass('BasicEntity');
 
 "use strict";
 /* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__dom_particle_js__ = __webpack_require__(6);
+/**
+ * @license
+ * Copyright (c) 2017 Google Inc. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * Code distributed by Google as part of this project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+
+
+
+
+// Regex to separate style and template.
+let re = /<style>((?:.|[\r\n])*)<\/style>((?:.|[\r\n])*)/;
+
+/** @class TransformationDomParticle
+ * Particle that does transformation stuff with DOM.
+ */
+class TransformationDomParticle extends __WEBPACK_IMPORTED_MODULE_1__dom_particle_js__["a" /* default */] {
+  getTemplate(slotName) {
+    return this._state.template;
+  }
+  _render(props, state) {
+    return state.renderModel;
+  }
+  _shouldRender(props, state) {
+    return Boolean(state.template && state.renderModel);
+  }
+
+  renderHostedSlot(slotName, hostedSlotId, content) {
+    this.combineHostedTemplate(slotName, hostedSlotId, content);
+    this.combineHostedModel(slotName, hostedSlotId, content);
+  }
+
+  // abstract
+  combineHostedTemplate(slotName, hostedSlotId, content) {}
+  combineHostedModel(slotName, hostedSlotId, content) {}
+
+  // Helper methods that may be reused in transformation particles to combine hosted content.
+  static combineTemplates(transformationTemplate, hostedTemplate) {
+    let transformationMatch = transformationTemplate.match(re);
+    if (!transformationMatch || transformationMatch.length != 3) {
+      return;
+    }
+    let hostedMatch = hostedTemplate.match(re);
+    if (!hostedMatch || hostedMatch.length != 3) {
+      return;
+    }
+
+    return `
+      <style>${transformationMatch[1].trim()}${hostedMatch[1].trim()}</style>
+      ${transformationMatch[2].trim().replace('{{hostedParticle}}', hostedMatch[2].trim())}
+    `;
+  }
+  static propsToItems(propsValues) {
+    return propsValues ? propsValues.map(({rawData, id}) => Object.assign({}, rawData, {subId: id})) : [];
+  }
+}
+
+/* harmony default export */ __webpack_exports__["a"] = (TransformationDomParticle);
+
+
+/***/ }),
+/* 27 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_assert_web_js__ = __webpack_require__(0);
 /**
  * @license
  * Copyright (c) 2017 Google Inc. All rights reserved.
@@ -3442,7 +3484,7 @@ class TupleFields {
 
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -3484,11 +3526,11 @@ class TypeVariable {
 
 
 /***/ }),
-/* 28 */
+/* 29 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(7);
+/* WEBPACK VAR INJECTION */(function(process) {/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__platform_fs_web_js__ = __webpack_require__(8);
 /*
   Copyright 2015 Google Inc. All Rights Reserved.
   Licensed under the Apache License, Version 2.0 (the "License");
