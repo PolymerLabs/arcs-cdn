@@ -64,8 +64,8 @@ class ArcHost extends Xen.Base {
   }
   async _applyConfig(config) {
     let arc = await this._createArc(config);
-    // TODO(sjmiles): IIUC callback that is invoked by runtime idle callback, seems redundant atm (?)
-    //arc.makeSuggestions = () => this._schedulePlanning(this._state);
+    // TODO(sjmiles): IIUC callback that is invoked by runtime idle callback ...
+    arc.makeSuggestions = () => this._schedulePlanning(this._state);
     ArcHost.log('instantiated', arc);
     this._setState({arc});
     this._fire('arc', arc);
