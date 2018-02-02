@@ -51,7 +51,7 @@ class ArcHandle extends Xen.Base {
       handle = await arc.createHandle(typeOf, name, id, tags);
     }
     // observe handle
-    handle.on('change', change => this._fire('handle', handle), arc);
+    handle.on('change', () => this._handleChanged(handle), arc);
     ArcHandle.log('created handle', name, tags);
     return handle;
   }
@@ -65,6 +65,9 @@ class ArcHandle extends Xen.Base {
       data = {id: arc.generateID(), rawData: data};
     }
     ArcsUtils.setHandleData(handle, data);
+  }
+  _handleChanged(handle) {
+    handle.debouncer = ArcsUtils.debounce(handle.debouncer, () => this._fire('change', handle), 500);
   }
 }
 ArcHandle.log = Xen.Base.logFactory('ArcHandle', '#c6a700');
