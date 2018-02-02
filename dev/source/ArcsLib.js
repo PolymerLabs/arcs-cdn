@@ -15,7 +15,10 @@ import Planner from '../../../arcs/runtime/planner.js';
 import SlotComposer from '../../../arcs/runtime/slot-composer.js';
 import Type from '../../../arcs/runtime/type.js';
 import BrowserLoader from './browser-cdn-loader.js';
+import Tracing from '../../../arcs/tracelib/trace.js';
 import scheduler from '../../../arcs/runtime/scheduler.js';
+
+//Tracing.enable();
 
 window.Arcs = {
   version: '0.3',
@@ -26,5 +29,6 @@ window.Arcs = {
   SlotComposer,
   Type,
   BrowserLoader,
-  scheduler: scheduler
+  Tracing,
+  scheduler
 };
