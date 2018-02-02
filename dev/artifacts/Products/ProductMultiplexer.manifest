@@ -9,7 +9,7 @@
 import 'Product.schema'
 
 shape HostedParticleShape
-  HostedParticleShape(in ~a)
+  HostedParticleShape(in Product)
   consume annotation
 
 // TODO: rename to a generic (non product specific) multiplexer.
@@ -21,11 +21,11 @@ particle ProductMultiplexer in 'ProductMultiplexer.js'
 
 // Same as ProductMultiplexer above, but with an additional connection.
 shape HostedParticleShape
-  HostedParticleShape(in ~a, in [~a])
+  HostedParticleShape(in Product, in [Product])
   consume annotation
 
 // TODO: rename to a generic (non product specific) multiplexer.
 particle ProductMultiplexer2 in 'ProductMultiplexer.js'
-  ProductMultiplexer2(host HostedParticleShape hostedParticle, in [~a] list, in [Product] others)
+  ProductMultiplexer2(host HostedParticleShape hostedParticle, in [Product] list, in [Product] others)
   consume set of annotation
   description `${hostedParticle} for ${list}`
