@@ -11,14 +11,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 import WatchGroup from './watch-group.js';
 import ArcsUtils from "../lib/arcs-utils.js";
 import Xen from '../../components/xen/xen.js';
+const db = window.db;
 
 class RemoteProfileHandles extends Xen.Base {
   static get observedAttributes() { return ['arc', 'user']; }
   _getInitialState() {
-    let group = new WatchGroup();
-    group.db = db;
     return {
-      group
+      group: Object.assign(new WatchGroup(), {db})
     };
   }
   _update(props, state, lastProps) {
@@ -39,17 +38,18 @@ class RemoteProfileHandles extends Xen.Base {
         path: `arcs/${key}/views`,
         // TODO(sjmiles): firebase knowledge here
         handler: snapshot => this._remoteHandlesChanged(arc, friends, snapshot.key, snapshot.val())
-      }
+      };
     });
   }
   _remoteHandlesChanged(arc, friends, key, remotes) {
     if (remotes) {
-      // TODO(sjmiles): these are remote-data-describing-a-handle ... cow needs a name
+      // TODO(sjmiles): `remotes` are remote-fb-nodes-describing-a-handle ... cow needs a name
       RemoteProfileHandles.log(`READING handles`, remotes);
       Object.keys(remotes).forEach(async key => {
         // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _handle_ keys
         // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
         let handle = await ArcsUtils.createOrUpdateHandle(arc, remotes[key], 'PROFILE');
+        this._fire('profile', handle);
         RemoteProfileHandles.log('created/updated handle', handle.id);
         this._synthesizeFriendsHandle(arc, friends, handle);
         //this._fire('handle', {handle});

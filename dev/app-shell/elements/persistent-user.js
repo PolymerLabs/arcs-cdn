@@ -74,7 +74,7 @@ import Xen from '../../components/xen/xen.js';
             user.id = id;
           }
           PersistentUser.log('READING user (watchUser)', user, 'from', String(snap.ref));
-          this._setState({user})
+          this._setState({user});
         }
       };
     }

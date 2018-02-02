@@ -18,6 +18,8 @@ defineParticle(({DomParticle, resolver}) => {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
+    padding: 8px 0;
+    /* need to be able to theme these colors */
     background-color: black;
     color: whitesmoke;
   }

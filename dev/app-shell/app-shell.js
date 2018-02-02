@@ -42,8 +42,8 @@ import "../components/toggle-button.js";
 import "../components/corellia-xen/cx-input.js";
 import "../components/good-map.js";
 
-const template = Xen.Template.createTemplate(
-`<style>
+const template = ArcsUtils.html`
+<style>
   body {
     background-color: gray;
   }
@@ -90,7 +90,7 @@ const template = Xen.Template.createTemplate(
     z-index: 1000;
   }
   app-toolbar > *, app-toolbar > [buttons] > * {
-    padding-right: 16px;
+    margin-right: 16px;
   }
   app-toolbar > [arc-title] {
     flex: 1;
@@ -99,10 +99,10 @@ const template = Xen.Template.createTemplate(
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  app-toolbar > select {
-    padding: 2px 0;
-    margin-right: 8px;
-    width: 96px;
+  app-toolbar > [avatar] {
+    height: 32px;
+    width: 32px;
+    border-radius: 100%;
   }
   [launcher] app-toolbar > [buttons] {
     display: none;
@@ -162,29 +162,33 @@ const template = Xen.Template.createTemplate(
 </style>
 
 <app-main launcher$="{{launcher}}">
-  <!--<arc-auth on-auth="_onAuth"></arc-auth>-->
-  <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
-  <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
-  <persistent-users on-users="_onUsers"></persistent-users>
-  <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
-  <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
-  <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles>
-  <remote-profile-handles arc="{{arc}}" user="{{user}}" on-friends="_onFriends"></remote-profile-handles>
-  <remote-shared-handles arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-handles>
-  <remote-friends-profiles-handles arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-handles>
-  <arc-handle arc="{{arc}}" data="{{arcsHandleData}}" options="{{arcsHandleOptions}}" on-handle="_onArcsHandle"></arc-handle>
-  <arc-handle arc="{{arc}}" data="{{identityHandleData}}" options="{{identityHandleOptions}}" on-handle="_onIdentityHandle"></arc-handle>
-  <arc-handle arc="{{arc}}" data="{{identitiesHandleData}}" options="{{identitiesHandleOptions}}" on-handle="_onIdentitiesHandle"></arc-handle>
-  <arc-handle arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarHandleOptions}}"></arc-handle>
-  <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
-  <!-- only for launcher -->
-  <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
+  <agents>
+    <!--<arc-auth on-auth="_onAuth"></arc-auth>-->
+    <arc-config rootpath="{{cdnPath}}" on-config="_onConfig"></arc-config>
+    <persistent-arc key="{{suggestKey}}" on-key="_onKey" metadata="{{metadata}}" on-metadata="_onMetadata"></persistent-arc>
+    <persistent-users on-users="_onUsers"></persistent-users>
+    <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
+    <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
+    <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles>
+    <remote-profile-handles arc="{{arc}}" user="{{user}}" on-profile="_onProfile" on-friends="_onFriends"></remote-profile-handles>
+    <remote-shared-handles arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-handles>
+    <remote-friends-profiles-handles arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-handles>
+    <arc-handle arc="{{arc}}" data="{{arcsHandleData}}" options="{{arcsHandleOptions}}" on-change="_onArcsHandleChange"></arc-handle>
+    <arc-handle arc="{{arc}}" data="{{identityHandleData}}" options="{{identityHandleOptions}}" on-change="_onIdentityHandleChange"></arc-handle>
+    <arc-handle arc="{{arc}}" data="{{identitiesHandleData}}" options="{{identitiesHandleOptions}}" on-change="_onIdentitiesHandleChange"></arc-handle>
+    <arc-handle arc="{{arc}}" data="{{friendsAvatarData}}" options="{{friendsAvatarHandleOptions}}"></arc-handle>
+    <arc-handle arc="{{arc}}" data="{{themeData}}" options="{{themeHandleOptions}}" on-change="_onShellThemeChange"></arc-handle>
+    <arc-steps plans="{{plans}}" plan="{{plan}}" steps="{{steps}}" step="{{step}}" on-step="_onStep" on-steps="_onSteps"></arc-steps>
+    <!-- only for launcher -->
+    <remote-visited-arcs user="{{launcherUser}}" arcs="{{visitedArcs}}" on-arcs="_onVisitedArcs"></remote-visited-arcs>
+  </agents>
+
   <!-- toolbar is here only to reserve space in the static flow, the app-toolbar is position-fixed -->
   <toolbar>
-    <app-toolbar>
-      <!--<i style="color: #9c27b0;" title="Arcs" on-click="_onNavClick">donut_small</i>-->
+    <app-toolbar style="{{shellThemeStyle}}">
       <img title="Arcs" on-click="_onNavClick" src="../logo_24x24.svg" style="cursor: pointer;">
-      <span arc-title style%="{{titleStatic}}" on-click="_onStartEditingTitle" unsafe-html="{{description}}"></span>
+      <span arc-title style="{{titleStatic}}" on-click="_onStartEditingTitle" unsafe-html="{{description}}"></span>
+      <span avatar style="{{avatarStyle}}"></span>
       <select on-change="_onUserSelected">{{usersOptions}}</select>
       <template users-options>
         <option value="{{value}}" selected="{{selected}}">{{user}}</option>
@@ -193,20 +197,23 @@ const template = Xen.Template.createTemplate(
         <toggle-button title="Arc Contains Profile Data" state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
         <toggle-button title="Share this Arc" state="{{sharedState}}" on-state="_onSharedState" icons="link supervisor_account"></toggle-button>
         <toggle-button title="Cast" on-state="_onCastState" icons="cast cast_connected"></toggle-button>
-        <i on-click="_onNewArcClick">note_add</i>
+        <i on-click="_onNewArcClick">add</i>
       </div>
     </app-toolbar>
   </toolbar>
+
   <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" suggestions="{{suggestions}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
   </arc-host>
+
   <footer>
     <arc-footer dots="{{dots}}" on-suggest="_onStep" on-search="_onSearch">
       <div slotid="suggestions"></div>
     </arc-footer>
   </footer>
 </app-main>
+
 <app-tools>
   <simple-tabs>
     <div tab="Manifests">
@@ -221,8 +228,8 @@ const template = Xen.Template.createTemplate(
     </div>
   </simple-tabs>
   <shell-particles arc="{{arc}}"></shell-particles>
-</app-tools>`
-);
+</app-tools>
+`;
 
 class AppShell extends Xen.Base {
   get host() {
@@ -233,7 +240,7 @@ class AppShell extends Xen.Base {
     return this;
   }
   get template() {
-    return template;
+    return Xen.Template.createTemplate(template);
   }
   _getInitialState() {
     let cdnPath = window.shellPath;
@@ -246,6 +253,15 @@ class AppShell extends Xen.Base {
         type: '[ArcMetadata]',
         name: 'ArcMetadata',
         tags: ['#arcmetadata']
+      },
+      themeHandleOptions: {
+        schemas: `${typesPath}/arc-types.manifest`,
+        type: 'Theme',
+        name: 'ShellTheme',
+        tags: ['#shelltheme']
+      },
+      themeData: {
+        mainBackground: "white"
       },
       identityHandleOptions: {
         schemas: `${typesPath}/identity-types.manifest`,
@@ -357,6 +373,10 @@ class AppShell extends Xen.Base {
       models: this._renderUserOptionModels(state.users, state.user)
     };
     state.dots = state.plans == null ? 'active' : '';
+    if (state.avatar && arc) {
+      const url = arc._loader._resolve(state.avatar.rawData.url);
+      state.avatarStyle = `background: url("${url}") center no-repeat; background-size: cover;`;
+    }
     // must have `auth` before doing anything else
     return state.auth ? state : null;
   }
@@ -554,7 +574,27 @@ class AppShell extends Xen.Base {
     }
   }
   _onFriends(e, friends) {
-    this._setIfDirty({friends});
+    //this._setIfDirty({friends});
+  }
+  async _onProfile(e, profile) {
+    let data;
+    switch (profile.id) {
+      case 'PROFILE_Avatar_avatar':
+      case 'PROFILE_!Person!_friends':
+        data = await ArcsUtils.getHandleData(profile);
+        AppShell.log(profile.id, data);
+        break;
+      default:
+        return;
+    }
+    switch(profile.id) {
+      case 'PROFILE_Avatar_avatar':
+        this._setIfDirty({avatar: data});
+        break;
+      case 'PROFILE_!Person!_friends':
+        this._setIfDirty({friends: data});
+        break;
+    }
   }
   _onNewArcClick() {
     open(`${location.origin}${location.pathname}`, `_blank`);
@@ -568,25 +608,19 @@ class AppShell extends Xen.Base {
       this._modifyProfileState(true);
     }
   }
-  async _onArcsHandle(e, handle) {
+  async _onArcsHandleChange(e, handle) {
     this._setState({
-      plans: null,
-      arcsHandle: handle,
+      // TODO(sjmiles): any reason to replan here? I don't think so
+      //plans: null,
       visitedArcs: await ArcsUtils.getHandleData(handle)
     });
     AppShell.log('onArcsHandle: ', this._state.visitedArcs);
   }
-  _onIdentityHandle(e, handle) {
-    this._setState({
-      plans: null,
-      identityHandle: handle
-    });
+  _onIdentityHandleChange() {
+    this._setState({plans: null});
   }
-  _onIdentitiesHandle(e, handle) {
-    this._setState({
-      plans: null,
-      identitiesHandle: handle
-    });
+  _onIdentitiesHandleChange() {
+    this._setState({plans: null});
   }
   _onMetadata(e, metadata) {
     this._setIfDirty({metadata});
@@ -693,6 +727,16 @@ class AppShell extends Xen.Base {
   }
   _onExclusions(e, exclusions) {
     this._setIfDirty({exclusions});
+  }
+  async _onShellThemeChange(e, handle) {
+    const theme = (await ArcsUtils.getHandleData(handle)).rawData;
+    AppShell.log('ShellThemeChange', theme);
+    this._setState({
+      shellThemeStyle: {
+        backgroundColor: theme.mainBackground,
+        color: theme.mainColor
+      }
+    });
   }
   _initGeolocation() {
     if ("geolocation" in navigator) {
