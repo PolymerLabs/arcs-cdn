@@ -39,8 +39,13 @@ function wait(msToWait) {
 }
 
 /**
- * Search the list of elements, return the one that matches the textQuery.
- * (return an error if there are multiple matches, null if there are none).
+ * Search the list of elements, return the one that matches (ignoring case
+ * differences) the textQuery.
+ * This method ignores case under the theory that a close match is better than
+ * none, and probably indicates an innocuous change in (for instance) the
+ * suggestion text rather than a change in functionality. This can be
+ * revisited if that changes.
+ * Return an error if there are multiple matches, null if there are none.
  * The return format should be an object with the format:
  *   {id: <element-id>, text: <found text>}
  */
@@ -59,7 +64,7 @@ function searchElementsForText(elements, textQuery) {
   assert.equal(textToId.length, elements.length);
 
   const matches = textToId.reduce((accumulator, currentValue) => {
-    const found = currentValue.text.includes(textQuery) ? currentValue : null;
+    const found = currentValue.text.toLowerCase().includes(textQuery.toLowerCase()) ? currentValue : null;
     if (accumulator && found) {
       throw Error(`found two matches ${accumulator}, ${found}`);
     } else if (accumulator) {
@@ -258,7 +263,7 @@ function allSuggestions() {
   // There are two 'i' elements -- the first is 'search' and the second is
   // 'add'. For test purposes we're looking for the search element.
   const magnifier = pierceShadowsSingle(
-    getFooterPath().concat(['div[search]', 'i:first-child'])
+    getFooterPath().concat(['div[search]', 'i[search]'])
   );
   console.log(`click: allSuggestions`);
   browser.elementIdClick(magnifier.value.ELEMENT);
@@ -303,7 +308,7 @@ function _waitForAndMaybeAcceptSuggestion(textSubstring, accept) {
           return false;
         }
 
-        console.log(`found: desiredSuggestion`);
+        console.log(`found: desiredSuggestion ${desiredSuggestion}`);
         if (accept) browser.elementIdClick(desiredSuggestion.id);
         return true;
       } catch (e) {
