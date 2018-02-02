@@ -427,13 +427,13 @@ describe('test Arcs demo flows', function() {
     // (2) verify 'action' slot is not visible after all products were moved.
 
     acceptSuggestion(
-      'Buy gifts for Claire, estimate arrival date for each product'
+      'Buy gifts for Claire, estimate arrival date for Products'
     );
     acceptSuggestion(
-      'check manufacturer information for each product in products from your browsing context'
+      'Check manufacturer information for products from your browsing context'
     );
     acceptSuggestion(
-      'Recommendations based on products from your browsing context'
+      'Recommendations based on Products recommended based on products from your browsing context'
       // TODO: add 'and Claire\'s wishlist' when regex is supported.
     );
 
