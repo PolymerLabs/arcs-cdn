@@ -260,8 +260,6 @@ function allSuggestions() {
   waitForStillness();
   openSuggestionDrawer();
 
-  // There are two 'i' elements -- the first is 'search' and the second is
-  // 'add'. For test purposes we're looking for the search element.
   const magnifier = pierceShadowsSingle(
     getFooterPath().concat(['div[search]', 'i[search]'])
   );
@@ -308,7 +306,7 @@ function _waitForAndMaybeAcceptSuggestion(textSubstring, accept) {
           return false;
         }
 
-        console.log(`found: desiredSuggestion ${desiredSuggestion}`);
+        console.log(`found: desiredSuggestion "${desiredSuggestion}"`);
         if (accept) browser.elementIdClick(desiredSuggestion.id);
         return true;
       } catch (e) {
