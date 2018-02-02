@@ -13,7 +13,6 @@ import 'Chooser.manifest'
 import 'GiftList.manifest'
 import 'Interests.manifest'
 import 'ProductMultiplexer.manifest'
-import 'ProductMultiplexer2.manifest'
 import 'AlsoOn.manifest'
 import 'Arrivinator.manifest'
 import 'ManufacturerInfo.manifest'
@@ -59,17 +58,17 @@ recipe
   GiftList
     person <- view1
   ProductMultiplexer
-    products <- view2
+    list <- view2
     hostedParticle = Arrivinator
   ProductMultiplexer
-    products <- view3
+    list <- view3
     hostedParticle = Arrivinator
 
 # Check manufacturer information for products.
 recipe
   use #shortlist as shortlist
   ProductMultiplexer
-    products <- shortlist
+    list <- shortlist
     hostedParticle <- ManufacturerInfo
 
 # TODO: Check for newer versions, e.g. there is a new version of [product].
