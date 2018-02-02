@@ -92,7 +92,7 @@ class DancingDots extends HTMLElement {
         easing: 'ease-in-out',
         delay: i * 40,
       };
-      bullet._animation = bullet.animate(keyframes, timing);
+      bullet._animation = bullet.animate && bullet.animate(keyframes, timing);
     });
   }
   _stop() {
@@ -100,14 +100,16 @@ class DancingDots extends HTMLElement {
       // Ideally we would cause the animation to reach the half way point
       // between iterations, but that's complicated without the setTiming
       // API.
-      const transform = getComputedStyle(bullet).transform;
-      const animation = bullet._animation;
-      const stopAnimation = bullet.animate(
-          {transform: [transform, 'translateY(0px)']},
-          // About 10 frames at 60hz.
-          {duration: 166.66, easing: 'ease'});
-      stopAnimation.startTime = animation.startTime + animation.currentTime;
-      animation.cancel();
+      if (bullet.animate) {
+        const transform = getComputedStyle(bullet).transform;
+        const animation = bullet._animation;
+        const stopAnimation = bullet.animate(
+            {transform: [transform, 'translateY(0px)']},
+            // About 10 frames at 60hz.
+            {duration: 166.66, easing: 'ease'});
+        stopAnimation.startTime = animation.startTime + animation.currentTime;
+        animation.cancel();
+      }
     }
   }
   startStop() {

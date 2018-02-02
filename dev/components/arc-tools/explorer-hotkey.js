@@ -14,6 +14,13 @@ document.body.appendChild(Object.assign(document.createElement('link'), {
 }));
 // <link rel="import" href="arc-explorer.html"></link>
 
+// include for strategy-explorer on Safari
+/*
+document.head.appendChild(Object.assign(document.createElement('script'), {
+  src: `https://rawgit.com/webcomponents/html-imports/master/html-imports.min.js`
+}));
+*/
+
 document.head.appendChild(Object.assign(document.createElement('style'), {innerText:
   `.explorer {
     display: none;
