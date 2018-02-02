@@ -8,18 +8,26 @@ http://polymer.github.io/PATENTS.txt
 -->
 <!DOCTYPE html>
 
-<script src='../runtime/browser/build/planner.js'></script>
 <link rel="import" href="strategy-explorer.html"></link>
 
 <strategy-explorer></strategy-explorer>
 
-<script>
+<script type="module">
+import Arc from '../runtime/arc.js';
+import Loader from '../runtime/browser-loader.js';
+import Manifest from '../runtime/manifest.js';
+import Planner from '../runtime/planner.js';
+import SlotComposer from '../runtime/slot-composer.js';
 
 (async () => {
   var loader = new Loader();
   let manifest = await Manifest.load('../runtime/browser/demo/recipes.manifest', loader)
-  var a = new Arc({id: "test-plan-arc", context: manifest});
-  a._search = 'I want a Chooser and a GiftList';
+  var a = new Arc({
+    id: "test-plan-arc",
+    context: manifest,
+    slotComposer: new SlotComposer({rootContext: document.body, affordance: "dom"})
+  });
+  a._search = 'I want a Chooser and a GiftList and ShowProducts';
   var p = new Planner();
   p.init(a);
   var strategyExplorer = document.querySelector('strategy-explorer');

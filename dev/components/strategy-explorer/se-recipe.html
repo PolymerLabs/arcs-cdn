@@ -22,6 +22,16 @@ http://polymer.github.io/PATENTS.txt
         height: 30px;
       }
 
+      #recipe-box:not([valid]) {
+        border: 1px solid fuchsia;
+        margin: 4px;
+      }
+
+      #recipe-box[active] {
+        margin: 4px;
+        background-color: lightyellow;
+      }
+
       #recipe-box[selected] {
         border: 2px solid green;
         margin: 4px;
@@ -58,6 +68,10 @@ http://polymer.github.io/PATENTS.txt
         border-style: dashed;
       }
 
+      #recipe-box[combined] {
+        background-color: lightgrey;
+      }
+
       #hash {
         color: #555;
         font-style: italic;
@@ -69,6 +83,8 @@ http://polymer.github.io/PATENTS.txt
       }
     </style>
     <div id='recipe-box'
+      valid$='{{recipe.valid}}'
+      active$='{{recipe.active}}'
       selected$='{{selected}}'
       activeParent$='{{activeParent}}'
       activeAncestor$='{{activeAncestor}}'
@@ -76,6 +92,7 @@ http://polymer.github.io/PATENTS.txt
       activeDescendant$='{{activeDescendant}}'
       terminal$='{{terminal}}'
       resolved$='{{recipe.resolved}}'
+      combined$='{{recipe.combined}}'
     ><div>{{recipe.score}}</div><div id='hash'>{{shortHash}}</div></div>
   </template>
 
@@ -170,8 +187,16 @@ http://polymer.github.io/PATENTS.txt
           this.descendants.forEach(descendant => descendant.activeDescendant = true);
           document._selectedBox = this;
 
+          recipeView.over = this;
+          recipeView.recipe = this.recipe;
           recipeView.pin();
-        })
+        });
+        document.addEventListener('select-hash', e => {
+          if (this.shortHash == e.detail) {
+            this.$['recipe-box'].click();
+          }
+        });
+
       }
     });
   </script>
