@@ -98,7 +98,7 @@ gulp.task('pack', async function() {
 
 gulp.task('copy-runtime', ['arcs-build', 'pack']);
 
-const components = `${target}components/`;
+const components = `components/`;
 const arcs = `../../arcs/`;
 const browserlib = `runtime/browser/lib/`;
 
