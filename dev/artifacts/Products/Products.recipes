@@ -33,7 +33,7 @@ recipe
   #Chooser.resultList -> ManageProducts.list
   Chooser.resultList -> ShowProducts.list
   Chooser.resultList -> Recommend.known
-  Chooser.resultList -> ProductMultiplexer2.products
+  Chooser.resultList -> ProductMultiplexer2.list
   Chooser.choices -> ProductMultiplexer2.others
   map #wishlist as wishlist
   copy #shortlist as shortlist
