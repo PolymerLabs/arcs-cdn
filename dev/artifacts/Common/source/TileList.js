@@ -20,7 +20,7 @@ defineParticle(({DomParticle, resolver}) => {
     justify-content: center;
     padding: 8px 0;
     /* need to be able to theme these colors */
-    background-color: black;
+    background-color: #333333;
     color: whitesmoke;
   }
   [${host}] > [card] {
@@ -32,11 +32,13 @@ defineParticle(({DomParticle, resolver}) => {
       width: calc(33% - 24px);
     }
   }
+  /*
   @media (min-width: 1200px) {
     [${host}] > [card] {
       width: calc(25% - 24px);
     }
   }
+  */
 </style>
 
 <template tiled-items>
