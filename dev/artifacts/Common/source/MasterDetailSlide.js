@@ -31,7 +31,7 @@ defineParticle(({DomParticle, html, log}) => {
     top: 56px;
     right: 0;
     left: 0;
-    height: calc(100vh - 32px);
+    height: calc(100vh - 168px);
     border-radius: 16px;
     padding: 0 16px;
     box-sizing: border-box;
