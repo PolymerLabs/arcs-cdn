@@ -170,7 +170,7 @@ const template = ArcsUtils.html`
     <persistent-user id="{{userId}}" user="{{user}}" key="{{key}}" on-user="_onUser"></persistent-user>
     <persistent-manifests manifests="{{manifests}}" on-manifests="_onManifests" exclusions="{{exclusions}}" on-exclusions="_onExclusions"></persistent-manifests>
     <persistent-handles arc="{{arc}}" key="{{key}}"></persistent-handles>
-    <remote-profile-handles arc="{{arc}}" user="{{user}}" on-profile="_onProfile" on-friends="_onFriends"></remote-profile-handles>
+    <remote-profile-handles arc="{{arc}}" user="{{user}}" on-profile="_onProfile"></remote-profile-handles>
     <remote-shared-handles arc="{{arc}}" user="{{user}}" friends="{{friends}}"></remote-shared-handles>
     <remote-friends-profiles-handles arc="{{arc}}" friends="{{friends}}" user="{{user}}"></remote-friends-profiles-handles>
     <arc-handle arc="{{arc}}" data="{{arcsHandleData}}" options="{{arcsHandleOptions}}" on-change="_onArcsHandleChange"></arc-handle>
@@ -572,9 +572,6 @@ class AppShell extends Xen.Base {
       });
       this._setState({arcsHandleData: data});
     }
-  }
-  _onFriends(e, friends) {
-    //this._setIfDirty({friends});
   }
   async _onProfile(e, profile) {
     let data;

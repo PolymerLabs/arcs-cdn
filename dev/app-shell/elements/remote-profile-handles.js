@@ -49,26 +49,10 @@ class RemoteProfileHandles extends Xen.Base {
         // TODO(sjmiles): `key` used to mean `amkey`, at some point I accidentally started sending _handle_ keys
         // but nothing broke ... I assume this was not injurious because these data are remote and not persistent
         let handle = await ArcsUtils.createOrUpdateHandle(arc, remotes[key], 'PROFILE');
-        this._fire('profile', handle);
         RemoteProfileHandles.log('created/updated handle', handle.id);
-        this._synthesizeFriendsHandle(arc, friends, handle);
-        //this._fire('handle', {handle});
+        this._fire('profile', handle);
       });
     }
-  }
-  // TODO(sjmiles): special handling for `friends` handle, should this be factored out?
-  _synthesizeFriendsHandle(arc, friends, handle) {
-    // TODO(sjmiles): `friends` is only captured once, assumption is that this handle is immortal
-    if (!friends && handle.id == 'PROFILE_!Person!_friends') {
-      this._state.friends = handle;
-      handle.on('change', this._friendsHandleChanged.bind(this, handle), arc);
-      this._friendsHandleChanged(handle);
-    }
-  }
-  async _friendsHandleChanged(handle) {
-    let data = await ArcsUtils.getHandleData(handle);
-    RemoteProfileHandles.log('FRIENDS handle changed:', data);
-    this._fire('friends', data);
   }
 }
 RemoteProfileHandles.log = Xen.Base.logFactory('RemotePHs', '#003c8f');
