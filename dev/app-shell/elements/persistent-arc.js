@@ -79,7 +79,9 @@ class PersistentArc extends Xen.Base {
         let metadata = snap.val();
         this._setState({metadata});
         PersistentArc.log('remoteChanged', metadata);
-        this._fire('metadata', metadata);
+        // TODO(sjmiles): should perform some kind of dirty/revision check here
+        // to avoid ping-ponging messages, just turning this off for now
+        //this._fire('metadata', metadata);
       }
     };
   }
