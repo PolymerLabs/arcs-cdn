@@ -38,6 +38,9 @@ const ArcsUtils = {
     return channel.port2;
   },
   createUrlMap(cdnRoot) {
+    // Module import not available in workers yet, we have to use the build for now
+    //const lib = document.URL.includes('debug') ? 'source' : 'lib';
+    const lib = 'lib';
     return {
       // TODO(sjmiles): mapping root and dot-root allows browser-cdn-loader to replace right-hand
       // side with fully-qualified URL when loading from worker context
@@ -46,7 +49,7 @@ const ArcsUtils = {
       'assets': `${cdnRoot}/assets`,
       'https://$cdn': `${cdnRoot}`,
       // TODO(sjmiles): map must always contain (explicitly, no prefixing) a mapping for `worker-entry-cdn.js`
-      'worker-entry-cdn.js': `${cdnRoot}/lib/worker-entry-cdn.js`
+      'worker-entry-cdn.js': `${cdnRoot}/${lib}/worker-entry-cdn.js`
     };
   },
   async makePlans(arc, timeout) {
