@@ -8,11 +8,11 @@
 
 "use strict";
 
-defineParticle(({DomParticle, resolver}) => {
+defineParticle(({DomParticle, html, log}) => {
 
   let host = `show-tiles`;
 
-  const template = `
+  const template = html`
 <style>
   [${host}] {
     display: flex;
@@ -55,15 +55,27 @@ defineParticle(({DomParticle, resolver}) => {
     get template() {
       return template;
     }
-    _shouldRender(props) {
-      return Boolean(props.items);
+    _shouldRender({items}) {
+      return Boolean(items);
+    }
+    async _willReceiveProps({items, selected}) {
+      if (selected && selected.delete) {
+        this._views.get('selected').clear();
+        log('request to delete', selected);
+        const item = items.find(item => item.id === selected.id);
+        if (item) {
+          const items = this._views.get('items');
+          items.remove(item);
+          log('new list', await items.toList());
+        }
+      }
     }
     _render({items}) {
-      //console.log('');
+      const sorted = items.sort((a,b) => a.name > b.name ? 1 : a.name === b.name ? 0 : -1);
       return {
         items: {
           $template: 'tiled-items',
-          models: items.sort((a,b) => a.name > b.name ? 1 : a.name === b.name ? 0 : -1).map(item => {
+          models: sorted.map(item => {
             return {
               id: item.id
             };
