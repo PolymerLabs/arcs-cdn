@@ -50,6 +50,9 @@ defineParticle(({DomParticle, html, log}) => {
   [${host}] button {
     background-color: transparent;
     border: none;
+    position: absolute;
+    right: 24px;
+    top: 10px;
   }
 </style>
 <div ${host}>
@@ -60,7 +63,7 @@ defineParticle(({DomParticle, html, log}) => {
   -->
   <div detail-panel>
     <div abs-panel open$="{{open}}" hide$="{{hide}}">
-      <div style="padding: 8px; text-align: right;"><button on-click="_onBack">X</button></div>
+      <button on-click="_onBack" class="material-icons">close</button>
       <div slotid="detail"></div>
     </div>
   </div>
