@@ -10,6 +10,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 import WatchGroup from './watch-group.js';
 import Xen from '../../components/xen/xen.js';
+const db = window.db;
 
 class RemoteVisitedArcs extends Xen.Base {
   static get observedAttributes() { return ['user', 'arcs']; }
@@ -28,7 +29,6 @@ class RemoteVisitedArcs extends Xen.Base {
     }
   }
   _watchVisitedArcs(user) {
-    let nodes, handler;
     if (user && user.arcs) {
       RemoteVisitedArcs.log(`watching visited arcs`);
       // build an object for mapping arc keys to arc metadata
