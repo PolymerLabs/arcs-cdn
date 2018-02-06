@@ -14571,10 +14571,10 @@ class OuterPortAttachment {
     this._sendMessage(this._describeHandleCall(args), args.data);
   }
 
-  _sendMessage(message, data) {
-    message.data = JSON.stringify(data);
-    message.timestamp = Date.now();
-    __WEBPACK_IMPORTED_MODULE_0__devtools_channel_provider_js__["a" /* default */].get().send(message);
+  _sendMessage(messageBody, data) {
+    messageBody.data = JSON.stringify(data);
+    messageBody.timestamp = Date.now();
+    __WEBPACK_IMPORTED_MODULE_0__devtools_channel_provider_js__["a" /* default */].get().send({messageType: 'dataflow', messageBody});
   }
 
   _describeHandleCall({operation, handle, particleId}) {
