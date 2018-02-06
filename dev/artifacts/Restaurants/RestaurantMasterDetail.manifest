@@ -8,7 +8,7 @@
 
 import 'Restaurant.schema'
 
-particle RestaurantMasterDetail in '../Things/source/MasterDetail.js'
+particle RestaurantMasterDetail in '../Common/source/MasterDetail.js'
   RestaurantMasterDetail(in [Restaurant] list, inout Restaurant selected)
   consume masterdetail
     provide master
