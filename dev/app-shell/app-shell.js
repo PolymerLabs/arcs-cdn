@@ -551,12 +551,14 @@ class AppShell extends Xen.Base {
       let data = Object.keys(visited).map(key => {
         let {metadata, profile} = visited[key];
         let href = `${location.origin}${location.pathname}?arc=${key}&user=${user.id}`;
-        if (metadata.externalManifest) href += `&manifest=${metadata.externalManifest}`;
+        if (metadata.externalManifest) {
+          href += `&manifest=${metadata.externalManifest}`;
+        }
         return {
           key: key,
           description: metadata.description || key.slice(1),
-          icon: metadata.icon || 'broken_image',
           color: metadata.color || 'gray',
+          bg: metadata.bg,
           href: href,
           profile: profile
         };
@@ -566,8 +568,8 @@ class AppShell extends Xen.Base {
         key: '*',
         blurb: 'New Arc',
         description: 'New Arc',
-        icon: 'star',
-        color: 'black',
+        bg: 'black',
+        color: 'white',
         href: `?arc=*&user=${user.id}`
       });
       this._setState({arcsHandleData: data});

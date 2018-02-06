@@ -6,13 +6,13 @@
 // http://polymer.github.io/PATENTS.txt
 
 schema ArcMetadata
-  normative
+  optional
     Text description
     Text icon
     Text key
     Text href
+    Text bg
     Text color
     Text profile
-  optional
     Text blurb
     URL externalManifest

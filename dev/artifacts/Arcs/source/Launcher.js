@@ -116,6 +116,8 @@ ${style}
           a.description.length > 70
             ? a.description.slice(0, 70) + '...'
             : a.description;
+        let bg = a.bg || a.color || 'gray';
+        let color = a.bg ? a.color : 'white';
         // populate the selected list
         list.push({
           arcId: a.id,
@@ -125,11 +127,9 @@ ${style}
           blurb,
           description: a.description,
           icon: a.icon,
-          iconStyle: {
-            color: a.color || 'gray'
-          },
           backStyle: {
-            backgroundColor: a.color || 'gray'
+            color: color,
+            backgroundColor: bg
           }
         });
       });

@@ -73,10 +73,11 @@ class PersistentArc extends Xen.Base {
     this._fire('key', key);
   }
   _assignColors(metadata) {
-    let bgs =    ['#5EF4BD', '#20E7FF', '#607D8B', '#FF7364', '#2FADE6', '#FFB843', '#FFF153', '#17C497'];
+    let bgs    = ['#5EF4BD', '#20E7FF', '#607D8B', '#FF7364', '#2FADE6', '#FFB843', '#FFF153', '#17C497'];
     let colors = ['#212121', '#212121', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#212121', '#212121', '#FFFFFF'];
-    metadata.color = colors[Math.floor(Math.random()*colors.length)];
-    metadata.bg = bgs[Math.floor(Math.random()*bgs.length)];
+    let choice = Math.floor(Math.random()*colors.length);
+    metadata.color = colors[choice];
+    metadata.bg = bgs[choice];
   }
   _watchKey(db, key) {
     let arcMetadata = db.child(key).child('metadata');
