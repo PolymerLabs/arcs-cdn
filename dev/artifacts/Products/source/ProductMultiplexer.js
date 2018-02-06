@@ -86,6 +86,7 @@ recipe
     }
 
     _willReceiveProps(props) {
+      return;
       let newItems = TransformationDomParticle.propsToItems(props.list);
       // Join with existing items in particle's state.
       if (this._state.renderModel && this._state.renderModel.items) {
