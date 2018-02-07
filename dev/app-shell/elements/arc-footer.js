@@ -73,8 +73,10 @@ class ArcFooter extends Xen.Base {
     // TODO(seefeld):
     //  This is a hack to open the footer only if the actual contents of the suggestions changed.
     //  Should happen upstream instead.
-    if (!state.open && this.innerHTML !== state.oldInnerHTML) {
-      this._setState({open: true, oldInnerHTML: this.innerHTML});
+    let html = this.innerHTML;
+    if (!state.open && html !== state.oldInnerHTML) {
+      ArcFooter.log('opening: old, new: ', state.oldInnerHtml, html);
+      this._setState({open: true, oldInnerHTML: html});
     }
   }
   _render(props, state) {

@@ -14,18 +14,15 @@ const template = Xen.Template.createTemplate(
   `<style>
     :host {
       display: block;
-      box-shadow: 0px 1px 5px 0px rgba(102,102,102,0.21);
-      background-color: white;
-      color: #666666;
-      padding: 4px;
-      margin-bottom: 8px;
+      border-radius: 16px;
+      background-color: rgb(222, 222, 222);
+      color: black;
+      padding: 16px;
+      margin: 8px 16px;
       cursor: pointer;
     }
     :host(:hover) {
-      background-color: rgba(86,255,86,0.25);
-      box-shadow: 0px 3px 11px 0px rgba(102,102,102,0.41);
-      padding-top: 2px;
-      margin-bottom: 10px;
+      background-color: rgb(221, 221, 255);
       color: black;
     }
   </style>

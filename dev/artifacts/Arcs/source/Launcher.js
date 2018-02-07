@@ -68,7 +68,7 @@ ${style}
 <template column>
   <div arc-chip style="{{backStyle}}">
     <div delete class="material-icons" key="{{arcId}}" on-click="_onDelete">remove_circle_outline</div>
-    <a href="{{href}}" target="_blank">
+    <a href="{{href}}" Xtarget="_blank">
       <div description title="{{description}}" unsafe-html="{{blurb}}"></div>
       <div style="flex: 1;"></div>
       <div style="margin-top: 32px;"><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i><i class="material-icons">account_circle</i></div>

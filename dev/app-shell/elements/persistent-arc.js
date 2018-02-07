@@ -36,7 +36,6 @@ class PersistentArc extends Xen.Base {
       this._createKey(state.db);
     }
     if (props.key && props.key !== '*') {
-      /*
       if (props.metadata) {
         // Typical developer workflow involves creating a new arc and
         // subsequently modifying the url to include a specific recipe via a
@@ -55,7 +54,6 @@ class PersistentArc extends Xen.Base {
           arcMetadata.update(props.metadata);
         }
       }
-      */
       if (props.key !== lastProps.key) {
         state.watch.watches = [this._watchKey(state.db, props.key)];
       }

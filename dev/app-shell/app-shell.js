@@ -113,6 +113,10 @@ const template = ArcsUtils.html`
     align-items: center;
     padding-right: 0;
   }
+  app-toolbar > [buttons] > a {
+    color: inherit;
+    text-decoration: none;
+  }
   footer {
     display: block;
     position: relative;
@@ -140,6 +144,11 @@ const template = ArcsUtils.html`
     left: 4px;
     font-size: 12px;
     font-family: monospace;
+  }
+  [slotid=suggestions] {
+    max-height: 356px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   /* wider-than-mobile */
   @media (min-width: 500px) {
@@ -197,7 +206,7 @@ const template = ArcsUtils.html`
         <toggle-button title="Arc Contains Profile Data" state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
         <toggle-button title="Share this Arc" state="{{sharedState}}" on-state="_onSharedState" icons="link supervisor_account"></toggle-button>
         <toggle-button title="Cast" on-state="_onCastState" icons="cast cast_connected"></toggle-button>
-        <i on-click="_onNewArcClick">add</i>
+        <a href="{{launcherUrl}}"><i>add</i></a>
       </div>
     </app-toolbar>
   </toolbar>
@@ -248,6 +257,8 @@ class AppShell extends Xen.Base {
     let typesPath = `${cdnPath}/app-shell/artifacts`;
     return {
       cdnPath,
+      linkTarget: '_self',
+      launcherUrl: `${location.origin}${location.pathname}`,
       arcsHandleOptions: {
         schemas: `${typesPath}/arc-types.manifest`,
         type: '[ArcMetadata]',
@@ -520,7 +531,7 @@ class AppShell extends Xen.Base {
   }
   _onNewUser() {
     let url = `?arc=profile&user=new`;
-    open(url, '_blank');
+    open(url, this._state.linkTarget);
   }
   _newUserPrompt() {
     // returns String 'null' (sheesh) on cancel
@@ -596,7 +607,7 @@ class AppShell extends Xen.Base {
     }
   }
   _onNewArcClick() {
-    open(`${location.origin}${location.pathname}`, `_blank`);
+    open(`${location.origin}${location.pathname}`, this._state.linkTarget);
   }
   _onKey(e, key) {
     this._setState({key});
