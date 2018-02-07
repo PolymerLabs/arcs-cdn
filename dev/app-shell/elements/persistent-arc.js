@@ -36,6 +36,9 @@ class PersistentArc extends Xen.Base {
       this._createKey(state.db);
     }
     if (props.key && props.key !== '*') {
+      if (props.key !== lastProps.key) {
+        state.watch.watches = [this._watchKey(state.db, props.key)];
+      }
       if (props.metadata) {
         // Typical developer workflow involves creating a new arc and
         // subsequently modifying the url to include a specific recipe via a
@@ -45,18 +48,21 @@ class PersistentArc extends Xen.Base {
         // pass it along to the 'New Arc' url, but that is not the current
         // state of the world.
         props.metadata['externalManifest'] = this._getExternalManifest();
-        // TODO(sjmiles): should perform some kind of dirty/revision check here
-        // to avoid ping-ponging messages, just turning this off for now
-        if (props.metadata !== state.metadata) {
-          state.metadata = props.metadata;
+        if (this._metadataHasChanged(props.metadata)) {
           let arcMetadata = state.db.child(props.key).child('metadata');
           PersistentArc.log('WRITING (update) metadata for', String(arcMetadata), props.metadata);
           arcMetadata.update(props.metadata);
         }
       }
-      if (props.key !== lastProps.key) {
-        state.watch.watches = [this._watchKey(state.db, props.key)];
-      }
+    }
+  }
+  _metadataHasChanged(metadata) {
+    const state = this._state;
+    const serial = JSON.stringify(metadata);
+    if (serial !== state.serial) {
+      PersistentArc.log('metadata changed', metadata);
+      state.serial = serial;
+      return true;
     }
   }
   _createKey(db) {
@@ -80,13 +86,14 @@ class PersistentArc extends Xen.Base {
   _watchKey(db, key) {
     let arcMetadata = db.child(key).child('metadata');
     PersistentArc.log('watching', String(arcMetadata));
+    const state = this._state;
     return {
       node: arcMetadata,
       handler: snap => {
         let metadata = snap.val();
-        PersistentArc.log('remoteChanged', metadata);
-        this._setState({metadata});
-        this._fire('metadata', metadata);
+        if (this._metadataHasChanged(metadata)) {
+          this._fire('metadata', metadata);
+        }
       }
     };
   }
