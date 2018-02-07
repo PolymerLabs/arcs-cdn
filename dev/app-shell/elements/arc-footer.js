@@ -53,7 +53,7 @@ const template = Xen.Template.createTemplate(
   <x-toast app-footer open="{{toastOpen}}" suggestion-container>
     <dancing-dots slot="toast-header" disabled="{{dotsDisabled}}" active="{{dotsActive}}"></dancing-dots>
     <div search>
-      <i class="material-icons" on-click="_onSearchClick">search</i>
+      <i class="material-icons" on-click="_onSearchClick" search>search</i>
       <input placeholder="Search" value="{{searchText}}" on-keypress="_onKeypress" on-input="_onSearchChange" on-blur="_onSearchCommit">
       <i class="material-icons" on-click="_onSearchClick">add</i>
     </div>
