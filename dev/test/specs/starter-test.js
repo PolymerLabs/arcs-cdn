@@ -261,7 +261,7 @@ function allSuggestions() {
   openSuggestionDrawer();
 
   const magnifier = pierceShadowsSingle(
-    getFooterPath().concat(['div[search]', 'i[search]'])
+    getFooterPath().concat(['div[search]', 'i[data-search]'])
   );
   console.log(`click: allSuggestions`);
   browser.elementIdClick(magnifier.value.ELEMENT);
