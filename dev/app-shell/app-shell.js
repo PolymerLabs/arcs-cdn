@@ -719,16 +719,19 @@ class AppShell extends Xen.Base {
     }
   }
   _onUpdateManifest(e, manifestPath) {
+    manifestPath = manifestPath.trim();
     AppShell.log(`onUpdateManifest: [${manifestPath}]`);
     this._setState({manifestPath});
   }
   _onPromoteManifest() {
-    let state = this._state;
-    //AppShell.log(`onPromoteManifest: [${state.manifestPath}]`);
+    const state = this._state;
     if (state.manifestPath) {
-      let manifests = (state.manifests || []).concat([state.manifestPath]);
-      AppShell.log(`onPromoteManifest: [${manifests}]`);
-      this._setState({manifestPath: '', manifests: manifests.slice()})
+      const currentManifests = state.manifests || [];
+      if (!currentManifests.includes(state.manifestPath)) {
+        const newManifests = currentManifests.concat(state.manifestPath);
+        AppShell.log(`Promoting manifest [new=${state.manifestPath}, all=[${newManifests}]].`);
+        this._setState({manifestPath: '', manifests: newManifests.slice()})
+      }
     }
   }
   _onManifests(e, manifests) {
