@@ -2279,14 +2279,14 @@ class DescriptionFormatter {
 
     // Combine all particles from direct and inner arcs.
     let allParticles = description.arc.activeRecipe.particles;
-    description._arc.recipes.forEach(recipe => {
-      let innerArcs = [...recipe.innerArcs.values()];
-      innerArcs.forEach(innerArc => {
-        innerArc.recipes.forEach(innerRecipe => {
-          allParticles = allParticles.concat(innerRecipe.particles);
-        });
-      });
-    });
+    // description._arc.recipes.forEach(recipe => {
+    //   let innerArcs = [...recipe.innerArcs.values()];
+    //   innerArcs.forEach(innerArc => {
+    //     innerArc.recipes.forEach(innerRecipe => {
+    //       allParticles = allParticles.concat(innerRecipe.particles);
+    //     });
+    //   });
+    // });
 
     await Promise.all(allParticles.map(async particle => {
       this._particleDescriptions.push(await this._createParticleDescription(particle, description.relevance));
@@ -3609,11 +3609,6 @@ class Scheduler {
 
 
 
-//let log = !global.document || (global.logging === false) ? () => {} : console.log.bind(console, `---------- DomParticle::`);
-//console.log(!!global.document, global.logging, log);
-
-let log = false ? console.log.bind(console) : () => {};
-
 /** @class DomParticle
  * Particle that does stuff with DOM.
  */
@@ -3705,7 +3700,7 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
     if (this._shouldRender(this._props, this._state)) {
       let content = {};
       if (slot._requestedContentTypes.has('template')) {
-        content['template'] = this._initializeRender(slot);
+        content['template'] = this.getTemplate(slot.slotName);
       }
       if (slot._requestedContentTypes.has('model')) {
         content['model'] = this._render(this._props, this._state);
@@ -3716,25 +3711,10 @@ class DomParticle extends __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_2__bro
       slot.render({});
     }
   }
-  _initializeRender(slot) {
-    let template = this.getTemplate(slot.slotName);
-    this._findHandlerNames(template).forEach(name => {
-      slot.clearEventHandlers(name);
-      slot.registerEventHandler(name, eventlet => {
-        if (this[name]) {
-          this[name](eventlet, this._state, this._views);
-        }
-      });
-    });
-    return template;
-  }
-  _findHandlerNames(html) {
-    let handlers = new Map();
-    let re = /on-.*?=\"([^\"]*)"/gmi;
-    for (let m=re.exec(html); m; m=re.exec(html)) {
-      handlers.set(m[1], true);
+  fireEvent(slotName, {handler, data}) {
+    if (this[handler]) {
+      this[handler]({data}, this._state);
     }
-    return Array.from(handlers.keys());
   }
   setParticleDescription(pattern) {
     if (typeof pattern === 'string') {
