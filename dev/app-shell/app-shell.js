@@ -232,9 +232,9 @@ const template = ArcsUtils.html`
     <div tab="Handle Explorer">
       <handle-explorer arc="{{arc}}"></handle-explorer>
     </div>
-    <div tab="App State">
+    <!-- <div tab="App State">
       <data-explorer style="font-size: 0.6em;" object="{{appState}}"></data-explorer>
-    </div>
+    </div> -->
   </simple-tabs>
   <shell-particles arc="{{arc}}"></shell-particles>
 </app-tools>
@@ -627,10 +627,12 @@ class AppShell extends Xen.Base {
     AppShell.log('onArcsHandle: ', this._state.visitedArcs);
   }
   _onIdentityHandleChange() {
-    this._setState({plans: null});
+    // TODO(sjmiles): runtime will cause replanning on any handle change
+    //this._setState({plans: null});
   }
   _onIdentitiesHandleChange() {
-    this._setState({plans: null});
+    // TODO(sjmiles): runtime will cause replanning on any handle change
+    //this._setState({plans: null});
   }
   _onMetadata(e, metadata) {
     this._setIfDirty({metadata});
@@ -671,11 +673,8 @@ class AppShell extends Xen.Base {
     }
   }
   _onPlans(e, plans) {
-    if (this._setIfDirty({plans})) {
-      if (plans) {
-        this._fire('generations', plans.generations, document);
-      }
-    }
+    this._setIfDirty({plans});
+    this._fire('generations', plans && plans.generations || [], document);
   }
   _onSearch({detail: {search}}) {
     const state = this._state;
