@@ -64,6 +64,11 @@ const template = Xen.Template.createTemplate(
 class ArcFooter extends Xen.Base {
   static get observedAttributes() { return ['dots', 'open', 'search']; }
   get template() { return template; }
+  _getInitialState() {
+    return {
+      oldInnerHTML: '<div slotid="suggestions"></div>'
+    };
+  }
   _didMount() {
     // TODO(sjmiles): this is a hack, repair asap. App should receive this event and
     // communicate the new state to footer.
@@ -75,7 +80,7 @@ class ArcFooter extends Xen.Base {
     //  Should happen upstream instead.
     let html = this.innerHTML;
     if (!state.open && html !== state.oldInnerHTML) {
-      ArcFooter.log('opening: old, new: ', state.oldInnerHtml, html);
+      //ArcFooter.log('opening: old, new: [${state.oldInnerHTML}] !== [${html}]');
       this._setState({open: true, oldInnerHTML: html});
     }
   }
@@ -84,7 +89,7 @@ class ArcFooter extends Xen.Base {
       dotsDisabled: props.dots == 'disabled',
       dotsActive: props.dots == 'active',
       searchText: state.search || '',
-      toastOpen: state.open == undefined ? true : state.open
+      toastOpen: state.open // == undefined ? true : state.open
     };
   }
   _onPlanSelected(e, suggestion) {
