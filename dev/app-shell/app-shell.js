@@ -730,7 +730,7 @@ class AppShell extends Xen.Base {
       if (!currentManifests.includes(state.manifestPath)) {
         const newManifests = currentManifests.concat(state.manifestPath);
         AppShell.log(`Promoting manifest [new=${state.manifestPath}, all=[${newManifests}]].`);
-        this._setState({manifestPath: '', manifests: newManifests.slice()})
+        this._setState({manifestPath: '', manifests: newManifests})
       }
     }
   }
