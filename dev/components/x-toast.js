@@ -32,6 +32,8 @@ const template = Xen.Template.createTemplate(`
     text-align: center;
     background-color: white;
     box-sizing: border-box;
+    cursor: pointer;
+    user-select: none;
   }
 </style>
 <div header><slot name="toast-header"></slot></div>
