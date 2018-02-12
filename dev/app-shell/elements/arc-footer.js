@@ -66,7 +66,8 @@ class ArcFooter extends Xen.Base {
   get template() { return template; }
   _getInitialState() {
     return {
-      oldInnerHTML: '<div slotid="suggestions"></div>'
+      open: false,
+      html: ''
     };
   }
   _didMount() {
@@ -78,10 +79,10 @@ class ArcFooter extends Xen.Base {
     // TODO(seefeld):
     //  This is a hack to open the footer only if the actual contents of the suggestions changed.
     //  Should happen upstream instead.
-    let html = this.innerHTML;
-    if (!state.open && html !== state.oldInnerHTML) {
+    let html = this.firstElementChild.innerHTML;
+    if (!state.open && html !== state.html) {
       //ArcFooter.log('opening: old, new: [${state.oldInnerHTML}] !== [${html}]');
-      this._setState({open: true, oldInnerHTML: html});
+      this._setState({open: true, html});
     }
   }
   _render(props, state) {
