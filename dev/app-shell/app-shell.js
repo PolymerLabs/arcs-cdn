@@ -102,6 +102,7 @@ const template = ArcsUtils.html`
   app-toolbar > [avatar] {
     height: 32px;
     width: 32px;
+    min-width: 32px;
     border-radius: 100%;
   }
   [launcher] app-toolbar > [buttons] {
@@ -149,6 +150,16 @@ const template = ArcsUtils.html`
     max-height: 356px;
     overflow-y: auto;
     overflow-x: hidden;
+  }
+  [slotid=modal] {
+    position: fixed;
+    top: 56px;
+    bottom: 0;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    box-sizing: border-box;
+    pointer-events: none;
   }
   /* wider-than-mobile */
   @media (min-width: 500px) {
@@ -206,7 +217,7 @@ const template = ArcsUtils.html`
         <toggle-button title="Arc Contains Profile Data" state="{{profileState}}" on-state="_onProfileState" icons="person_outline person"></toggle-button>
         <toggle-button title="Share this Arc" state="{{sharedState}}" on-state="_onSharedState" icons="link supervisor_account"></toggle-button>
         <toggle-button title="Cast" on-state="_onCastState" icons="cast cast_connected"></toggle-button>
-        <a href="{{launcherUrl}}"><i>add</i></a>
+        <a href="{{launcherUrl}}"><i>apps</i></a>
       </div>
     </app-toolbar>
   </toolbar>
@@ -214,6 +225,7 @@ const template = ArcsUtils.html`
   <arc-host config="{{hostConfig}}" manifests="{{manifests}}" exclusions="{{exclusions}}" plans="{{plans}}" plan="{{plan}}" suggestions="{{suggestions}}" on-arc="_onArc" on-plans="_onPlans" on-applied="_onApplied">
     <div slotid="toproot"></div>
     <div slotid="root"></div>
+    <div slotid="modal"></div>
   </arc-host>
 
   <footer>
